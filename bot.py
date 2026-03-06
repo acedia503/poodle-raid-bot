@@ -12,8 +12,7 @@ from atool import get_character_info
 from raid_logic import build_balanced_raids, format_raid_result
 from storage import save_active_raids, load_active_raids
 
-from dotenv import load_dotenv
-load_dotenv()
+from storage import save_active_raids, load_active_raids, init_db
 
 # =========================
 # 기본 설정
@@ -498,6 +497,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
             f"오류가 발생했습니다: {type(error).__name__}",
             ephemeral=True
         )
+
 
 
 bot.run(TOKEN)
