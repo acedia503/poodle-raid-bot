@@ -169,7 +169,7 @@ async def raid_list(interaction: discord.Interaction):
             f"**{raid_name}** | 입장조건 `템렙 {min_ilvl}` | 신청자 `{member_count}명`"
         )
 
-    add_long_text_fields(embed, "등록된 레이드", "\n".join(lines))
+    add_long_text_fields(embed, "\n".join(lines))
     embed.set_footer(text=f"총 레이드 수: {len(active_raids)}개")
 
     await interaction.response.send_message(embed=embed)
@@ -402,7 +402,7 @@ async def list_members(interaction: discord.Interaction, 레이드이름: str):
     )
 
     if success_lines:
-        add_long_text_fields(embed, f"신청자 {len(success_lines)}명", "\n".join(success_lines))
+        add_long_text_fields(embed, "\n".join(success_lines))
 
     if fail_lines:
         add_long_text_fields(embed, "조회 실패", "\n".join(fail_lines))
@@ -681,5 +681,6 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
