@@ -215,22 +215,28 @@ async def delete_raid(interaction: discord.Interaction, 레이드이름: str):
     캐릭터명="아툴에서 조회할 캐릭터명"
 )
 async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐릭터명: str):
+    print("DEBUG /신청 시작", 레이드이름, 캐릭터명)
+
     if not ensure_allowed_guild_or_reply(interaction):
         await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
         return
 
+    await interaction.response.defer(ephemeral=True)
+
     캐릭터명 = 캐릭터명.strip()
 
     if 레이드이름 not in active_raids:
-        await interaction.response.send_message("존재하지 않는 레이드입니다.", ephemeral=True)
+        print("DEBUG 존재하지 않는 레이드", 레이드이름)
+        await interaction.followup.send("존재하지 않는 레이드입니다.", ephemeral=True)
         return
 
     members = active_raids[레이드이름]["members"]
+    print("DEBUG 현재 members 수", len(members))
 
-    # 중복 방지: 같은 레이드에 같은 캐릭터명이 이미 존재하면 차단
     for member in members:
         if member.name == 캐릭터명:
-            await interaction.response.send_message(
+            print("DEBUG 중복 신청 감지", 캐릭터명)
+            await interaction.followup.send(
                 "이미 신청한 캐릭터입니다.",
                 ephemeral=True
             )
@@ -239,10 +245,10 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
     try:
         data = safe_character_data(캐릭터명)
         print("DEBUG 아툴 조회 결과", data)
-    except Exception:
+    except Exception as e:
         print("DEBUG 아툴 조회 실패", repr(e))
         logging.exception("아툴 조회 실패")
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "아툴 조회에 실패했습니다. 잠시 후 다시 시도해주세요.",
             ephemeral=True
         )
@@ -261,7 +267,7 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
                 f"현재 템렙: **{data['ilvl']}**"
             )
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed, ephemeral=True)
         return
 
     char = Character(
@@ -272,14 +278,14 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
 
     members.append(char)
     print("DEBUG 저장 직전")
-    
+
     try:
         save_active_raids(active_raids)
         print("DEBUG 저장 완료")
     except Exception as e:
         print("DEBUG DB 저장 실패", repr(e))
         logging.exception("DB 저장 실패")
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "신청 저장 중 오류가 발생했습니다.",
             ephemeral=True
         )
@@ -295,7 +301,7 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
             f"아툴 점수: **{data['score']}**"
         )
     )
-    await interaction.response.send_message(embed=embed)
+    await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 # =========================
@@ -675,4 +681,5 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
