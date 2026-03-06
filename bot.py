@@ -447,15 +447,13 @@ async def force_cancel_apply(interaction: discord.Interaction, 레이드이름: 
 @bot.tree.command(name="공대생성", description="레이드 공대 자동 생성")
 @app_commands.describe(레이드이름="공대를 생성할 레이드 이름")
 async def make_party(interaction: discord.Interaction, 레이드이름: str):
-    if not ensure_allowed_guild_or_reply(interaction):
-        await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
-        return
 
     if 레이드이름 not in active_raids:
         await interaction.response.send_message("존재하지 않는 레이드입니다.", ephemeral=True)
         return
 
     members = active_raids[레이드이름]["members"]
+
     if not members:
         await interaction.response.send_message("신청자가 없습니다.")
         return
@@ -470,13 +468,10 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
     for m in members:
         try:
             data = safe_character_data(m.name)
-            ilvl = data["ilvl"]
-            job = data["job"]
-            score = data["score"]
 
-            if ilvl < min_ilvl:
+            if data["ilvl"] < min_ilvl:
                 invalid_members.append(
-                    f"{m.user_name} | {m.name} | {ilvl} | 입장불가"
+                    f"{m.user_name} | {m.name} | {data['ilvl']} | 입장불가"
                 )
                 continue
 
@@ -484,25 +479,30 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
                 "user_id": m.user_id,
                 "user_name": m.user_name,
                 "name": m.name,
-                "job": job,
-                "ilvl": ilvl,
-                "score": score
+                "job": data["job"],
+                "ilvl": data["ilvl"],
+                "score": data["score"]
             })
 
         except Exception as e:
             logging.exception("공대생성 아툴 조회 실패")
             invalid_members.append(
-                f"{m.user_name} | {m.name} | 아툴조회실패: {type(e).__name__}: {e}"
+                f"{m.user_name} | {m.name} | 조회실패"
             )
 
     if len(refreshed_members) < 8:
-        embed = make_simple_embed(
+
+        embed = discord.Embed(
             title="❌ 공대 생성 실패",
-            description=f"공대를 만들 수 있는 인원이 부족합니다.\n현재 유효 인원: **{len(refreshed_members)}명**"
+            description=f"유효 인원이 부족합니다\n현재 인원: {len(refreshed_members)}명"
         )
 
         if invalid_members:
-            add_long_text_fields(embed, "제외 인원", "\n".join(invalid_members))
+            embed.add_field(
+                name="제외 인원",
+                value="```\n" + "\n".join(invalid_members[:40]) + "\n```",
+                inline=False
+            )
 
         await interaction.followup.send(embed=embed)
         return
@@ -510,18 +510,98 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
     raids, waiting_members, error = build_balanced_raids(refreshed_members)
 
     if error:
-        embed = make_simple_embed(title="❌ 공대 생성 실패", description=error)
-        if invalid_members:
-            add_long_text_fields(embed, "제외 인원", "\n".join(invalid_members))
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(error)
         return
 
-    msg = format_raid_result(레이드이름, raids, waiting_members, invalid_members)
+    # =========================
+    # 공대 Embed 출력
+    # =========================
 
-    embed = make_simple_embed(title=f"⚔️ {레이드이름} 공대 생성 결과")
-    add_long_text_fields(embed, "결과", msg)
+    for idx, raid in enumerate(raids, start=1):
 
-    await interaction.followup.send(embed=embed)
+        total_members = raid["party1"] + raid["party2"]
+
+        total_ilvl = sum(m["ilvl"] for m in total_members)
+        total_score = sum(m["score"] for m in total_members)
+
+        avg_ilvl = total_ilvl // len(total_members)
+        avg_score = total_score // len(total_members)
+
+        embed = discord.Embed(
+            title=f"⚔️ {레이드이름} {idx}공대",
+            description=f"평균 템렙: **{avg_ilvl}** | 평균 아툴: **{avg_score}**"
+        )
+
+        # 1파티
+        party1_lines = []
+        for m in raid["party1"]:
+            party1_lines.append(
+                f"{m['user_name']} | {m['name']} | {m['job']} | {m['ilvl']} | {m['score']}"
+            )
+
+        embed.add_field(
+            name="1파티",
+            value="```\n" + "\n".join(party1_lines) + "\n```",
+            inline=False
+        )
+
+        # 2파티
+        party2_lines = []
+        for m in raid["party2"]:
+            party2_lines.append(
+                f"{m['user_name']} | {m['name']} | {m['job']} | {m['ilvl']} | {m['score']}"
+            )
+
+        embed.add_field(
+            name="2파티",
+            value="```\n" + "\n".join(party2_lines) + "\n```",
+            inline=False
+        )
+
+        await interaction.followup.send(embed=embed)
+
+    # =========================
+    # 대기 인원
+    # =========================
+
+    if waiting_members:
+
+        lines = []
+
+        for m in waiting_members:
+            lines.append(
+                f"{m['user_name']} | {m['name']} | {m['job']} | {m['ilvl']} | {m['score']}"
+            )
+
+        embed = discord.Embed(
+            title="⏳ 대기 인원"
+        )
+
+        embed.add_field(
+            name=f"{len(waiting_members)}명",
+            value="```\n" + "\n".join(lines[:40]) + "\n```",
+            inline=False
+        )
+
+        await interaction.followup.send(embed=embed)
+
+    # =========================
+    # 제외 인원
+    # =========================
+
+    if invalid_members:
+
+        embed = discord.Embed(
+            title="🚫 제외 인원"
+        )
+
+        embed.add_field(
+            name=f"{len(invalid_members)}명",
+            value="```\n" + "\n".join(invalid_members[:40]) + "\n```",
+            inline=False
+        )
+
+        await interaction.followup.send(embed=embed)
 
 
 # =========================
