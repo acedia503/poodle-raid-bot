@@ -6,7 +6,7 @@ import os
 import psycopg2
 from models import Character
 
-DATABASE_URL = ${{Postgres.DATABASE_URL}}
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_conn():
     if not DATABASE_URL:
