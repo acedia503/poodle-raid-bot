@@ -6,11 +6,13 @@ import logging
 import discord
 from discord.ext import commands
 from discord import app_commands
+from discord.ui import View, Button
 
 from models import Character
 from atool import get_character_info
 from raid_logic import build_balanced_raids
 from storage import save_active_raids, load_active_raids, init_db
+
 
 # =========================
 # 기본 설정
@@ -116,6 +118,61 @@ def format_party_block(members: list[dict]) -> str:
     return f"```{text}```"
 
 
+class DeleteRaidConfirmView(View):
+    def __init__(self, raid_name: str, member_count: int, requester_id: int):
+        super().__init__(timeout=60)
+        self.raid_name = raid_name
+        self.member_count = member_count
+        self.requester_id = requester_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.requester_id:
+            await interaction.response.send_message(
+                "이 삭제 확인 버튼은 명령어를 실행한 관리자만 사용할 수 있습니다.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
+    async def confirm_delete(self, interaction: discord.Interaction, button: Button):
+        global active_raids
+
+        if self.raid_name not in active_raids:
+            embed = make_simple_embed(
+                title="⚠️ 이미 삭제되었거나 존재하지 않는 레이드입니다."
+            )
+            await interaction.response.edit_message(embed=embed, view=None)
+            return
+
+        member_count = len(active_raids[self.raid_name]["members"])
+
+        del active_raids[self.raid_name]
+        save_active_raids(active_raids)
+
+        embed = make_simple_embed(
+            title="🗑️ 레이드 삭제 완료",
+            description=(
+                f"레이드: **{self.raid_name}**\n"
+                f"삭제된 신청자 수: **{member_count}명**"
+            )
+        )
+
+        await interaction.response.edit_message(embed=embed, view=None)
+
+    @discord.ui.button(label="취소", style=discord.ButtonStyle.secondary)
+    async def cancel_delete(self, interaction: discord.Interaction, button: Button):
+        embed = make_simple_embed(
+            title="✅ 레이드 삭제가 취소되었습니다.",
+            description=f"레이드: **{self.raid_name}**"
+        )
+        await interaction.response.edit_message(embed=embed, view=None)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+
+
 # =========================
 # 이벤트
 # =========================
@@ -186,7 +243,7 @@ async def raid_list(interaction: discord.Interaction):
             f"**{raid_name}** | 입장조건 `템렙 {min_ilvl}` | 신청자 `{member_count}명`"
         )
 
-    add_long_text_fields(embed, "등록된 레이드", "\n".join(lines))
+    add_long_text_fields(embed, "\n".join(lines))
     embed.set_footer(text=f"총 레이드 수: {len(active_raids)}개")
 
     await interaction.response.send_message(embed=embed)
@@ -201,22 +258,42 @@ async def raid_list(interaction: discord.Interaction):
 @app_commands.checks.has_permissions(administrator=True)
 async def delete_raid(interaction: discord.Interaction, 레이드이름: str):
     if not ensure_allowed_guild_or_reply(interaction):
-        await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
+        await interaction.response.send_message(
+            "이 서버에서는 사용할 수 없는 봇입니다.",
+            ephemeral=True
+        )
         return
 
     if 레이드이름 not in active_raids:
-        await interaction.response.send_message("존재하지 않는 레이드입니다.", ephemeral=True)
+        await interaction.response.send_message(
+            "존재하지 않는 레이드입니다.",
+            ephemeral=True
+        )
         return
 
     member_count = len(active_raids[레이드이름]["members"])
-    del active_raids[레이드이름]
-    save_active_raids(active_raids)
 
     embed = make_simple_embed(
-        title="🗑️ 레이드 삭제 완료",
-        description=f"레이드: **{레이드이름}**\n삭제된 신청자 수: **{member_count}명**"
+        title="⚠️ 레이드 삭제 확인",
+        description=(
+            f"레이드: **{레이드이름}**\n"
+            f"현재 신청자 수: **{member_count}명**\n\n"
+            f"삭제하면 **신청목록도 함께 삭제됩니다.**\n"
+            f"계속하려면 아래 버튼을 눌러주세요."
+        )
     )
-    await interaction.response.send_message(embed=embed)
+
+    view = DeleteRaidConfirmView(
+        raid_name=레이드이름,
+        member_count=member_count,
+        requester_id=interaction.user.id
+    )
+
+    await interaction.response.send_message(
+        embed=embed,
+        view=view,
+        ephemeral=True
+    )
 
 
 # =========================
@@ -408,7 +485,7 @@ async def list_members(interaction: discord.Interaction, 레이드이름: str):
     )
 
     if success_lines:
-        add_long_text_fields(embed, f"신청자 {len(success_lines)}명", "\n".join(success_lines))
+        add_long_text_fields(embed, "\n".join(success_lines))
 
     if fail_lines:
         add_long_text_fields(embed, "조회 실패", "\n".join(fail_lines))
@@ -638,3 +715,4 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
