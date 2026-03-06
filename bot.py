@@ -76,6 +76,7 @@ def safe_character_data(name: str):
 @bot.event
 async def on_ready():
     try:
+        init_db()
         synced = await bot.tree.sync()
         print(f"{bot.user} 레이드봇 준비 완료 / 슬래시 명령어 {len(synced)}개 동기화")
     except Exception:
@@ -501,3 +502,4 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
