@@ -238,7 +238,9 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
 
     try:
         data = safe_character_data(캐릭터명)
+        print("DEBUG 아툴 조회 결과", data)
     except Exception:
+        print("DEBUG 아툴 조회 실패", repr(e))
         logging.exception("아툴 조회 실패")
         await interaction.response.send_message(
             "아툴 조회에 실패했습니다. 잠시 후 다시 시도해주세요.",
@@ -247,8 +249,10 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
         return
 
     min_ilvl = active_raids[레이드이름]["min_ilvl"]
+    print("DEBUG min_ilvl", min_ilvl)
 
     if data["ilvl"] < min_ilvl:
+        print("DEBUG 신청불가", data["ilvl"], min_ilvl)
         embed = make_simple_embed(
             title="❌ 신청 불가",
             description=(
@@ -267,7 +271,19 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
     )
 
     members.append(char)
-    save_active_raids(active_raids)
+    print("DEBUG 저장 직전")
+    
+    try:
+        save_active_raids(active_raids)
+        print("DEBUG 저장 완료")
+    except Exception as e:
+        print("DEBUG DB 저장 실패", repr(e))
+        logging.exception("DB 저장 실패")
+        await interaction.response.send_message(
+            "신청 저장 중 오류가 발생했습니다.",
+            ephemeral=True
+        )
+        return
 
     embed = make_simple_embed(
         title="✅ 신청 완료",
@@ -659,3 +675,4 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
