@@ -1,9 +1,0 @@
-# python cache
-__pycache__/
-*.pyc
-
-# env variables
-.env
-
-# runtime data
-raids.json
