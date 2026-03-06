@@ -1,16 +1,17 @@
 # storage.py
 # PostgreSQL 저장 담당
 
+
 import os
 import psycopg2
 from models import Character
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-
+DATABASE_URL = ${{Postgres.DATABASE_URL}}
 
 def get_conn():
-    return psycopg2.connect(DATABASE_URL)
-
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL 환경변수가 설정되지 않았습니다.")
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
 
 def init_db():
     conn = get_conn()
