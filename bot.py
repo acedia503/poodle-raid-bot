@@ -10,7 +10,7 @@ from discord import app_commands
 from models import Character
 from atool import get_character_info
 from raid_logic import build_balanced_raids, format_raid_result
-from storage import save_active_raids, load_active_raids
+from storage import save_active_raids, load_active_raids, init_db
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -78,6 +78,7 @@ def safe_character_data(name: str):
 @bot.event
 async def on_ready():
     try:
+        init_db()
         synced = await bot.tree.sync()
         print(f"{bot.user} 레이드봇 준비 완료 / 슬래시 명령어 {len(synced)}개 동기화")
     except Exception:
