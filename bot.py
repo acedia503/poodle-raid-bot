@@ -1028,12 +1028,14 @@ async def search_atool(interaction: discord.Interaction, 캐릭터명: str):
         data = get_character_info(캐릭터명)
 
         embed = discord.Embed(
-            title=f"{캐릭터명} 아툴 조회",
+            title="아툴 조회 결과",
+            description=f"캐릭터명: **{캐릭터명}**",
             color=discord.Color.blue()
         )
         embed.add_field(name="직업", value=str(data.get("job", "알수없음")), inline=True)
-        embed.add_field(name="아이템레벨", value=str(data.get("ilvl", 0)), inline=True)
-        embed.add_field(name="아툴 점수", value=str(data.get("score", 0)), inline=True)
+        embed.add_field(name="아이템 레벨", value=str(data.get("ilvl", 0)), inline=True)
+        embed.add_field(name="아툴 전투 점수", value=str(data.get("score", 0)), inline=True)
+        embed.add_field(name="달성 최고 점수", value=str(data.get("max_score", 0)), inline=True)
 
         await interaction.followup.send(embed=embed)
 
@@ -1098,6 +1100,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
