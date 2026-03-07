@@ -123,6 +123,28 @@ def safe_character_data(name: str) -> dict:
         "job": str(data.get("job", "알수없음") or "알수없음").strip(),
         "score": int(data.get("score", 0) or 0),
     }
+    
+def split_lines_by_length(lines: list[str], limit: int = 3800) -> list[str]:
+    chunks: list[str] = []
+    current = ""
+
+    for line in lines:
+        line = str(line)
+
+        if not current:
+            current = line
+            continue
+
+        if len(current) + 1 + len(line) > limit:
+            chunks.append(current)
+            current = line
+        else:
+            current += "\n" + line
+
+    if current:
+        chunks.append(current)
+
+    return chunks
 
 
 # =========================
@@ -453,53 +475,55 @@ async def list_members(interaction: discord.Interaction, 레이드이름: str):
 
     min_ilvl = active_raids[레이드이름]["min_ilvl"]
 
-    success_lines = []
-    fail_lines = []
+    success_lines: list[str] = []
+    fail_lines: list[str] = []
 
-    for m in members:
+    for idx, m in enumerate(members, start=1):
         try:
             data = safe_character_data(m.name)
             status = "신청가능" if data["ilvl"] >= min_ilvl else "입장불가"
 
             success_lines.append(
-                format_member_line(
-                    m.user_name,
-                    m.name,
-                    data["job"],
-                    data["ilvl"],
-                    data["score"],
-                    status
-                )
+                f"{idx}. {m.user_name} | {m.name} | {data['job']} | "
+                f"템렙 {data['ilvl']} | 아툴 {data['score']} | {status}"
             )
-
         except Exception as e:
             logging.exception("신청목록 아툴 조회 실패")
             fail_lines.append(
-                f"{m.user_name} | {m.name} | 조회실패: {type(e).__name__}"
+                f"{idx}. {m.user_name} | {m.name} | 조회실패: {type(e).__name__}"
             )
 
-    description = [
+    all_lines: list[str] = [
         f"입장 조건: **템렙 {min_ilvl} 이상**",
         "",
         "**신청자 목록**",
-        "\n".join(success_lines)
     ]
 
+    all_lines.extend(success_lines)
+
     if fail_lines:
-        description += [
+        all_lines.extend([
             "",
             "**조회 실패**",
-            "\n".join(fail_lines)
-        ]
+        ])
+        all_lines.extend(fail_lines)
 
-    embed = make_simple_embed(
-        title=f"📋 {레이드이름} 신청 목록",
-        description="\n".join(description)
-    )
+    chunks = split_lines_by_length(all_lines, limit=3800)
 
-    embed.set_footer(text=f"총 신청자 수: {len(members)}명")
+    for page, chunk in enumerate(chunks, start=1):
+        title = f"📋 {레이드이름} 신청 목록"
+        if len(chunks) > 1:
+            title += f" ({page}/{len(chunks)})"
 
-    await interaction.followup.send(embed=embed, ephemeral=True)
+        embed = make_simple_embed(
+            title=title,
+            description=chunk
+        )
+
+        if page == len(chunks):
+            embed.set_footer(text=f"총 신청자 수: {len(members)}명")
+
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 # =========================
@@ -1163,5 +1187,6 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
