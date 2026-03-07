@@ -16,8 +16,6 @@ from raid_logic import build_balanced_raids
 
 from storage import (
     add_raid_member,
-    clear_saved_parties,
-    delete_raid as delete_raid_record,
     init_db,
     load_active_raids,
     load_generated_parties,
@@ -32,6 +30,13 @@ from party_helpers import (
     remove_member_from_saved_parties,
     place_member_to_destination,
     get_party_size,
+)
+
+from ui_helpers import (
+    make_simple_embed,
+    add_long_text_fields,
+    format_member_line,
+    build_party_result_embeds,
 )
 
 from views import (
@@ -831,7 +836,7 @@ async def modify_party(
         raids,
         waiting_members,
         excluded_members,
-        target_member,
+        캐릭터명,
     )
 
     if not found:
@@ -1067,6 +1072,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
