@@ -21,12 +21,6 @@ from party_helpers import (
 )
 
 
-def member_display_key(member: dict) -> str:
-    user_id = member.get("user_id", 0)
-    name = member.get("name", "")
-    return f"{user_id}:{name}"
-
-
 class DeleteRaidConfirmView(discord.ui.View):
     def __init__(
         self,
@@ -59,10 +53,7 @@ class DeleteRaidConfirmView(discord.ui.View):
 
         member_count = len(self.active_raids[self.raid_name]["members"])
 
-        # 메모리 상태 먼저 정리
         del self.active_raids[self.raid_name]
-
-        # DB에서도 해당 레이드만 삭제
         deleted = delete_raid(self.raid_name)
 
         embed = make_simple_embed(
@@ -177,20 +168,20 @@ class FullPartyResolveView(discord.ui.View):
         self.source_raid_index = source_raid_index
         self.source_party_name = source_party_name
 
-        self.selected_target_value: str | None = None
+        self.selected_target_name: str | None = None
         self.selected_destination: str | None = None
 
         target_party = self.raids[target_raid_no - 1][f"party{target_party_no}"]
 
         target_options = []
         for m in target_party[:25]:
-            if member_display_key(m) == member_display_key(self.moving_member):
+            if m.get("name") == self.moving_member.get("name"):
                 continue
 
             target_options.append(
                 SelectOption(
                     label=f"{m['name']} ({m['job']})",
-                    value=member_display_key(m),
+                    value=m["name"],
                     description=f"{m['user_name']} | {m['ilvl']} | {m['score']}",
                 )
             )
@@ -263,7 +254,7 @@ class FullPartyResolveView(discord.ui.View):
         return True
 
     async def target_select_callback(self, interaction: discord.Interaction):
-        self.selected_target_value = self.target_select.values[0]
+        self.selected_target_name = self.target_select.values[0]
         await interaction.response.defer()
 
     async def destination_select_callback(self, interaction: discord.Interaction):
@@ -271,20 +262,20 @@ class FullPartyResolveView(discord.ui.View):
         await interaction.response.defer()
 
     def _find_selected_target(self) -> dict | None:
-        if not self.selected_target_value or self.selected_target_value == "__none__":
+        if not self.selected_target_name or self.selected_target_name == "__none__":
             return None
 
         target_party = self.raids[self.target_raid_no - 1][f"party{self.target_party_no}"]
 
         for member in target_party:
-            if member_display_key(member) == self.selected_target_value:
+            if member.get("name") == self.selected_target_name:
                 return member
 
         return None
 
     @discord.ui.button(label="확정", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_target_value or self.selected_target_value == "__none__":
+        if not self.selected_target_name or self.selected_target_name == "__none__":
             await interaction.response.send_message("먼저 추가 이동할 공대원을 선택해주세요.", ephemeral=True)
             return
 
@@ -299,17 +290,17 @@ class FullPartyResolveView(discord.ui.View):
             if not selected_member:
                 await interaction.response.send_message("선택한 공대원을 찾을 수 없습니다.", ephemeral=True)
                 return
-            
+
             found_target = find_member_in_saved_parties(
                 self.raids,
                 self.waiting_members,
                 self.excluded_members,
-                selected_member,
+                selected_member["name"],
             )
             if not found_target:
                 await interaction.response.send_message("선택한 공대원을 찾을 수 없습니다.", ephemeral=True)
                 return
-            
+
             displaced_member = remove_member_from_saved_parties(
                 self.raids,
                 self.waiting_members,
@@ -362,7 +353,6 @@ class FullPartyResolveView(discord.ui.View):
                 displaced_text = f"{self.source_raid_index + 1}공대 {src_party_no}파티"
 
             else:
-                # raid:{raid_no}:{party_no}
                 try:
                     _, raid_no_str, party_no_str = self.selected_destination.split(":")
                     raid_no = int(raid_no_str)
