@@ -199,7 +199,13 @@ async def raid_list(interaction: discord.Interaction):
     lines = []
     for raid_name, raid_data in active_raids.items():
         min_ilvl = raid_data["min_ilvl"]
-        member_count = len(raid_data["members"])
+    
+        try:
+            member_count = count_raid_members(raid_name)
+        except Exception:
+            logging.exception("신청자 수 조회 실패")
+            member_count = "?"
+    
         lines.append(
             f"**{raid_name}** | 입장조건 `템렙 {min_ilvl}` | 신청자 `{member_count}명`"
         )
@@ -1101,6 +1107,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
