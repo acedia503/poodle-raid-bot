@@ -1084,7 +1084,7 @@ async def search_atool(interaction: discord.Interaction, 캐릭터명: str):
 @create_raid.error
 @delete_raid_command.error
 @force_cancel_apply.error
-@make_party.error
+@raid_create.error
 @clear_party.error
 @modify_party.error
 async def admin_command_error(interaction: discord.Interaction, error):
@@ -1135,6 +1135,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
