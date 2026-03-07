@@ -550,6 +550,9 @@ async def force_cancel_apply(interaction: discord.Interaction, 레이드이름: 
 
 @bot.tree.command(name="공대생성", description="레이드 공대 자동 생성")
 @app_commands.describe(레이드이름="공대를 생성할 레이드 이름")
+@app_commands.checks.has_permissions(administrator=True)
+async def raid_create(interaction: discord.Interaction):
+    await interaction.response.send_message("공대 생성!", ephemeral=True)
 async def make_party(interaction: discord.Interaction, 레이드이름: str):
     if not ensure_allowed_guild_or_reply(interaction):
         await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
@@ -1111,6 +1114,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
