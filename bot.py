@@ -359,7 +359,7 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
             f"아툴 점수: **{data['score']}**"
         )
     )
-    await interaction.followup.send(embed=embed, ephemeral=True)
+    await interaction.followup.send(embed=embed, ephemeral=False)
 
 
 # =========================
@@ -418,7 +418,7 @@ async def cancel_apply(interaction: discord.Interaction, 레이드이름: str, �
         title="✅ 신청 취소 완료",
         description=f"레이드: **{레이드이름}**\n캐릭터: **{removed_member.name}**"
     )
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await interaction.response.send_message(embed=embed, ephemeral=False)
 
 
 # =========================
@@ -479,7 +479,7 @@ async def list_members(interaction: discord.Interaction, 레이드이름: str):
         add_long_text_fields(embed, "조회 실패", "\n".join(fail_lines))
 
     embed.set_footer(text=f"총 신청자 수: {len(members)}명")
-    await interaction.followup.send(embed=embed)
+    await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 # =========================
@@ -666,8 +666,15 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
 # =========================
 
 @bot.tree.command(name="공대확인", description="저장된 공대 편성 조회")
-@app_commands.describe(레이드이름="조회할 레이드 이름")
-async def party_list(interaction: discord.Interaction, 레이드이름: str):
+@app_commands.describe(
+    레이드이름="조회할 레이드 이름",
+    나만보기="응답을 나만 보기로 표시할지 여부"
+)
+async def party_list(
+    interaction: discord.Interaction,
+    레이드이름: str,
+    나만보기: bool = False
+):
     if not ensure_allowed_guild_or_reply(interaction):
         await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
         return
@@ -676,13 +683,22 @@ async def party_list(interaction: discord.Interaction, 레이드이름: str):
         await interaction.response.send_message("존재하지 않는 레이드입니다.", ephemeral=True)
         return
 
-    await interaction.response.defer()
+    is_admin = interaction.user.guild_permissions.administrator
+
+    # 일반 유저는 항상 나만 보기
+    # 관리자는 옵션으로 선택 가능
+    is_ephemeral = True if not is_admin else 나만보기
+
+    await interaction.response.defer(ephemeral=is_ephemeral)
 
     try:
         raids, waiting_members, excluded_members = load_generated_parties(레이드이름)
     except Exception:
         logging.exception("공대목록 조회 실패")
-        await interaction.followup.send("저장된 공대 정보를 불러오는 중 오류가 발생했습니다.")
+        await interaction.followup.send(
+            "저장된 공대 정보를 불러오는 중 오류가 발생했습니다.",
+            ephemeral=is_ephemeral
+        )
         return
 
     if not raids and not waiting_members and not excluded_members:
@@ -690,13 +706,13 @@ async def party_list(interaction: discord.Interaction, 레이드이름: str):
             title="📭 저장된 공대 없음",
             description=f"레이드: **{레이드이름}**\n먼저 `/공대생성`을 실행해주세요."
         )
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, ephemeral=is_ephemeral)
         return
 
     embeds = build_party_result_embeds(레이드이름, raids, waiting_members, excluded_members)
 
     for embed in embeds:
-        await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed, ephemeral=is_ephemeral)
 
 
 # =========================
@@ -1137,6 +1153,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
