@@ -36,7 +36,6 @@ def fetch_character_from_atool(character_name: str) -> dict:
         "Referer": "https://www.aion2tool.com/",
     }
 
-    # 1. 메인 페이지 접속해서 쿠키 확보
     main_resp = session.get(
         "https://www.aion2tool.com/",
         headers=common_headers,
@@ -44,7 +43,6 @@ def fetch_character_from_atool(character_name: str) -> dict:
     )
     main_resp.raise_for_status()
 
-    # 2. 검색 API 호출
     url = "https://www.aion2tool.com/api/character/search"
     payload = {
         "race": FIXED_RACE,
@@ -57,10 +55,8 @@ def fetch_character_from_atool(character_name: str) -> dict:
         "Content-Type": "application/json",
     }
 
-    # 3. 요청 간격 제한 (서버 차단 방지)
     time.sleep(0.2)
 
-    # 4. 실제 API 요청
     resp = session.post(url, json=payload, headers=headers, timeout=10)
     resp.raise_for_status()
 
@@ -108,7 +104,7 @@ def fetch_character_from_atool(character_name: str) -> dict:
     return {
         "job": job,
         "ilvl": ilvl,
-        "score": score
+        "score": score,
         "max_score": max_score
     }
 
@@ -147,6 +143,5 @@ def get_character_info(character_name: str) -> dict:
         "max_score": data["max_score"],
         "ts": now
     }
-
 
     return data
