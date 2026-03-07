@@ -213,7 +213,7 @@ def build_balanced_raids(refreshed_members: list[dict[str, Any]]):
     for raw in refreshed_members:
         member = normalize_member(raw)
         if member is None:
-            invalid_members.append(f"잘못된 데이터 제외: {raw!r}")
+            invalid_members.append("잘못된 멤버 데이터 1건 제외")
             continue
 
         identity = member_identity(member)
@@ -389,3 +389,4 @@ def format_raid_result(
         result_lines.append(f"차이: {max(raid_scores) - min(raid_scores)}")
 
     return "\n".join(result_lines)
+
