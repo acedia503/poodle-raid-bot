@@ -202,6 +202,100 @@ def assign_member_to_party(raid: dict[str, list[dict[str, Any]]], party_name: st
 # 4. 공대 생성 알고리즘
 # ----------------------------
 
+from __future__ import annotations
+
+from typing import Any
+
+
+def raid_has_same_user(
+    raid: dict[str, list[dict[str, Any]]],
+    user_id: int,
+) -> bool:
+    """해당 공대(2개 파티 포함)에 같은 user_id가 이미 있는지 확인"""
+    for party_name in ("party1", "party2"):
+        for member in raid[party_name]:
+            if member.get("user_id") == user_id:
+                return True
+    return False
+
+
+def find_placeable_candidate(
+    candidates: list[dict[str, Any]],
+    raid: dict[str, list[dict[str, Any]]],
+    party: list[dict[str, Any]],
+    prefer_priority: bool,
+):
+    """
+    후보 중에서
+    - 현재 공대에 같은 user_id가 없는 사람만 추리고
+    - 그 안에서 가장 적절한 후보를 pick_best_candidate로 선택
+    """
+    valid_candidates = [
+        m for m in candidates
+        if not raid_has_same_user(raid, m["user_id"])
+    ]
+
+    if not valid_candidates:
+        return None
+
+    return pick_best_candidate(
+        valid_candidates,
+        party,
+        prefer_priority=prefer_priority,
+    )
+
+
+def get_available_raids(
+    raids: list[dict[str, list[dict[str, Any]]]],
+    raid_size: int,
+) -> list[dict[str, list[dict[str, Any]]]]:
+    """정원이 아직 남아 있는 공대만 반환"""
+    return [
+        r for r in raids
+        if len(r["party1"]) + len(r["party2"]) < raid_size
+    ]
+
+
+def get_possible_parties(
+    raid: dict[str, list[dict[str, Any]]],
+    party_size: int,
+) -> list[tuple[str, list[dict[str, Any]]]]:
+    """정원이 남아 있는 파티 목록 반환"""
+    possible_parties: list[tuple[str, list[dict[str, Any]]]] = []
+
+    if len(raid["party1"]) < party_size:
+        possible_parties.append(("party1", raid["party1"]))
+    if len(raid["party2"]) < party_size:
+        possible_parties.append(("party2", raid["party2"]))
+
+    return possible_parties
+
+
+def pick_target_raid(
+    available_raids: list[dict[str, list[dict[str, Any]]]],
+):
+    """
+    가장 약한 공대부터 채우기 위해
+    총점 -> 총 아이템레벨 -> 현재 인원 수 순으로 낮은 공대 선택
+    """
+    return min(
+        available_raids,
+        key=lambda r: (
+            raid_score_sum(r),
+            raid_ilvl_sum(r),
+            len(r["party1"]) + len(r["party2"]),
+        ),
+    )
+
+
+def pick_target_party(
+    possible_parties: list[tuple[str, list[dict[str, Any]]]],
+) -> tuple[str, list[dict[str, Any]]]:
+    """점수가 더 낮은 파티부터 채우기"""
+    possible_parties.sort(key=lambda x: party_score_sum(x[1]))
+    return possible_parties[0]
+
+
 def build_balanced_raids(refreshed_members: list[dict[str, Any]]):
     raid_size = 8
     party_size = 4
@@ -210,6 +304,7 @@ def build_balanced_raids(refreshed_members: list[dict[str, Any]]):
     invalid_members: list[str] = []
     seen_identities: set[tuple[int, str]] = set()
 
+    # 1) 데이터 정규화 + 중복 제거
     for raw in refreshed_members:
         member = normalize_member(raw)
         if member is None:
@@ -226,8 +321,10 @@ def build_balanced_raids(refreshed_members: list[dict[str, Any]]):
         seen_identities.add(identity)
         normalized_members.append(member)
 
+    # 2) 역할군 분리
     healers, supports, others = split_members_by_job(normalized_members)
 
+    # 3) 생성 가능한 공대 수 계산
     max_by_people = len(normalized_members) // raid_size
     max_by_healers = len(healers)
     raid_count = min(max_by_people, max_by_healers)
@@ -240,36 +337,44 @@ def build_balanced_raids(refreshed_members: list[dict[str, Any]]):
 
     usable_count = raid_count * raid_size
 
-    raids: list[dict[str, list[dict[str, Any]]]] = []
-    for _ in range(raid_count):
-        raids.append({
-            "party1": [],
-            "party2": [],
-        })
+    # 4) 공대 초기화
+    raids: list[dict[str, list[dict[str, Any]]]] = [
+        {"party1": [], "party2": []}
+        for _ in range(raid_count)
+    ]
 
+    # 5) 공대당 필수 힐러 1명씩 배치
     mandatory_healers = healers[:raid_count]
     remaining_healers = healers[raid_count:]
 
     for i, healer in enumerate(mandatory_healers):
         assign_member_to_party(raids[i], "party2", healer)
 
+    # 6) 추가 핵심 인원 선배치
+    # 우선순위: 남는 힐러 > 서포트
     for raid in raids:
-        candidate = None
-
-        if remaining_healers:
-            candidate = pick_best_candidate(
-                remaining_healers, raid["party1"], prefer_priority=True
-            )
+        candidate = find_placeable_candidate(
+            remaining_healers,
+            raid,
+            raid["party1"],
+            prefer_priority=True,
+        )
+        if candidate is not None:
+            assign_member_to_party(raid, "party1", candidate)
             remove_member(remaining_healers, candidate)
-            assign_member_to_party(raid, "party1", candidate)
+            continue
 
-        elif supports:
-            candidate = pick_best_candidate(
-                supports, raid["party1"], prefer_priority=True
-            )
+        candidate = find_placeable_candidate(
+            supports,
+            raid,
+            raid["party1"],
+            prefer_priority=True,
+        )
+        if candidate is not None:
+            assign_member_to_party(raid, "party1", candidate)
             remove_member(supports, candidate)
-            assign_member_to_party(raid, "party1", candidate)
 
+    # 7) 남은 인원 풀
     remaining_pool = remaining_healers + supports + others
     remaining_pool.sort(key=member_sort_key, reverse=True)
 
@@ -280,41 +385,52 @@ def build_balanced_raids(refreshed_members: list[dict[str, Any]]):
     waiting_members = remaining_pool[slots_left:]
     waiting_members.sort(key=member_sort_key, reverse=True)
 
+    # 8) 남은 슬롯 채우기
     while assign_members:
-        available_raids = [
-            r for r in raids if len(r["party1"]) + len(r["party2"]) < raid_size
-        ]
-
+        available_raids = get_available_raids(raids, raid_size)
         if not available_raids:
             break
 
-        target_raid = min(
+        placed = False
+
+        # 가장 약한 공대부터 시도
+        sorted_raids = sorted(
             available_raids,
             key=lambda r: (
                 raid_score_sum(r),
                 raid_ilvl_sum(r),
                 len(r["party1"]) + len(r["party2"]),
-            )
+            ),
         )
 
-        possible_parties = []
-        if len(target_raid["party1"]) < party_size:
-            possible_parties.append(("party1", target_raid["party1"]))
-        if len(target_raid["party2"]) < party_size:
-            possible_parties.append(("party2", target_raid["party2"]))
+        for target_raid in sorted_raids:
+            possible_parties = get_possible_parties(target_raid, party_size)
+            if not possible_parties:
+                continue
 
-        if not possible_parties:
+            target_party_name, target_party = pick_target_party(possible_parties)
+
+            candidate = find_placeable_candidate(
+                assign_members,
+                target_raid,
+                target_party,
+                prefer_priority=False,
+            )
+
+            if candidate is None:
+                continue
+
+            assign_member_to_party(target_raid, target_party_name, candidate)
+            remove_member(assign_members, candidate)
+            placed = True
             break
 
-        possible_parties.sort(key=lambda x: party_score_sum(x[1]))
-        target_party_name, target_party = possible_parties[0]
-
-        candidate = pick_best_candidate(assign_members, target_party, prefer_priority=False)
-        if candidate is None:
+        if not placed:
+            # 남은 사람들은 어떤 공대에도 더 이상 못 들어가는 상태
+            waiting_members.extend(assign_members)
+            waiting_members.sort(key=member_sort_key, reverse=True)
+            assign_members.clear()
             break
-
-        assign_member_to_party(target_raid, target_party_name, candidate)
-        remove_member(assign_members, candidate)
 
     return raids, waiting_members, invalid_members
 
@@ -389,4 +505,5 @@ def format_raid_result(
         result_lines.append(f"차이: {max(raid_scores) - min(raid_scores)}")
 
     return "\n".join(result_lines)
+
 
