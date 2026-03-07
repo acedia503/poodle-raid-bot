@@ -66,6 +66,29 @@ def split_text_by_lines(text: str, limit: int = SAFE_TEXT_LIMIT) -> list[str]:
     return chunks or ["-"]
 
 
+def split_lines_by_length(lines: list[str], limit: int = 3800) -> list[str]:
+    chunks: list[str] = []
+    current = ""
+
+    for line in lines:
+        line = str(line)
+
+        if not current:
+            current = line
+            continue
+
+        if len(current) + 1 + len(line) > limit:
+            chunks.append(current)
+            current = line
+        else:
+            current += "\n" + line
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
+
 def add_long_text_fields(
     embed: discord.Embed,
     field_name: str,
