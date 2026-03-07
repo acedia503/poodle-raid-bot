@@ -11,6 +11,7 @@ from discord.ui import View, Button
 from models import Character
 from atool import get_character_info
 from raid_logic import build_balanced_raids
+
 from storage import (
     save_active_raids,
     load_active_raids,
@@ -20,6 +21,21 @@ from storage import (
     clear_saved_parties,
 )
 
+from ui_helpers import (
+    make_simple_embed,
+    split_text_by_lines,
+    add_long_text_fields,
+    format_member_line,
+    format_party_block,
+    build_party_result_embeds,
+)
+
+from party_helpers import (
+    find_member_in_saved_parties,
+    remove_member_from_saved_parties,
+    place_member_to_destination,
+    get_party_size,
+)
 
 # =========================
 # 기본 설정
@@ -55,40 +71,6 @@ def is_allowed_guild(interaction: discord.Interaction) -> bool:
     return interaction.guild is not None and interaction.guild.id in ALLOWED_GUILD_IDS
 
 
-def make_simple_embed(title: str, description: str | None = None) -> discord.Embed:
-    return discord.Embed(title=title, description=description)
-
-
-def split_text_by_lines(text: str, limit: int = 1000) -> list[str]:
-    lines = text.split("\n")
-    chunks = []
-    current = ""
-
-    for line in lines:
-        appended = f"{current}\n{line}" if current else line
-        if len(appended) > limit:
-            if current:
-                chunks.append(current)
-            while len(line) > limit:
-                chunks.append(line[:limit])
-                line = line[limit:]
-            current = line
-        else:
-            current = appended
-
-    if current:
-        chunks.append(current)
-
-    return chunks
-
-
-def add_long_text_fields(embed: discord.Embed, field_name: str, text: str, inline: bool = False):
-    chunks = split_text_by_lines(text, limit=1000)
-    for idx, chunk in enumerate(chunks, start=1):
-        name = field_name if idx == 1 else f"{field_name} ({idx})"
-        embed.add_field(name=name, value=chunk, inline=inline)
-
-
 def safe_character_data(name: str) -> dict:
     data = get_character_info(name)
     return {
@@ -100,29 +82,6 @@ def safe_character_data(name: str) -> dict:
 
 def ensure_allowed_guild_or_reply(interaction: discord.Interaction) -> bool:
     return is_allowed_guild(interaction)
-
-
-def format_member_line(user_name: str, char_name: str, job: str, ilvl: int, score: int, status: str) -> str:
-    return (
-        f"`{user_name}` | `{char_name}` | `{job}` | "
-        f"템렙 `{ilvl}` | 아툴 `{score}` | **{status}**"
-    )
-
-
-def format_party_block(members: list[dict]) -> str:
-    if not members:
-        return "```-```"
-
-    lines = []
-    for m in members:
-        lines.append(
-            f"{m['user_name']} | {m['name']} | {m['job']} | {m['ilvl']} | {m['score']}"
-        )
-
-    text = "\n".join(lines)
-    if len(text) > 1000:
-        text = text[:995] + "\n..."
-    return f"```{text}```"
 
 
 class DeleteRaidConfirmView(View):
@@ -907,5 +866,6 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
