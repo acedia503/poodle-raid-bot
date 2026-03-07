@@ -72,7 +72,7 @@ class DeleteRaidConfirmView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=None)
 
 
-class ClearPartyConfirmView(discord.ui.View):
+class ClearPartyView(discord.ui.View):
     def __init__(self, raid_name: str, requester_id: int):
         super().__init__(timeout=60)
         self.raid_name = raid_name
@@ -147,6 +147,9 @@ class FullPartyResolveView(discord.ui.View):
         source_text: str,
         target_raid_no: int,
         target_party_no: int,
+        source_location_type: str,
+        source_raid_index: int | None = None,
+        source_party_name: str | None = None,
     ):
         super().__init__(timeout=120)
         self.raid_name = raid_name
@@ -174,7 +177,7 @@ class FullPartyResolveView(discord.ui.View):
         ]
 
         self.target_select = discord.ui.Select(
-            placeholder="밀어낼 공대원을 선택하세요",
+            placeholder="추가 이동할 공대원을 선택하세요",
             min_values=1,
             max_values=1,
             options=target_options
@@ -186,6 +189,17 @@ class FullPartyResolveView(discord.ui.View):
             SelectOption(label="대기", value="waiting", description="선택한 공대원을 대기 인원으로 이동"),
             SelectOption(label="제외", value="excluded", description="선택한 공대원을 제외 인원으로 이동"),
         ]
+
+        if self.source_location_type == "raid":
+            src_party_no = 1 if self.source_party_name == "party1" else 2
+            destination_options.insert(
+                0,
+                SelectOption(
+                    label="자리교체",
+                    value="swap_back",
+                    description=f"{self.source_raid_index + 1}공대 {src_party_no}파티로 이동"
+                )
+            )
 
         for idx, raid in enumerate(self.raids, start=1):
             for party_no in (1, 2):
@@ -203,7 +217,7 @@ class FullPartyResolveView(discord.ui.View):
                     )
 
         self.destination_select = discord.ui.Select(
-            placeholder="밀어낸 공대원을 어디로 이동할지 선택하세요",
+            placeholder="추가 이동할 공대원을 어디로 이동할지 선택하세요",
             min_values=1,
             max_values=1,
             options=destination_options[:25]
@@ -231,11 +245,11 @@ class FullPartyResolveView(discord.ui.View):
     @discord.ui.button(label="확정", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.selected_target_name:
-            await interaction.response.send_message("먼저 밀어낼 공대원을 선택해주세요.", ephemeral=True)
+            await interaction.response.send_message("먼저 이동할 공대원을 선택해주세요.", ephemeral=True)
             return
 
         if not self.selected_destination:
-            await interaction.response.send_message("밀어낸 공대원의 이동 위치를 선택해주세요.", ephemeral=True)
+            await interaction.response.send_message("추가 이동할 공대원의 이동 위치를 선택해주세요.", ephemeral=True)
             return
 
         try:
@@ -262,17 +276,29 @@ class FullPartyResolveView(discord.ui.View):
             if self.selected_destination == "waiting":
                 self.waiting_members.append(displaced_member)
                 displaced_text = "대기"
-
+            
             elif self.selected_destination == "excluded":
                 self.excluded_members.append(displaced_member)
                 displaced_text = "제외"
+            
+            elif self.selected_destination == "swap_back":
+                if self.source_location_type != "raid":
+                    await interaction.response.send_message(
+                        "자리교체는 원래 공대에 있던 캐릭터만 사용할 수 있습니다.",
+                        ephemeral=True
+                    )
+        return
 
-            else:
-                _, raid_no_str, party_no_str = self.selected_destination.split(":")
-                raid_no = int(raid_no_str)
-                party_no = int(party_no_str)
-                self.raids[raid_no - 1][f"party{party_no}"].append(displaced_member)
-                displaced_text = f"{raid_no}공대 {party_no}파티"
+    self.raids[self.source_raid_index][self.source_party_name].append(displaced_member)
+    src_party_no = 1 if self.source_party_name == "party1" else 2
+    displaced_text = f"{self.source_raid_index + 1}공대 {src_party_no}파티"
+
+else:
+    _, raid_no_str, party_no_str = self.selected_destination.split(":")
+    raid_no = int(raid_no_str)
+    party_no = int(party_no_str)
+    self.raids[raid_no - 1][f"party{party_no}"].append(displaced_member)
+    displaced_text = f"{raid_no}공대 {party_no}파티"
 
             save_generated_parties(
                 self.raid_name,
@@ -288,7 +314,7 @@ class FullPartyResolveView(discord.ui.View):
                     f"이동 캐릭터: **{self.moving_member['name']}**\n"
                     f"이동 전: **{self.source_text}**\n"
                     f"이동 후: **{self.target_raid_no}공대 {self.target_party_no}파티**\n\n"
-                    f"밀려난 캐릭터: **{displaced_member['name']}**\n"
+                    f"추가 이동 캐릭터: **{displaced_member['name']}**\n"
                     f"이동 위치: **{displaced_text}**"
                 )
             )
