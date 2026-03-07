@@ -13,6 +13,7 @@ from discord.ext import commands
 from atool import get_character_info
 from models import Character
 from raid_logic import build_balanced_raids
+
 from storage import (
     add_raid_member,
     clear_saved_parties,
@@ -25,13 +26,19 @@ from storage import (
     save_raid,
     save_raid_members,
 )
-from ui_helpers import (
-    add_long_text_fields,
-    build_party_result_embeds,
-    format_member_line,
-    make_simple_embed,
+
+from party_helpers import (
+    find_member_in_saved_parties,
+    remove_member_from_saved_parties,
+    place_member_to_destination,
+    get_party_size,
 )
-from views import ClearPartyView, DeleteRaidConfirmView
+
+from views import (
+    ClearPartyView,
+    DeleteRaidConfirmView,
+    FullPartyResolveView,
+)
 
 
 # =========================
@@ -58,6 +65,33 @@ ALLOWED_GUILD_IDS = set()
 #     123456789012345678,
 #     987654321098765432,
 # }
+
+def format_saved_member(member: dict) -> str:
+    return (
+        f"{member.get('user_name', '알수없음')} | "
+        f"{member.get('name', '-')} | "
+        f"{member.get('job', '-')} | "
+        f"{member.get('ilvl', 0)} | "
+        f"{member.get('score', 0)}"
+    )
+
+
+def build_found_location_text(found: dict) -> str:
+    location = found.get("location")
+
+    if location == "raid":
+        raid_index = found.get("raid_index", 0)
+        party_name = found.get("party_name", "party1")
+        party_no = 1 if party_name == "party1" else 2
+        return f"{raid_index + 1}공대 {party_no}파티"
+
+    if location == "waiting":
+        return "대기"
+
+    if location == "excluded":
+        return "제외"
+
+    return "알수없음"
 
 
 # =========================
@@ -694,13 +728,297 @@ async def clear_party(interaction: discord.Interaction, 레이드이름: str):
 
 
 # =========================
+# /공대수정
+# =========================
+
+@bot.tree.command(name="공대수정", description="저장된 공대에서 캐릭터를 공대/대기/제외로 이동")
+@app_commands.describe(
+    레이드이름="수정할 레이드 이름",
+    캐릭터명="이동할 캐릭터명",
+    이동종류="공대 / 대기 / 제외",
+    대상공대="이동종류가 공대일 때 대상 공대 번호",
+    대상파티="이동종류가 공대일 때 대상 파티 번호(1 또는 2)",
+)
+@app_commands.choices(
+    이동종류=[
+        app_commands.Choice(name="공대", value="raid"),
+        app_commands.Choice(name="대기", value="waiting"),
+        app_commands.Choice(name="제외", value="excluded"),
+    ],
+    대상파티=[
+        app_commands.Choice(name="1파티", value=1),
+        app_commands.Choice(name="2파티", value=2),
+    ]
+)
+@app_commands.checks.has_permissions(administrator=True)
+async def modify_party(
+    interaction: discord.Interaction,
+    레이드이름: str,
+    캐릭터명: str,
+    이동종류: app_commands.Choice[str],
+    대상공대: int | None = None,
+    대상파티: app_commands.Choice[int] | None = None,
+):
+    if not ensure_allowed_guild_or_reply(interaction):
+        await interaction.response.send_message(
+            "이 서버에서는 사용할 수 없는 봇입니다.",
+            ephemeral=True
+        )
+        return
+
+    레이드이름 = 레이드이름.strip()
+    캐릭터명 = 캐릭터명.strip()
+
+    if 레이드이름 not in active_raids:
+        await interaction.response.send_message(
+            "존재하지 않는 레이드입니다.",
+            ephemeral=True
+        )
+        return
+
+    try:
+        raids, waiting_members, excluded_members = load_generated_parties(레이드이름)
+    except Exception:
+        logging.exception("공대수정 공대 불러오기 실패")
+        await interaction.response.send_message(
+            "저장된 공대 정보를 불러오는 중 오류가 발생했습니다.",
+            ephemeral=True
+        )
+        return
+
+    if not raids and not waiting_members and not excluded_members:
+        await interaction.response.send_message(
+            "저장된 공대 정보가 없습니다. 먼저 `/공대생성`을 실행해주세요.",
+            ephemeral=True
+        )
+        return
+
+    # 이름 기준으로 찾되, 실제 저장 구조는 user_id + name 기준으로 동작
+    # 여기서는 캐릭터명이 유일하다는 운영 가정 하에 첫 번째 매칭 사용
+    target_member = None
+
+    for raid in raids:
+        for party_name in ("party1", "party2"):
+            for member in raid.get(party_name, []):
+                if member.get("name") == 캐릭터명:
+                    target_member = member
+                    break
+            if target_member:
+                break
+        if target_member:
+            break
+
+    if target_member is None:
+        for member in waiting_members:
+            if member.get("name") == 캐릭터명:
+                target_member = member
+                break
+
+    if target_member is None:
+        for member in excluded_members:
+            if member.get("name") == 캐릭터명:
+                target_member = member
+                break
+
+    if target_member is None:
+        await interaction.response.send_message(
+            "저장된 공대/대기/제외 목록에서 해당 캐릭터를 찾을 수 없습니다.",
+            ephemeral=True
+        )
+        return
+
+    found = find_member_in_saved_parties(
+        raids,
+        waiting_members,
+        excluded_members,
+        target_member,
+    )
+
+    if not found:
+        await interaction.response.send_message(
+            "해당 캐릭터의 현재 위치를 찾을 수 없습니다.",
+            ephemeral=True
+        )
+        return
+
+    source_text = build_found_location_text(found)
+    move_type = 이동종류.value
+
+    # 같은 위치로 이동 방지
+    if move_type == "waiting" and found["location"] == "waiting":
+        await interaction.response.send_message(
+            f"이미 대기 상태입니다.\n현재 위치: {source_text}",
+            ephemeral=True
+        )
+        return
+
+    if move_type == "excluded" and found["location"] == "excluded":
+        await interaction.response.send_message(
+            f"이미 제외 상태입니다.\n현재 위치: {source_text}",
+            ephemeral=True
+        )
+        return
+
+    if move_type == "raid":
+        if 대상공대 is None or 대상파티 is None:
+            await interaction.response.send_message(
+                "공대 이동에는 대상공대와 대상파티를 함께 입력해야 합니다.",
+                ephemeral=True
+            )
+            return
+
+        if 대상공대 < 1 or 대상공대 > len(raids):
+            await interaction.response.send_message(
+                f"대상공대는 1 ~ {len(raids)} 범위여야 합니다.",
+                ephemeral=True
+            )
+            return
+
+        target_party_no = 대상파티.value
+        target_party_name = f"party{target_party_no}"
+        target_party = raids[대상공대 - 1][target_party_name]
+
+        # 이미 같은 위치면 막기
+        if (
+            found["location"] == "raid"
+            and found.get("raid_index") == 대상공대 - 1
+            and found.get("party_name") == target_party_name
+        ):
+            await interaction.response.send_message(
+                f"이미 {대상공대}공대 {target_party_no}파티에 있습니다.",
+                ephemeral=True
+            )
+            return
+
+        # 가득 차 있으면 FullPartyResolveView로 처리
+        if get_party_size(target_party) >= 4:
+            view = FullPartyResolveView(
+                raid_name=레이드이름,
+                requester_id=interaction.user.id,
+                raids=raids,
+                waiting_members=waiting_members,
+                excluded_members=excluded_members,
+                moving_member=target_member,
+                source_text=source_text,
+                target_raid_no=대상공대,
+                target_party_no=target_party_no,
+                source_location_type=found["location"],
+                source_raid_index=found.get("raid_index"),
+                source_party_name=found.get("party_name"),
+            )
+
+            embed = make_simple_embed(
+                title="⚠️ 대상 파티가 가득 참",
+                description=(
+                    f"레이드: **{레이드이름}**\n"
+                    f"이동 캐릭터: **{target_member['name']}**\n"
+                    f"현재 위치: **{source_text}**\n"
+                    f"대상 위치: **{대상공대}공대 {target_party_no}파티**\n\n"
+                    f"추가 이동할 공대원과 그 공대원의 이동 위치를 선택해주세요."
+                )
+            )
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            return
+
+        # 가득 차 있지 않으면 바로 이동
+        removed_member = remove_member_from_saved_parties(
+            raids,
+            waiting_members,
+            excluded_members,
+            found,
+        )
+        if not removed_member:
+            await interaction.response.send_message(
+                "현재 위치에서 캐릭터를 제거하지 못했습니다.",
+                ephemeral=True
+            )
+            return
+
+        try:
+            place_member_to_destination(
+                raids,
+                waiting_members,
+                excluded_members,
+                removed_member,
+                move_type="raid",
+                target_raid_no=대상공대,
+                target_party_no=target_party_no,
+            )
+            save_generated_parties(레이드이름, raids, waiting_members, excluded_members)
+        except Exception:
+            logging.exception("공대수정 저장 실패(공대 이동)")
+            await interaction.response.send_message(
+                "공대 이동 저장 중 오류가 발생했습니다.",
+                ephemeral=True
+            )
+            return
+
+        embed = make_simple_embed(
+            title="✅ 공대 수정 완료",
+            description=(
+                f"레이드: **{레이드이름}**\n"
+                f"캐릭터: **{removed_member['name']}**\n"
+                f"이동 전: **{source_text}**\n"
+                f"이동 후: **{대상공대}공대 {target_party_no}파티**"
+            )
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
+    # 대기 / 제외 이동
+    removed_member = remove_member_from_saved_parties(
+        raids,
+        waiting_members,
+        excluded_members,
+        found,
+    )
+    if not removed_member:
+        await interaction.response.send_message(
+            "현재 위치에서 캐릭터를 제거하지 못했습니다.",
+            ephemeral=True
+        )
+        return
+
+    try:
+        place_member_to_destination(
+            raids,
+            waiting_members,
+            excluded_members,
+            removed_member,
+            move_type=move_type,
+        )
+        save_generated_parties(레이드이름, raids, waiting_members, excluded_members)
+    except Exception:
+        logging.exception("공대수정 저장 실패(%s)", move_type)
+        await interaction.response.send_message(
+            "공대 수정 저장 중 오류가 발생했습니다.",
+            ephemeral=True
+        )
+        return
+
+    move_text = "대기" if move_type == "waiting" else "제외"
+
+    embed = make_simple_embed(
+        title="✅ 공대 수정 완료",
+        description=(
+            f"레이드: **{레이드이름}**\n"
+            f"캐릭터: **{removed_member['name']}**\n"
+            f"이동 전: **{source_text}**\n"
+            f"이동 후: **{move_text}**"
+        )
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# =========================
 # 관리자 권한 에러
 # =========================
 
 @create_raid.error
 @delete_raid_command.error
 @force_cancel_apply.error
+@make_party.error
 @clear_party.error
+@modify_party.error
 async def admin_command_error(interaction: discord.Interaction, error):
     if isinstance(error, app_commands.errors.MissingPermissions):
         if interaction.response.is_done():
@@ -749,3 +1067,4 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
