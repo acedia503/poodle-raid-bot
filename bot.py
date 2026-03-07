@@ -431,18 +431,24 @@ async def cancel_apply(interaction: discord.Interaction, 레이드이름: str, �
 @app_commands.describe(레이드이름="조회할 레이드 이름")
 async def list_members(interaction: discord.Interaction, 레이드이름: str):
     if not ensure_allowed_guild_or_reply(interaction):
-        await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
+        await interaction.response.send_message(
+            "이 서버에서는 사용할 수 없는 봇입니다.",
+            ephemeral=True
+        )
         return
 
     if 레이드이름 not in active_raids:
-        await interaction.response.send_message("존재하지 않는 레이드입니다.", ephemeral=True)
+        await interaction.response.send_message(
+            "존재하지 않는 레이드입니다.",
+            ephemeral=True
+        )
         return
 
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral=True)
 
     members = active_raids[레이드이름]["members"]
     if not members:
-        await interaction.followup.send("신청자가 없습니다.")
+        await interaction.followup.send("신청자가 없습니다.", ephemeral=True)
         return
 
     min_ilvl = active_raids[레이드이름]["min_ilvl"]
@@ -467,7 +473,9 @@ async def list_members(interaction: discord.Interaction, 레이드이름: str):
             )
         except Exception as e:
             logging.exception("신청목록 아툴 조회 실패")
-            fail_lines.append(f"`{m.user_name}` | `{m.name}` | 조회실패: `{type(e).__name__}`")
+            fail_lines.append(
+                f"`{m.user_name}` | `{m.name}` | 조회실패: `{type(e).__name__}`"
+            )
 
     embed = make_simple_embed(
         title=f"📋 {레이드이름} 신청 목록",
@@ -481,6 +489,7 @@ async def list_members(interaction: discord.Interaction, 레이드이름: str):
         add_long_text_fields(embed, "조회 실패", "\n".join(fail_lines))
 
     embed.set_footer(text=f"총 신청자 수: {len(members)}명")
+
     await interaction.followup.send(embed=embed, ephemeral=True)
 
 
@@ -1145,3 +1154,4 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
