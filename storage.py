@@ -186,16 +186,22 @@ def clear_saved_parties(raid_name: str):
         conn.close()
 
 
-def save_generated_parties(raid_name: str, raids: list[dict], waiting_members: list[dict]):
+def save_generated_parties(
+    raid_name: str,
+    raids: list[dict],
+    waiting_members: list[dict],
+    excluded_members: list[dict] | None = None
+):
+    if excluded_members is None:
+        excluded_members = []
+
     conn = get_conn()
     cur = conn.cursor()
 
     try:
-        # 기존 저장된 공대 결과 삭제
         cur.execute("DELETE FROM raid_party_members WHERE raid_name = %s", (raid_name,))
         cur.execute("DELETE FROM raid_parties WHERE raid_name = %s", (raid_name,))
 
-        # 공대 저장
         for idx, raid in enumerate(raids, start=1):
             cur.execute(
                 """
@@ -205,7 +211,6 @@ def save_generated_parties(raid_name: str, raids: list[dict], waiting_members: l
                 (raid_name, idx)
             )
 
-            # 1파티 저장
             for order_idx, member in enumerate(raid["party1"], start=1):
                 cur.execute(
                     """
@@ -221,7 +226,6 @@ def save_generated_parties(raid_name: str, raids: list[dict], waiting_members: l
                     )
                 )
 
-            # 2파티 저장
             for order_idx, member in enumerate(raid["party2"], start=1):
                 cur.execute(
                     """
@@ -237,7 +241,6 @@ def save_generated_parties(raid_name: str, raids: list[dict], waiting_members: l
                     )
                 )
 
-        # 대기 인원 저장 (raid_no = 0, party_name = waiting)
         for order_idx, member in enumerate(waiting_members, start=1):
             cur.execute(
                 """
@@ -248,6 +251,21 @@ def save_generated_parties(raid_name: str, raids: list[dict], waiting_members: l
                 """,
                 (
                     raid_name, 0, "waiting", order_idx,
+                    member["user_id"], member["user_name"], member["name"],
+                    member["job"], member["ilvl"], member["score"]
+                )
+            )
+
+        for order_idx, member in enumerate(excluded_members, start=1):
+            cur.execute(
+                """
+                INSERT INTO raid_party_members
+                (raid_name, raid_no, party_name, position_order,
+                 user_id, user_name, character_name, job, ilvl, score)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    raid_name, 0, "excluded", order_idx,
                     member["user_id"], member["user_name"], member["name"],
                     member["job"], member["ilvl"], member["score"]
                 )
@@ -273,7 +291,7 @@ def load_generated_parties(raid_name: str):
         raid_rows = cur.fetchall()
 
         if not raid_rows:
-            return [], []
+            return [], [], []
 
         raids = []
         for row in raid_rows:
@@ -295,6 +313,7 @@ def load_generated_parties(raid_name: str):
         rows = cur.fetchall()
 
         waiting_members = []
+        excluded_members = []
 
         for row in rows:
             member = {
@@ -310,6 +329,10 @@ def load_generated_parties(raid_name: str):
                 waiting_members.append(member)
                 continue
 
+            if row["party_name"] == "excluded":
+                excluded_members.append(member)
+                continue
+
             raid_no = row["raid_no"]
             if raid_no not in raid_map:
                 continue
@@ -319,7 +342,6 @@ def load_generated_parties(raid_name: str):
             elif row["party_name"] == "party2":
                 raid_map[raid_no]["party2"].append(member)
 
-        # raid_no는 내부용이라 반환 전에 제거
         clean_raids = []
         for raid in raids:
             clean_raids.append({
@@ -327,8 +349,9 @@ def load_generated_parties(raid_name: str):
                 "party2": raid["party2"]
             })
 
-        return clean_raids, waiting_members
+        return clean_raids, waiting_members, excluded_members
 
     finally:
         cur.close()
         conn.close()
+
