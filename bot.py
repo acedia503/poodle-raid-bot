@@ -190,28 +190,32 @@ async def raid_list(interaction: discord.Interaction):
         await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
         return
 
-    if not active_raids:
+    try:
+        latest_raids = load_active_raids()
+    except Exception:
+        logging.exception("레이드 목록 조회 실패")
+        await interaction.response.send_message(
+            "레이드 목록을 불러오는 중 오류가 발생했습니다.",
+            ephemeral=True
+        )
+        return
+
+    if not latest_raids:
         await interaction.response.send_message("등록된 레이드가 없습니다.")
         return
 
     embed = make_simple_embed(title="📋 레이드 목록")
 
     lines = []
-    for raid_name, raid_data in active_raids.items():
+    for raid_name, raid_data in latest_raids.items():
         min_ilvl = raid_data["min_ilvl"]
-    
-        try:
-            member_count = count_raid_members(raid_name)
-        except Exception:
-            logging.exception("신청자 수 조회 실패")
-            member_count = "?"
-    
+        member_count = len(raid_data["members"])
         lines.append(
             f"**{raid_name}** | 입장조건 `템렙 {min_ilvl}` | 신청자 `{member_count}명`"
         )
 
     add_long_text_fields(embed, "목록", "\n".join(lines))
-    embed.set_footer(text=f"총 레이드 수: {len(active_raids)}개")
+    embed.set_footer(text=f"총 레이드 수: {len(latest_raids)}개")
 
     await interaction.response.send_message(embed=embed)
 
@@ -1107,6 +1111,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
