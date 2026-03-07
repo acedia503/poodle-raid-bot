@@ -145,6 +145,7 @@ async def on_ready():
     레이드이름="레이드 이름",
     입장템렙="입장 가능한 최소 템렙"
 )
+@app_commands.default_permissions(administrator=True)
 @app_commands.checks.has_permissions(administrator=True)
 async def create_raid(interaction: discord.Interaction, 레이드이름: str, 입장템렙: int):
     if not ensure_allowed_guild_or_reply(interaction):
@@ -226,6 +227,7 @@ async def raid_list(interaction: discord.Interaction):
 
 @bot.tree.command(name="레이드삭제", description="레이드 목록 삭제")
 @app_commands.describe(레이드이름="삭제할 레이드 이름")
+@app_commands.default_permissions(administrator=True)
 @app_commands.checks.has_permissions(administrator=True)
 async def delete_raid_command(interaction: discord.Interaction, 레이드이름: str):
     if not ensure_allowed_guild_or_reply(interaction):
@@ -487,6 +489,7 @@ async def list_members(interaction: discord.Interaction, 레이드이름: str):
     레이드이름="신청을 삭제할 레이드 이름",
     캐릭터명="삭제할 캐릭터명"
 )
+@app_commands.default_permissions(administrator=True)
 @app_commands.checks.has_permissions(administrator=True)
 async def force_cancel_apply(interaction: discord.Interaction, 레이드이름: str, 캐릭터명: str):
     if not ensure_allowed_guild_or_reply(interaction):
@@ -550,6 +553,7 @@ async def force_cancel_apply(interaction: discord.Interaction, 레이드이름: 
 
 @bot.tree.command(name="공대생성", description="레이드 공대 자동 생성")
 @app_commands.describe(레이드이름="공대를 생성할 레이드 이름")
+@app_commands.default_permissions(administrator=True)
 @app_commands.checks.has_permissions(administrator=True)
 async def raid_create(interaction: discord.Interaction):
     await interaction.response.send_message("공대 생성!", ephemeral=True)
@@ -684,6 +688,7 @@ async def party_list(interaction: discord.Interaction, 레이드이름: str):
 
 @bot.tree.command(name="공대초기화", description="저장된 공대 편성만 초기화")
 @app_commands.describe(레이드이름="초기화할 레이드 이름")
+@app_commands.default_permissions(administrator=True)
 @app_commands.checks.has_permissions(administrator=True)
 async def clear_party(interaction: discord.Interaction, 레이드이름: str):
     if not ensure_allowed_guild_or_reply(interaction):
@@ -769,6 +774,7 @@ async def clear_party(interaction: discord.Interaction, 레이드이름: str):
         app_commands.Choice(name="2파티", value=2),
     ]
 )
+@app_commands.default_permissions(administrator=True)
 @app_commands.checks.has_permissions(administrator=True)
 async def modify_party(
     interaction: discord.Interaction,
@@ -1114,6 +1120,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
