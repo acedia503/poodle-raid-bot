@@ -676,7 +676,7 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
 async def party_list(
     interaction: discord.Interaction,
     레이드이름: str,
-    Literal["나만보기"] | None = None
+    나만보기: Literal["나만보기"] | None = None
 ):
     if not ensure_allowed_guild_or_reply(interaction):
         await interaction.response.send_message(
@@ -1164,6 +1164,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
