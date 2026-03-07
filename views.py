@@ -295,11 +295,21 @@ class FullPartyResolveView(discord.ui.View):
         try:
             target_party = self.raids[self.target_raid_no - 1][f"party{self.target_party_no}"]
 
-            found_target = self._find_selected_target()
+            selected_member = self._find_selected_target()
+            if not selected_member:
+                await interaction.response.send_message("선택한 공대원을 찾을 수 없습니다.", ephemeral=True)
+                return
+            
+            found_target = find_member_in_saved_parties(
+                self.raids,
+                self.waiting_members,
+                self.excluded_members,
+                selected_member,
+            )
             if not found_target:
                 await interaction.response.send_message("선택한 공대원을 찾을 수 없습니다.", ephemeral=True)
                 return
-
+            
             displaced_member = remove_member_from_saved_parties(
                 self.raids,
                 self.waiting_members,
