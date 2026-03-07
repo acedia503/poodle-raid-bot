@@ -471,22 +471,31 @@ async def list_members(interaction: discord.Interaction, 레이드이름: str):
                     status
                 )
             )
+
         except Exception as e:
             logging.exception("신청목록 아툴 조회 실패")
             fail_lines.append(
-                f"`{m.user_name}` | `{m.name}` | 조회실패: `{type(e).__name__}`"
+                f"{m.user_name} | {m.name} | 조회실패: {type(e).__name__}"
             )
+
+    description = [
+        f"입장 조건: **템렙 {min_ilvl} 이상**",
+        "",
+        "**신청자 목록**",
+        "\n".join(success_lines)
+    ]
+
+    if fail_lines:
+        description += [
+            "",
+            "**조회 실패**",
+            "\n".join(fail_lines)
+        ]
 
     embed = make_simple_embed(
         title=f"📋 {레이드이름} 신청 목록",
-        description=f"입장 조건: **템렙 {min_ilvl} 이상**"
+        description="\n".join(description)
     )
-
-    if success_lines:
-        add_long_text_fields(embed, "신청자", "\n".join(success_lines))
-
-    if fail_lines:
-        add_long_text_fields(embed, "조회 실패", "\n".join(fail_lines))
 
     embed.set_footer(text=f"총 신청자 수: {len(members)}명")
 
@@ -1154,4 +1163,5 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
