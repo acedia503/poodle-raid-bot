@@ -9,14 +9,17 @@ import discord
 
 
 EMBED_FIELD_LIMIT = 1024
+EMBED_TITLE_LIMIT = 256
+EMBED_DESCRIPTION_LIMIT = 4096
 SAFE_TEXT_LIMIT = 1000
+TABLE_LINE_LIMIT = 80
 
 
 def make_simple_embed(title: str, description: str | None = None) -> discord.Embed:
-    safe_title = str(title).strip()[:256] if title else "안내"
+    safe_title = safe_str(title, "안내")[:EMBED_TITLE_LIMIT]
     safe_description = None
     if description is not None:
-        safe_description = str(description).strip()[:4096]
+        safe_description = safe_str(description, "-")[:EMBED_DESCRIPTION_LIMIT]
     return discord.Embed(title=safe_title, description=safe_description)
 
 
@@ -42,8 +45,8 @@ def split_text_by_lines(text: str, limit: int = SAFE_TEXT_LIMIT) -> list[str]:
     chunks: list[str] = []
     current = ""
 
-    for line in lines:
-        line = line.rstrip()
+    for raw_line in lines:
+        line = raw_line.rstrip()
         appended = f"{current}\n{line}" if current else line
 
         if len(appended) <= limit:
@@ -66,44 +69,35 @@ def split_text_by_lines(text: str, limit: int = SAFE_TEXT_LIMIT) -> list[str]:
     return chunks or ["-"]
 
 
-def split_lines_by_length(lines: list[str], limit: int = 3800) -> list[str]:
-    chunks: list[str] = []
-    current = ""
-
-    for line in lines:
-        line = str(line)
-
-        if not current:
-            current = line
-            continue
-
-        if len(current) + 1 + len(line) > limit:
-            chunks.append(current)
-            current = line
-        else:
-            current += "\n" + line
-
-    if current:
-        chunks.append(current)
-
-    return chunks
-
-
 def add_long_text_fields(
     embed: discord.Embed,
     field_name: str,
     text: str,
     inline: bool = False,
-):
+) -> None:
     chunks = split_text_by_lines(text, limit=SAFE_TEXT_LIMIT)
 
     for idx, chunk in enumerate(chunks, start=1):
         name = field_name if idx == 1 else f"{field_name} ({idx})"
         embed.add_field(
-            name=safe_str(name, "내용")[:256],
+            name=safe_str(name, "내용")[:EMBED_TITLE_LIMIT],
             value=safe_str(chunk, "-")[:EMBED_FIELD_LIMIT],
             inline=inline,
         )
+
+
+def _fit_text(value: Any, width: int) -> str:
+    text = safe_str(value)
+    if len(text) > width:
+        return text[: max(1, width - 1)] + "…"
+    return text.ljust(width)
+
+
+def _fit_number(value: Any, width: int) -> str:
+    text = str(safe_int(value))
+    if len(text) > width:
+        return text[-width:]
+    return text.rjust(width)
 
 
 def format_member_line(
@@ -125,41 +119,46 @@ def format_member_line(
 
 
 def format_member_simple(member: dict[str, Any]) -> str:
-    return (
-        f"{safe_str(member.get('user_name'), '알수없음')} | "
-        f"{safe_str(member.get('name'))} | "
-        f"{safe_str(member.get('job'))} | "
-        f"{safe_int(member.get('ilvl'))} | "
-        f"{safe_int(member.get('score'))}"
-    )
+    user_name = _fit_text(member.get("user_name", "알수없음"), 10)
+    char_name = _fit_text(member.get("name"), 10)
+    job = _fit_text(member.get("job"), 8)
+    ilvl = _fit_number(member.get("ilvl"), 4)
+    score = _fit_number(member.get("score"), 5)
+
+    line = f"{user_name} | {char_name} | {job} | {ilvl} | {score}"
+    return line[:TABLE_LINE_LIMIT]
+
+
+def _party_table_lines(members: list[dict[str, Any]]) -> list[str]:
+    header = "유저명       | 캐릭명       | 직업       | 템렙 |  아툴"
+    separator = "-" * len(header)
+
+    if not members:
+        return [header, separator, "-"]
+
+    return [header, separator] + [format_member_simple(m) for m in members]
 
 
 def format_party_block(members: list[dict[str, Any]]) -> str:
-    if not members:
-        return "```-```"
+    lines = _party_table_lines(members)
 
-    lines = [format_member_simple(m) for m in members]
-    text = "\n".join(lines)
+    full_block = "```" + "\n".join(lines) + "```"
+    if len(full_block) <= EMBED_FIELD_LIMIT:
+        return full_block
 
-    wrapped = f"```{text}```"
-    if len(wrapped) <= EMBED_FIELD_LIMIT:
-        return wrapped
-
-    # 코드블록 포함 길이 기준으로 안전하게 자르기
     trimmed_lines: list[str] = []
-    current_len = 6  # opening/closing ```
     for line in lines:
-        extra = len(line) + (1 if trimmed_lines else 0)
-        if current_len + extra + 4 > EMBED_FIELD_LIMIT:  # \n...
+        candidate_lines = trimmed_lines + [line]
+        candidate_block = "```" + "\n".join(candidate_lines) + "\n...```"
+        if len(candidate_block) > EMBED_FIELD_LIMIT:
             break
         trimmed_lines.append(line)
-        current_len += extra
 
     if not trimmed_lines:
-        first = lines[0][:EMBED_FIELD_LIMIT - 10]
-        return f"```{first}\n...```"
+        shortened = lines[0][: EMBED_FIELD_LIMIT - 10]
+        return f"```{shortened}\n...```"
 
-    return f"```{chr(10).join(trimmed_lines)}\n...```"
+    return "```" + "\n".join(trimmed_lines) + "\n...```"
 
 
 def calc_party_stats(members: list[dict[str, Any]]) -> tuple[int, int, int]:
@@ -174,7 +173,7 @@ def build_party_result_embeds(
     raids: list[dict[str, Any]],
     waiting_members: list[dict[str, Any]],
     excluded_members: list[dict[str, Any]] | None = None,
-):
+) -> list[discord.Embed]:
     if excluded_members is None:
         excluded_members = []
 
@@ -187,12 +186,16 @@ def build_party_result_embeds(
         total_members = party1 + party2
 
         member_count, total_ilvl, total_score = calc_party_stats(total_members)
-        avg_ilvl = total_ilvl // member_count if member_count else 0
-        avg_score = total_score // member_count if member_count else 0
+        avg_ilvl = round(total_ilvl / member_count) if member_count else 0
+        avg_score = round(total_score / member_count) if member_count else 0
 
         embed = make_simple_embed(
             title=f"⚔️ {safe_raid_name} {idx}공대",
-            description=f"인원: **{member_count}명** | 평균 템렙: **{avg_ilvl}** | 평균 아툴: **{avg_score}**",
+            description=(
+                f"인원: **{member_count}명** | "
+                f"평균 템렙: **{avg_ilvl}** | "
+                f"평균 아툴: **{avg_score}**"
+            ),
         )
 
         embed.add_field(
