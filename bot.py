@@ -131,9 +131,11 @@ def safe_character_data(name: str) -> dict:
 async def on_ready():
     try:
         synced = await bot.tree.sync()
-        logging.info("%s 레이드봇 준비 완료 / 슬래시 명령어 %d개 동기화", bot.user, len(synced))
-    except Exception:
-        logging.exception("on_ready 처리 실패")
+        print(f"동기화 완료: {len(synced)}개")
+    except Exception as e:
+        print(f"동기화 실패: {e}")
+
+    print(f"{bot.user} 로그인 완료")
 
 
 # =========================
@@ -1135,6 +1137,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
