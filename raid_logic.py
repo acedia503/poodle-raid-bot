@@ -202,11 +202,6 @@ def assign_member_to_party(raid: dict[str, list[dict[str, Any]]], party_name: st
 # 4. 공대 생성 알고리즘
 # ----------------------------
 
-from __future__ import annotations
-
-from typing import Any
-
-
 def raid_has_same_user(
     raid: dict[str, list[dict[str, Any]]],
     user_id: int,
@@ -505,5 +500,6 @@ def format_raid_result(
         result_lines.append(f"차이: {max(raid_scores) - min(raid_scores)}")
 
     return "\n".join(result_lines)
+
 
 
