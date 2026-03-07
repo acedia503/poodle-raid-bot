@@ -23,6 +23,7 @@ from storage import (
     save_generated_parties,
     save_raid,
     save_raid_members,
+    count_raid_members,
 )
 
 from party_helpers import (
@@ -1100,6 +1101,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
