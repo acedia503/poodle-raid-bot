@@ -10,6 +10,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from typing import Literal
+
 from atool import get_character_info
 from models import Character
 from raid_logic import build_balanced_raids
@@ -665,29 +667,38 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
 # /공대확인
 # =========================
 
+
 @bot.tree.command(name="공대확인", description="저장된 공대 편성 조회")
 @app_commands.describe(
     레이드이름="조회할 레이드 이름",
-    나만보기="응답을 나만 보기로 표시할지 여부"
+    나만보기="나만 보기로 표시"
 )
 async def party_list(
     interaction: discord.Interaction,
     레이드이름: str,
-    나만보기: bool = False
+    나만보기: Literal["나만보기"] | None = None
 ):
     if not ensure_allowed_guild_or_reply(interaction):
-        await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
+        await interaction.response.send_message(
+            "이 서버에서는 사용할 수 없는 봇입니다.",
+            ephemeral=True
+        )
         return
 
     if 레이드이름 not in active_raids:
-        await interaction.response.send_message("존재하지 않는 레이드입니다.", ephemeral=True)
+        await interaction.response.send_message(
+            "존재하지 않는 레이드입니다.",
+            ephemeral=True
+        )
         return
 
     is_admin = interaction.user.guild_permissions.administrator
 
-    # 일반 유저는 항상 나만 보기
-    # 관리자는 옵션으로 선택 가능
-    is_ephemeral = True if not is_admin else 나만보기
+    # 일반 유저는 항상 나만보기
+    if not is_admin:
+        is_ephemeral = True
+    else:
+        is_ephemeral = (나만보기 == "나만보기")
 
     await interaction.response.defer(ephemeral=is_ephemeral)
 
@@ -1153,6 +1164,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
