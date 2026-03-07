@@ -15,6 +15,10 @@ from models import Character
 VALID_PARTY_NAMES = {"party1", "party2", "waiting", "excluded"}
 
 
+# =========================
+# 공통 유틸
+# =========================
+
 def get_database_url() -> str:
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
@@ -33,14 +37,21 @@ def safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def normalize_text(value: Any, default: str = "") -> str:
+    if value is None:
+        return default
+    text = str(value).strip()
+    return text if text else default
+
+
 def normalize_member(member: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(member, dict):
         return None
 
     user_id = safe_int(member.get("user_id"), 0)
-    user_name = str(member.get("user_name", "알수없음")).strip() or "알수없음"
-    name = str(member.get("name", "")).strip()
-    job = str(member.get("job", "")).strip()
+    user_name = normalize_text(member.get("user_name"), "알수없음")
+    name = normalize_text(member.get("name"))
+    job = normalize_text(member.get("job"))
     ilvl = safe_int(member.get("ilvl"), 0)
     score = safe_int(member.get("score"), 0)
 
@@ -61,6 +72,18 @@ def normalize_member(member: dict[str, Any]) -> dict[str, Any] | None:
         "score": score,
     }
 
+
+def normalize_character(character: Character) -> Character:
+    return Character(
+        user_id=safe_int(character.user_id, 0),
+        user_name=normalize_text(character.user_name, "알수없음"),
+        name=normalize_text(character.name),
+    )
+
+
+# =========================
+# DB 초기화
+# =========================
 
 def init_db():
     with get_conn() as conn:
@@ -97,7 +120,9 @@ def init_db():
                 id SERIAL PRIMARY KEY,
                 raid_name TEXT NOT NULL REFERENCES raids(raid_name) ON DELETE CASCADE,
                 raid_no INTEGER NOT NULL CHECK (raid_no >= 0),
-                party_name TEXT NOT NULL CHECK (party_name IN ('party1', 'party2', 'waiting', 'excluded')),
+                party_name TEXT NOT NULL CHECK (
+                    party_name IN ('party1', 'party2', 'waiting', 'excluded')
+                ),
                 position_order INTEGER NOT NULL CHECK (position_order > 0),
                 user_id BIGINT NOT NULL,
                 user_name TEXT NOT NULL,
@@ -114,6 +139,11 @@ def init_db():
             """)
 
             cur.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_raid_party_member
+            ON raid_party_members (raid_name, raid_no, party_name, user_id, character_name);
+            """)
+
+            cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_raid_members_raid_name
             ON raid_members (raid_name);
             """)
@@ -125,64 +155,27 @@ def init_db():
 
 
 # =========================
-# 레이드 / 신청목록 저장
+# 레이드 기본 정보
 # =========================
 
-def save_active_raids(active_raids: dict[str, dict[str, Any]]):
-    """
-    전체 active_raids 스냅샷 저장.
-    현재 구조는 전체 덮어쓰기지만, 한 트랜잭션 안에서 처리해 중간 실패 시 롤백됨.
-    """
+def save_raid(raid_name: str, min_ilvl: int) -> None:
+    safe_raid_name = normalize_text(raid_name)
+    if not safe_raid_name:
+        raise ValueError("raid_name이 비어 있습니다.")
+
+    safe_min_ilvl = max(0, safe_int(min_ilvl, 0))
+
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM raid_party_members;")
-            cur.execute("DELETE FROM raid_parties;")
-            cur.execute("DELETE FROM raid_members;")
-            cur.execute("DELETE FROM raids;")
-
-            for raid_name, raid_data in active_raids.items():
-                safe_raid_name = str(raid_name).strip()
-                if not safe_raid_name:
-                    continue
-
-                min_ilvl = safe_int(raid_data.get("min_ilvl", 0), 0)
-                if min_ilvl < 0:
-                    min_ilvl = 0
-
-                members = raid_data.get("members", [])
-
-                cur.execute(
-                    """
-                    INSERT INTO raids (raid_name, min_ilvl)
-                    VALUES (%s, %s)
-                    """,
-                    (safe_raid_name, min_ilvl)
-                )
-
-                seen_members: set[tuple[int, str]] = set()
-
-                for member in members:
-                    if not isinstance(member, Character):
-                        continue
-
-                    identity = (member.user_id, member.name.strip())
-                    if identity in seen_members:
-                        continue
-                    seen_members.add(identity)
-
-                    cur.execute(
-                        """
-                        INSERT INTO raid_members
-                        (raid_name, user_id, user_name, character_name)
-                        VALUES (%s, %s, %s, %s)
-                        """,
-                        (
-                            safe_raid_name,
-                            member.user_id,
-                            member.user_name.strip() or "알수없음",
-                            member.name.strip(),
-                        )
-                    )
+            cur.execute(
+                """
+                INSERT INTO raids (raid_name, min_ilvl)
+                VALUES (%s, %s)
+                ON CONFLICT (raid_name)
+                DO UPDATE SET min_ilvl = EXCLUDED.min_ilvl
+                """,
+                (safe_raid_name, safe_min_ilvl)
+            )
 
 
 def load_active_raids() -> dict[str, dict[str, Any]]:
@@ -206,7 +199,7 @@ def load_active_raids() -> dict[str, dict[str, Any]]:
             cur.execute("""
                 SELECT raid_name, user_id, user_name, character_name
                 FROM raid_members
-                ORDER BY id
+                ORDER BY raid_name, id
             """)
             member_rows = cur.fetchall()
 
@@ -219,8 +212,8 @@ def load_active_raids() -> dict[str, dict[str, Any]]:
                     active_raids[raid_name]["members"].append(
                         Character(
                             user_id=safe_int(row["user_id"], 0),
-                            user_name=str(row["user_name"]).strip() or "알수없음",
-                            name=str(row["character_name"]).strip()
+                            user_name=normalize_text(row["user_name"], "알수없음"),
+                            name=normalize_text(row["character_name"]),
                         )
                     )
                 except (TypeError, ValueError):
@@ -229,43 +222,231 @@ def load_active_raids() -> dict[str, dict[str, Any]]:
             return active_raids
 
 
-# =========================
-# 공대 저장 / 조회 / 초기화
-# =========================
-
-def clear_saved_parties(raid_name: str):
-    safe_raid_name = str(raid_name).strip()
+def load_raid(raid_name: str) -> dict[str, Any] | None:
+    safe_raid_name = normalize_text(raid_name)
     if not safe_raid_name:
-        return
+        return None
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT raid_name, min_ilvl
+                FROM raids
+                WHERE raid_name = %s
+            """, (safe_raid_name,))
+            row = cur.fetchone()
+
+            if not row:
+                return None
+
+            raid_data = {
+                "min_ilvl": safe_int(row["min_ilvl"], 0),
+                "members": []
+            }
+
+            cur.execute("""
+                SELECT user_id, user_name, character_name
+                FROM raid_members
+                WHERE raid_name = %s
+                ORDER BY id
+            """, (safe_raid_name,))
+            members = cur.fetchall()
+
+            for m in members:
+                try:
+                    raid_data["members"].append(
+                        Character(
+                            user_id=safe_int(m["user_id"], 0),
+                            user_name=normalize_text(m["user_name"], "알수없음"),
+                            name=normalize_text(m["character_name"]),
+                        )
+                    )
+                except (TypeError, ValueError):
+                    continue
+
+            return raid_data
+
+
+def delete_raid(raid_name: str) -> bool:
+    safe_raid_name = normalize_text(raid_name)
+    if not safe_raid_name:
+        return False
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM raid_party_members WHERE raid_name = %s", (safe_raid_name,))
-            cur.execute("DELETE FROM raid_parties WHERE raid_name = %s", (safe_raid_name,))
+            cur.execute(
+                "DELETE FROM raids WHERE raid_name = %s",
+                (safe_raid_name,)
+            )
+            return cur.rowcount > 0
 
 
-def save_generated_parties(
-    raid_name: str,
-    raids: list[dict[str, Any]],
-    waiting_members: list[dict[str, Any]],
-    excluded_members: list[dict[str, Any]] | None = None
-):
-    if excluded_members is None:
-        excluded_members = []
+# =========================
+# 신청자 저장
+# =========================
 
-    safe_raid_name = str(raid_name).strip()
+def save_raid_members(raid_name: str, members: list[Character]) -> None:
+    """
+    특정 레이드의 신청자 목록만 교체 저장.
+    다른 레이드 데이터는 건드리지 않음.
+    """
+    safe_raid_name = normalize_text(raid_name)
     if not safe_raid_name:
         raise ValueError("raid_name이 비어 있습니다.")
 
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT 1 FROM raids WHERE raid_name = %s", (safe_raid_name,))
-            exists = cur.fetchone()
-            if not exists:
+            if cur.fetchone() is None:
                 raise ValueError(f"존재하지 않는 레이드입니다: {safe_raid_name}")
 
-            cur.execute("DELETE FROM raid_party_members WHERE raid_name = %s", (safe_raid_name,))
-            cur.execute("DELETE FROM raid_parties WHERE raid_name = %s", (safe_raid_name,))
+            cur.execute(
+                "DELETE FROM raid_members WHERE raid_name = %s",
+                (safe_raid_name,)
+            )
+
+            seen_members: set[tuple[int, str]] = set()
+
+            for raw_member in members:
+                if not isinstance(raw_member, Character):
+                    continue
+
+                try:
+                    member = normalize_character(raw_member)
+                except (TypeError, ValueError):
+                    continue
+
+                if member.user_id <= 0 or not member.name:
+                    continue
+
+                identity = (member.user_id, member.name)
+                if identity in seen_members:
+                    continue
+                seen_members.add(identity)
+
+                cur.execute(
+                    """
+                    INSERT INTO raid_members
+                    (raid_name, user_id, user_name, character_name)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (
+                        safe_raid_name,
+                        member.user_id,
+                        member.user_name,
+                        member.name,
+                    )
+                )
+
+
+def add_raid_member(raid_name: str, member: Character) -> bool:
+    safe_raid_name = normalize_text(raid_name)
+    if not safe_raid_name:
+        raise ValueError("raid_name이 비어 있습니다.")
+
+    member = normalize_character(member)
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM raids WHERE raid_name = %s", (safe_raid_name,))
+            if cur.fetchone() is None:
+                raise ValueError(f"존재하지 않는 레이드입니다: {safe_raid_name}")
+
+            cur.execute(
+                """
+                INSERT INTO raid_members
+                (raid_name, user_id, user_name, character_name)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (raid_name, user_id, character_name) DO NOTHING
+                """,
+                (
+                    safe_raid_name,
+                    member.user_id,
+                    member.user_name,
+                    member.name,
+                )
+            )
+            return cur.rowcount > 0
+
+
+def remove_raid_member(raid_name: str, user_id: int, character_name: str) -> bool:
+    safe_raid_name = normalize_text(raid_name)
+    safe_character_name = normalize_text(character_name)
+
+    if not safe_raid_name or not safe_character_name:
+        return False
+
+    safe_user_id = safe_int(user_id, 0)
+    if safe_user_id <= 0:
+        return False
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM raid_members
+                WHERE raid_name = %s
+                  AND user_id = %s
+                  AND character_name = %s
+                """,
+                (safe_raid_name, safe_user_id, safe_character_name)
+            )
+            return cur.rowcount > 0
+
+
+# =========================
+# 공대 저장 / 조회 / 초기화
+# =========================
+
+def clear_saved_parties(raid_name: str) -> None:
+    safe_raid_name = normalize_text(raid_name)
+    if not safe_raid_name:
+        return
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM raid_party_members WHERE raid_name = %s",
+                (safe_raid_name,)
+            )
+            cur.execute(
+                "DELETE FROM raid_parties WHERE raid_name = %s",
+                (safe_raid_name,)
+            )
+
+
+def save_generated_parties(
+    raid_name: str,
+    raids: list[dict[str, Any]],
+    waiting_members: list[dict[str, Any]],
+    excluded_members: list[dict[str, Any]] | None = None,
+) -> None:
+    """
+    특정 레이드의 공대 결과만 교체 저장.
+    다른 레이드 결과는 건드리지 않음.
+    """
+    if excluded_members is None:
+        excluded_members = []
+
+    safe_raid_name = normalize_text(raid_name)
+    if not safe_raid_name:
+        raise ValueError("raid_name이 비어 있습니다.")
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1 FROM raids WHERE raid_name = %s", (safe_raid_name,))
+            if cur.fetchone() is None:
+                raise ValueError(f"존재하지 않는 레이드입니다: {safe_raid_name}")
+
+            # 위험한 전체 삭제 대신, 해당 레이드의 공대 결과만 삭제
+            cur.execute(
+                "DELETE FROM raid_party_members WHERE raid_name = %s",
+                (safe_raid_name,)
+            )
+            cur.execute(
+                "DELETE FROM raid_parties WHERE raid_name = %s",
+                (safe_raid_name,)
+            )
 
             for idx, raid in enumerate(raids, start=1):
                 cur.execute(
@@ -278,10 +459,17 @@ def save_generated_parties(
 
                 for party_name in ("party1", "party2"):
                     party_members = raid.get(party_name, [])
+                    seen_party_members: set[tuple[int, str]] = set()
+
                     for order_idx, raw_member in enumerate(party_members, start=1):
                         member = normalize_member(raw_member)
                         if member is None:
                             continue
+
+                        identity = (member["user_id"], member["name"])
+                        if identity in seen_party_members:
+                            continue
+                        seen_party_members.add(identity)
 
                         cur.execute(
                             """
@@ -305,10 +493,17 @@ def save_generated_parties(
                         )
 
             for party_name, members in (("waiting", waiting_members), ("excluded", excluded_members)):
+                seen_special_members: set[tuple[int, str]] = set()
+
                 for order_idx, raw_member in enumerate(members, start=1):
                     member = normalize_member(raw_member)
                     if member is None:
                         continue
+
+                    identity = (member["user_id"], member["name"])
+                    if identity in seen_special_members:
+                        continue
+                    seen_special_members.add(identity)
 
                     cur.execute(
                         """
@@ -333,7 +528,7 @@ def save_generated_parties(
 
 
 def load_generated_parties(raid_name: str):
-    safe_raid_name = str(raid_name).strip()
+    safe_raid_name = normalize_text(raid_name)
     if not safe_raid_name:
         return [], [], []
 
@@ -355,7 +550,7 @@ def load_generated_parties(raid_name: str):
                 raids.append({
                     "raid_no": row["raid_no"],
                     "party1": [],
-                    "party2": []
+                    "party2": [],
                 })
 
             raid_map = {raid["raid_no"]: raid for raid in raids}
@@ -394,7 +589,7 @@ def load_generated_parties(raid_name: str):
                     excluded_members.append(member)
                     continue
 
-                raid_no = row["raid_no"]
+                raid_no = safe_int(row["raid_no"], 0)
                 if raid_no not in raid_map:
                     continue
 
@@ -405,7 +600,8 @@ def load_generated_parties(raid_name: str):
             for raid in raids:
                 clean_raids.append({
                     "party1": raid["party1"],
-                    "party2": raid["party2"]
+                    "party2": raid["party2"],
                 })
 
             return clean_raids, waiting_members, excluded_members
+        
