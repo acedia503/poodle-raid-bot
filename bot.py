@@ -1,41 +1,38 @@
 # bot.py
 # 디스코드 명령어 담당
 
-import os
+from __future__ import annotations
+
 import logging
+import os
+
 import discord
-from discord.ext import commands
 from discord import app_commands
-from discord.ui import View, Button
+from discord.ext import commands
 
-from models import Character
 from atool import get_character_info
+from models import Character
 from raid_logic import build_balanced_raids
-
 from storage import (
-    save_active_raids,
-    load_active_raids,
-    init_db,
-    save_generated_parties,
-    load_generated_parties,
+    add_raid_member,
     clear_saved_parties,
+    delete_raid as delete_raid_record,
+    init_db,
+    load_active_raids,
+    load_generated_parties,
+    remove_raid_member,
+    save_generated_parties,
+    save_raid,
+    save_raid_members,
 )
-
 from ui_helpers import (
-    make_simple_embed,
-    split_text_by_lines,
     add_long_text_fields,
-    format_member_line,
-    format_party_block,
     build_party_result_embeds,
+    format_member_line,
+    make_simple_embed,
 )
+from views import ClearPartyView, DeleteRaidConfirmView
 
-from party_helpers import (
-    find_member_in_saved_parties,
-    remove_member_from_saved_parties,
-    place_member_to_destination,
-    get_party_size,
-)
 
 # =========================
 # 기본 설정
@@ -50,6 +47,8 @@ if not TOKEN:
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# DB 초기화 후 로드
+init_db()
 active_raids = load_active_raids()
 
 # 비워두면 모든 서버 허용
@@ -71,177 +70,17 @@ def is_allowed_guild(interaction: discord.Interaction) -> bool:
     return interaction.guild is not None and interaction.guild.id in ALLOWED_GUILD_IDS
 
 
-def safe_character_data(name: str) -> dict:
-    data = get_character_info(name)
-    return {
-        "ilvl": data.get("ilvl", 0),
-        "job": data.get("job", "알수없음"),
-        "score": data.get("score", 0),
-    }
-
-
 def ensure_allowed_guild_or_reply(interaction: discord.Interaction) -> bool:
     return is_allowed_guild(interaction)
 
 
-class DeleteRaidConfirmView(View):
-    def __init__(self, raid_name: str, member_count: int, requester_id: int):
-        super().__init__(timeout=60)
-        self.raid_name = raid_name
-        self.member_count = member_count
-        self.requester_id = requester_id
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.requester_id:
-            await interaction.response.send_message(
-                "이 삭제 확인 버튼은 명령어를 실행한 관리자만 사용할 수 있습니다.",
-                ephemeral=True
-            )
-            return False
-        return True
-
-    @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
-    async def confirm_delete(self, interaction: discord.Interaction, button: Button):
-        global active_raids
-
-        if self.raid_name not in active_raids:
-            embed = make_simple_embed(
-                title="⚠️ 이미 삭제되었거나 존재하지 않는 레이드입니다."
-            )
-            await interaction.response.edit_message(embed=embed, view=None)
-            return
-
-        member_count = len(active_raids[self.raid_name]["members"])
-
-        del active_raids[self.raid_name]
-        save_active_raids(active_raids)
-
-        embed = make_simple_embed(
-            title="🗑️ 레이드 삭제 완료",
-            description=(
-                f"레이드: **{self.raid_name}**\n"
-                f"삭제된 신청자 수: **{member_count}명**"
-            )
-        )
-
-        await interaction.response.edit_message(embed=embed, view=None)
-
-    @discord.ui.button(label="취소", style=discord.ButtonStyle.secondary)
-    async def cancel_delete(self, interaction: discord.Interaction, button: Button):
-        embed = make_simple_embed(
-            title="✅ 레이드 삭제가 취소되었습니다.",
-            description=f"레이드: **{self.raid_name}**"
-        )
-        await interaction.response.edit_message(embed=embed, view=None)
-
-    async def on_timeout(self):
-        for item in self.children:
-            item.disabled = True
-
-
-def build_party_result_embeds(레이드이름: str, raids: list[dict], waiting_members: list[dict]):
-    embeds = []
-
-    for idx, raid in enumerate(raids, start=1):
-        total_members = raid["party1"] + raid["party2"]
-
-        total_ilvl = sum(m["ilvl"] for m in total_members)
-        total_score = sum(m["score"] for m in total_members)
-
-        avg_ilvl = total_ilvl // len(total_members) if total_members else 0
-        avg_score = total_score // len(total_members) if total_members else 0
-
-        embed = make_simple_embed(
-            title=f"⚔️ {레이드이름} {idx}공대",
-            description=f"평균 템렙: **{avg_ilvl}** | 평균 아툴: **{avg_score}**"
-        )
-
-        embed.add_field(
-            name="1파티",
-            value=format_party_block(raid["party1"]),
-            inline=False
-        )
-        embed.add_field(
-            name="2파티",
-            value=format_party_block(raid["party2"]),
-            inline=False
-        )
-
-        embeds.append(embed)
-
-    if waiting_members:
-        waiting_lines = []
-        for m in waiting_members:
-            waiting_lines.append(
-                f"{m['user_name']} | {m['name']} | {m['job']} | {m['ilvl']} | {m['score']}"
-            )
-
-        waiting_embed = make_simple_embed(title="⏳ 대기 인원")
-        add_long_text_fields(waiting_embed, f"{len(waiting_members)}명", "\n".join(waiting_lines))
-        embeds.append(waiting_embed)
-
-    return embeds
-
-
-class ClearPartyConfirmView(discord.ui.View):
-    def __init__(self, raid_name: str, requester_id: int):
-        super().__init__(timeout=60)
-        self.raid_name = raid_name
-        self.requester_id = requester_id
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.requester_id:
-            await interaction.response.send_message(
-                "이 버튼은 명령어를 실행한 관리자만 사용할 수 있습니다.",
-                ephemeral=True
-            )
-            return False
-        return True
-
-    @discord.ui.button(label="공대초기화", style=discord.ButtonStyle.danger)
-    async def confirm_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            raids, waiting_members = load_generated_parties(self.raid_name)
-
-            if not raids and not waiting_members:
-                embed = make_simple_embed(
-                    title="⚠️ 초기화할 공대 정보가 없습니다.",
-                    description=f"레이드: **{self.raid_name}**"
-                )
-                await interaction.response.edit_message(embed=embed, view=None)
-                return
-
-            total_party_members = sum(len(r["party1"]) + len(r["party2"]) for r in raids)
-            total_waiting = len(waiting_members)
-
-            clear_saved_parties(self.raid_name)
-
-            embed = make_simple_embed(
-                title="🧹 공대 초기화 완료",
-                description=(
-                    f"레이드: **{self.raid_name}**\n"
-                    f"삭제된 공대원 수: **{total_party_members}명**\n"
-                    f"삭제된 대기 인원 수: **{total_waiting}명**\n\n"
-                    f"신청목록은 유지됩니다."
-                )
-            )
-            await interaction.response.edit_message(embed=embed, view=None)
-
-        except Exception:
-            logging.exception("공대초기화 실패")
-            embed = make_simple_embed(
-                title="❌ 공대 초기화 실패",
-                description="공대 초기화 중 오류가 발생했습니다."
-            )
-            await interaction.response.edit_message(embed=embed, view=None)
-
-    @discord.ui.button(label="취소", style=discord.ButtonStyle.secondary)
-    async def cancel_clear(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = make_simple_embed(
-            title="✅ 공대 초기화가 취소되었습니다.",
-            description=f"레이드: **{self.raid_name}**"
-        )
-        await interaction.response.edit_message(embed=embed, view=None)
+def safe_character_data(name: str) -> dict:
+    data = get_character_info(name) or {}
+    return {
+        "ilvl": int(data.get("ilvl", 0) or 0),
+        "job": str(data.get("job", "알수없음") or "알수없음").strip(),
+        "score": int(data.get("score", 0) or 0),
+    }
 
 
 # =========================
@@ -251,9 +90,8 @@ class ClearPartyConfirmView(discord.ui.View):
 @bot.event
 async def on_ready():
     try:
-        init_db()
         synced = await bot.tree.sync()
-        print(f"{bot.user} 레이드봇 준비 완료 / 슬래시 명령어 {len(synced)}개 동기화")
+        logging.info("%s 레이드봇 준비 완료 / 슬래시 명령어 %d개 동기화", bot.user, len(synced))
     except Exception:
         logging.exception("on_ready 처리 실패")
 
@@ -273,15 +111,27 @@ async def create_raid(interaction: discord.Interaction, 레이드이름: str, �
         await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
         return
 
+    레이드이름 = 레이드이름.strip()
+
+    if not 레이드이름:
+        await interaction.response.send_message("레이드 이름이 비어 있습니다.", ephemeral=True)
+        return
+
     if 레이드이름 in active_raids:
         await interaction.response.send_message("이미 존재하는 레이드입니다.", ephemeral=True)
         return
 
+    if 입장템렙 < 0:
+        await interaction.response.send_message("입장 템렙은 0 이상이어야 합니다.", ephemeral=True)
+        return
+
     active_raids[레이드이름] = {
         "min_ilvl": 입장템렙,
-        "members": []
+        "members": [],
     }
-    save_active_raids(active_raids)
+
+    save_raid(레이드이름, 입장템렙)
+    save_raid_members(레이드이름, [])
 
     embed = make_simple_embed(
         title="✅ 레이드 추가 완료",
@@ -314,7 +164,7 @@ async def raid_list(interaction: discord.Interaction):
             f"**{raid_name}** | 입장조건 `템렙 {min_ilvl}` | 신청자 `{member_count}명`"
         )
 
-    add_long_text_fields(embed, "\n".join(lines))
+    add_long_text_fields(embed, "목록", "\n".join(lines))
     embed.set_footer(text=f"총 레이드 수: {len(active_raids)}개")
 
     await interaction.response.send_message(embed=embed)
@@ -327,7 +177,7 @@ async def raid_list(interaction: discord.Interaction):
 @bot.tree.command(name="레이드삭제", description="레이드 목록 삭제")
 @app_commands.describe(레이드이름="삭제할 레이드 이름")
 @app_commands.checks.has_permissions(administrator=True)
-async def delete_raid(interaction: discord.Interaction, 레이드이름: str):
+async def delete_raid_command(interaction: discord.Interaction, 레이드이름: str):
     if not ensure_allowed_guild_or_reply(interaction):
         await interaction.response.send_message(
             "이 서버에서는 사용할 수 없는 봇입니다.",
@@ -356,8 +206,8 @@ async def delete_raid(interaction: discord.Interaction, 레이드이름: str):
 
     view = DeleteRaidConfirmView(
         raid_name=레이드이름,
-        member_count=member_count,
-        requester_id=interaction.user.id
+        requester_id=interaction.user.id,
+        active_raids=active_raids,
     )
 
     await interaction.response.send_message(
@@ -377,34 +227,33 @@ async def delete_raid(interaction: discord.Interaction, 레이드이름: str):
     캐릭터명="아툴에서 조회할 캐릭터명"
 )
 async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐릭터명: str):
-    print("DEBUG /신청 시작", 레이드이름, 캐릭터명)
-
     if not ensure_allowed_guild_or_reply(interaction):
         await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
 
+    레이드이름 = 레이드이름.strip()
     캐릭터명 = 캐릭터명.strip()
 
     if 레이드이름 not in active_raids:
         await interaction.followup.send("존재하지 않는 레이드입니다.", ephemeral=True)
         return
 
+    if not 캐릭터명:
+        await interaction.followup.send("캐릭터명이 비어 있습니다.", ephemeral=True)
+        return
+
     members = active_raids[레이드이름]["members"]
-    print("DEBUG 현재 members 수", len(members))
 
     for member in members:
         if member.name == 캐릭터명:
-            print("DEBUG 중복 신청 감지", 캐릭터명)
             await interaction.followup.send("이미 신청한 캐릭터입니다.", ephemeral=True)
             return
 
     try:
         data = safe_character_data(캐릭터명)
-        print("DEBUG 아툴 조회 결과", data)
-    except Exception as e:
-        print("DEBUG 아툴 조회 실패", repr(e))
+    except Exception:
         logging.exception("아툴 조회 실패")
         await interaction.followup.send(
             "아툴 조회에 실패했습니다. 잠시 후 다시 시도해주세요.",
@@ -413,8 +262,6 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
         return
 
     min_ilvl = active_raids[레이드이름]["min_ilvl"]
-    print("DEBUG min_ilvl", min_ilvl)
-
     if data["ilvl"] < min_ilvl:
         embed = make_simple_embed(
             title="❌ 신청 불가",
@@ -433,20 +280,20 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
         name=캐릭터명
     )
 
-    members.append(char)
-    print("DEBUG 저장 직전")
-
     try:
-        save_active_raids(active_raids)
-        print("DEBUG 저장 완료")
-    except Exception as e:
-        print("DEBUG DB 저장 실패", repr(e))
-        logging.exception("DB 저장 실패")
+        inserted = add_raid_member(레이드이름, char)
+        if not inserted:
+            await interaction.followup.send("이미 신청한 캐릭터입니다.", ephemeral=True)
+            return
+    except Exception:
+        logging.exception("DB 신청 저장 실패")
         await interaction.followup.send(
             "신청 저장 중 오류가 발생했습니다.",
             ephemeral=True
         )
         return
+
+    members.append(char)
 
     embed = make_simple_embed(
         title="✅ 신청 완료",
@@ -475,6 +322,9 @@ async def cancel_apply(interaction: discord.Interaction, 레이드이름: str, �
         await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
         return
 
+    레이드이름 = 레이드이름.strip()
+    캐릭터명 = 캐릭터명.strip()
+
     if 레이드이름 not in active_raids:
         await interaction.response.send_message("존재하지 않는 레이드입니다.", ephemeral=True)
         return
@@ -495,7 +345,20 @@ async def cancel_apply(interaction: discord.Interaction, 레이드이름: str, �
         return
 
     removed_member = members.pop(target_index)
-    save_active_raids(active_raids)
+
+    try:
+        removed = remove_raid_member(레이드이름, interaction.user.id, 캐릭터명)
+        if not removed:
+            logging.warning("신청취소 DB 반영 없음: %s / %s", 레이드이름, 캐릭터명)
+    except Exception:
+        logging.exception("신청취소 DB 저장 실패")
+        # 메모리 복구
+        members.insert(target_index, removed_member)
+        await interaction.response.send_message(
+            "신청 취소 저장 중 오류가 발생했습니다.",
+            ephemeral=True
+        )
+        return
 
     embed = make_simple_embed(
         title="✅ 신청 취소 완료",
@@ -556,7 +419,7 @@ async def list_members(interaction: discord.Interaction, 레이드이름: str):
     )
 
     if success_lines:
-        add_long_text_fields(embed, "\n".join(success_lines))
+        add_long_text_fields(embed, "신청자", "\n".join(success_lines))
 
     if fail_lines:
         add_long_text_fields(embed, "조회 실패", "\n".join(fail_lines))
@@ -579,6 +442,9 @@ async def force_cancel_apply(interaction: discord.Interaction, 레이드이름: 
     if not ensure_allowed_guild_or_reply(interaction):
         await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
         return
+
+    레이드이름 = 레이드이름.strip()
+    캐릭터명 = 캐릭터명.strip()
 
     if 레이드이름 not in active_raids:
         await interaction.response.send_message("존재하지 않는 레이드입니다.", ephemeral=True)
@@ -603,7 +469,19 @@ async def force_cancel_apply(interaction: discord.Interaction, 레이드이름: 
         return
 
     members.pop(target_index)
-    save_active_raids(active_raids)
+
+    try:
+        removed = remove_raid_member(레이드이름, target_member.user_id, target_member.name)
+        if not removed:
+            logging.warning("강제 신청삭제 DB 반영 없음: %s / %s", 레이드이름, 캐릭터명)
+    except Exception:
+        logging.exception("강제 신청삭제 DB 저장 실패")
+        members.insert(target_index, target_member)
+        await interaction.response.send_message(
+            "강제 신청 삭제 저장 중 오류가 발생했습니다.",
+            ephemeral=True
+        )
+        return
 
     embed = make_simple_embed(
         title="🗑️ 강제 신청 삭제 완료",
@@ -659,7 +537,7 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
                 "name": m.name,
                 "job": data["job"],
                 "ilvl": data["ilvl"],
-                "score": data["score"]
+                "score": data["score"],
             })
 
         except Exception:
@@ -678,30 +556,34 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
         await interaction.followup.send(embed=embed)
         return
 
-    raids, waiting_members, error = build_balanced_raids(refreshed_members)
+    raids, waiting_members, build_invalid_members = build_balanced_raids(refreshed_members)
+    all_invalid_members = invalid_members + build_invalid_members
 
-    if error:
-        embed = make_simple_embed(title="❌ 공대 생성 실패", description=error)
-        if invalid_members:
-            add_long_text_fields(embed, "제외 인원", "\n".join(invalid_members))
+    if not raids:
+        embed = make_simple_embed(
+            title="❌ 공대 생성 실패",
+            description="공대를 생성할 수 없습니다."
+        )
+        if all_invalid_members:
+            add_long_text_fields(embed, "제외 인원", "\n".join(all_invalid_members))
         await interaction.followup.send(embed=embed)
         return
 
     try:
-        save_generated_parties(레이드이름, raids, waiting_members)
+        save_generated_parties(레이드이름, raids, waiting_members, [])
     except Exception:
         logging.exception("공대 저장 실패")
         await interaction.followup.send("공대 생성은 되었지만 저장 중 오류가 발생했습니다.")
         return
 
-    embeds = build_party_result_embeds(레이드이름, raids, waiting_members)
+    embeds = build_party_result_embeds(레이드이름, raids, waiting_members, [])
 
     for embed in embeds:
         await interaction.followup.send(embed=embed)
 
-    if invalid_members:
+    if all_invalid_members:
         invalid_embed = make_simple_embed(title="🚫 제외 인원")
-        add_long_text_fields(invalid_embed, f"{len(invalid_members)}명", "\n".join(invalid_members))
+        add_long_text_fields(invalid_embed, f"{len(all_invalid_members)}명", "\n".join(all_invalid_members))
         await interaction.followup.send(embed=invalid_embed)
 
 
@@ -723,13 +605,13 @@ async def party_list(interaction: discord.Interaction, 레이드이름: str):
     await interaction.response.defer()
 
     try:
-        raids, waiting_members = load_generated_parties(레이드이름)
+        raids, waiting_members, excluded_members = load_generated_parties(레이드이름)
     except Exception:
         logging.exception("공대목록 조회 실패")
         await interaction.followup.send("저장된 공대 정보를 불러오는 중 오류가 발생했습니다.")
         return
 
-    if not raids and not waiting_members:
+    if not raids and not waiting_members and not excluded_members:
         embed = make_simple_embed(
             title="📭 저장된 공대 없음",
             description=f"레이드: **{레이드이름}**\n먼저 `/공대생성`을 실행해주세요."
@@ -737,7 +619,7 @@ async def party_list(interaction: discord.Interaction, 레이드이름: str):
         await interaction.followup.send(embed=embed)
         return
 
-    embeds = build_party_result_embeds(레이드이름, raids, waiting_members)
+    embeds = build_party_result_embeds(레이드이름, raids, waiting_members, excluded_members)
 
     for embed in embeds:
         await interaction.followup.send(embed=embed)
@@ -766,7 +648,7 @@ async def clear_party(interaction: discord.Interaction, 레이드이름: str):
         return
 
     try:
-        raids, waiting_members = load_generated_parties(레이드이름)
+        raids, waiting_members, excluded_members = load_generated_parties(레이드이름)
     except Exception:
         logging.exception("공대초기화 사전 조회 실패")
         await interaction.response.send_message(
@@ -777,8 +659,9 @@ async def clear_party(interaction: discord.Interaction, 레이드이름: str):
 
     total_party_members = sum(len(r["party1"]) + len(r["party2"]) for r in raids)
     total_waiting = len(waiting_members)
+    total_excluded = len(excluded_members)
 
-    if total_party_members == 0 and total_waiting == 0:
+    if total_party_members == 0 and total_waiting == 0 and total_excluded == 0:
         embed = make_simple_embed(
             title="📭 초기화할 공대 없음",
             description=f"레이드: **{레이드이름}**\n저장된 공대 편성이 없습니다."
@@ -791,13 +674,14 @@ async def clear_party(interaction: discord.Interaction, 레이드이름: str):
         description=(
             f"레이드: **{레이드이름}**\n"
             f"현재 공대원 수: **{total_party_members}명**\n"
-            f"현재 대기 인원 수: **{total_waiting}명**\n\n"
+            f"현재 대기 인원 수: **{total_waiting}명**\n"
+            f"현재 제외 인원 수: **{total_excluded}명**\n\n"
             f"초기화하면 **저장된 공대 편성만 삭제**됩니다.\n"
             f"**신청목록은 유지됩니다.**"
         )
     )
 
-    view = ClearPartyConfirmView(
+    view = ClearPartyView(
         raid_name=레이드이름,
         requester_id=interaction.user.id
     )
@@ -814,9 +698,8 @@ async def clear_party(interaction: discord.Interaction, 레이드이름: str):
 # =========================
 
 @create_raid.error
-@delete_raid.error
+@delete_raid_command.error
 @force_cancel_apply.error
-@make_party.error
 @clear_party.error
 async def admin_command_error(interaction: discord.Interaction, error):
     if isinstance(error, app_commands.errors.MissingPermissions):
@@ -866,6 +749,3 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
-
-
-
