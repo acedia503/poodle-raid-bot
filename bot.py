@@ -188,7 +188,7 @@ async def raid_list(interaction: discord.Interaction):
         await interaction.response.send_message("등록된 레이드가 없습니다.")
         return
 
-    embed = make_simple_embed(title="📋 레이드")
+    embed = make_simple_embed(title="📋 레이드 목록")
 
     lines = []
     for raid_name, raid_data in active_raids.items():
@@ -1067,5 +1067,6 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
