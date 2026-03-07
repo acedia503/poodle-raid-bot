@@ -667,38 +667,19 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
 # /공대확인
 # =========================
 
-
 @bot.tree.command(name="공대확인", description="저장된 공대 편성 조회")
-@app_commands.describe(
-    레이드이름="조회할 레이드 이름",
-    나만보기="나만 보기로 표시"
-)
-async def party_list(
-    interaction: discord.Interaction,
-    레이드이름: str,
-    나만보기: Literal["나만보기"] | None = None
-):
+@app_commands.describe(레이드이름="조회할 레이드 이름")
+async def party_list(interaction: discord.Interaction, 레이드이름: str):
     if not ensure_allowed_guild_or_reply(interaction):
-        await interaction.response.send_message(
-            "이 서버에서는 사용할 수 없는 봇입니다.",
-            ephemeral=True
-        )
+        await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
         return
 
     if 레이드이름 not in active_raids:
-        await interaction.response.send_message(
-            "존재하지 않는 레이드입니다.",
-            ephemeral=True
-        )
+        await interaction.response.send_message("존재하지 않는 레이드입니다.", ephemeral=True)
         return
 
     is_admin = interaction.user.guild_permissions.administrator
-
-    # 일반 유저는 항상 나만보기
-    if not is_admin:
-        is_ephemeral = True
-    else:
-        is_ephemeral = (나만보기 == "나만보기")
+    is_ephemeral = not is_admin   # 관리자는 공개, 일반 유저는 나만 보기
 
     await interaction.response.defer(ephemeral=is_ephemeral)
 
@@ -1164,23 +1145,3 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
