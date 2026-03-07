@@ -205,7 +205,7 @@ class FullPartyResolveView(discord.ui.View):
             ]
 
         self.target_select = discord.ui.Select(
-            placeholder="밀어낼 공대원을 선택하세요",
+            placeholder="추가 이동할 공대원을 선택하세요",
             min_values=1,
             max_values=1,
             options=target_options,
@@ -245,7 +245,7 @@ class FullPartyResolveView(discord.ui.View):
                     )
 
         self.destination_select = discord.ui.Select(
-            placeholder="밀려난 공대원을 어디로 이동할지 선택하세요",
+            placeholder="추가 이동할 공대원을 어디로 이동할지 선택하세요",
             min_values=1,
             max_values=1,
             options=destination_options[:25],
@@ -285,11 +285,11 @@ class FullPartyResolveView(discord.ui.View):
     @discord.ui.button(label="확정", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.selected_target_value or self.selected_target_value == "__none__":
-            await interaction.response.send_message("먼저 밀어낼 공대원을 선택해주세요.", ephemeral=True)
+            await interaction.response.send_message("먼저 추가 이동할 공대원을 선택해주세요.", ephemeral=True)
             return
 
         if not self.selected_destination:
-            await interaction.response.send_message("밀려난 공대원의 이동 위치를 선택해주세요.", ephemeral=True)
+            await interaction.response.send_message("추가 이동할 공대원의 이동 위치를 선택해주세요.", ephemeral=True)
             return
 
         try:
