@@ -100,6 +100,7 @@ def fetch_character_from_atool(character_name: str) -> dict:
     job = character.get("job")
     ilvl = to_int(character.get("combat_power"))
     score = to_int(character.get("combat_score"))
+    max_score = to_int(character.get("combat_score_max"))
 
     if not job:
         raise ValueError(f"직업 정보가 없습니다: {character}")
@@ -108,6 +109,7 @@ def fetch_character_from_atool(character_name: str) -> dict:
         "job": job,
         "ilvl": ilvl,
         "score": score
+        "max_score": max_score
     }
 
 
@@ -126,12 +128,14 @@ def get_character_info(character_name: str) -> dict:
         and "job" in cached
         and "ilvl" in cached
         and "score" in cached
+        and "max_score" in cached
         and now - cached["ts"] < CACHE_SECONDS
     ):
         return {
             "job": cached["job"],
             "ilvl": cached["ilvl"],
-            "score": cached["score"]
+            "score": cached["score"],
+            "max_score": cached["max_score"]
         }
 
     data = fetch_character_from_atool(character_name)
@@ -140,7 +144,9 @@ def get_character_info(character_name: str) -> dict:
         "job": data["job"],
         "ilvl": data["ilvl"],
         "score": data["score"],
+        "max_score": data["max_score"],
         "ts": now
     }
+
 
     return data
