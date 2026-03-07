@@ -555,20 +555,31 @@ async def force_cancel_apply(interaction: discord.Interaction, 레이드이름: 
 @app_commands.describe(레이드이름="공대를 생성할 레이드 이름")
 @app_commands.default_permissions(administrator=True)
 @app_commands.checks.has_permissions(administrator=True)
-async def raid_create(interaction: discord.Interaction):
-    await interaction.response.send_message("공대 생성!", ephemeral=True)
+async def raid_create(interaction: discord.Interaction, 레이드이름: str):
+    await make_party(interaction, 레이드이름)
+
+
 async def make_party(interaction: discord.Interaction, 레이드이름: str):
     if not ensure_allowed_guild_or_reply(interaction):
-        await interaction.response.send_message("이 서버에서는 사용할 수 없는 봇입니다.", ephemeral=True)
+        await interaction.response.send_message(
+            "이 서버에서는 사용할 수 없는 봇입니다.",
+            ephemeral=True
+        )
         return
 
     if 레이드이름 not in active_raids:
-        await interaction.response.send_message("존재하지 않는 레이드입니다.", ephemeral=True)
+        await interaction.response.send_message(
+            "존재하지 않는 레이드입니다.",
+            ephemeral=True
+        )
         return
 
     members = active_raids[레이드이름]["members"]
     if not members:
-        await interaction.response.send_message("신청자가 없습니다.")
+        await interaction.response.send_message(
+            "신청자가 없습니다.",
+            ephemeral=True
+        )
         return
 
     await interaction.response.defer()
@@ -640,7 +651,11 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
 
     if all_invalid_members:
         invalid_embed = make_simple_embed(title="🚫 제외 인원")
-        add_long_text_fields(invalid_embed, f"{len(all_invalid_members)}명", "\n".join(all_invalid_members))
+        add_long_text_fields(
+            invalid_embed,
+            f"{len(all_invalid_members)}명",
+            "\n".join(all_invalid_members)
+        )
         await interaction.followup.send(embed=invalid_embed)
 
 
@@ -1120,6 +1135,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
