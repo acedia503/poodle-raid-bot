@@ -281,6 +281,20 @@ def delete_raid(raid_name: str) -> bool:
             return cur.rowcount > 0
 
 
+def count_raid_members(raid_name: str) -> int:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM raid_members
+                WHERE raid_name = %s
+                """,
+                (raid_name,)
+            )
+            row = cur.fetchone()
+            return row[0] if row else 0
+
 # =========================
 # 신청자 저장
 # =========================
@@ -605,3 +619,4 @@ def load_generated_parties(raid_name: str):
 
             return clean_raids, waiting_members, excluded_members
         
+
