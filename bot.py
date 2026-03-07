@@ -1014,6 +1014,32 @@ async def modify_party(
     )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
+# =========================
+# 개인 아툴 점수 조회
+# =========================
+
+@bot.tree.command(name="아툴", description="개인 아툴 점수 조회")
+@app_commands.describe(캐릭터명="조회할 캐릭터 이름")
+async def search_atool(interaction: discord.Interaction, 캐릭터명: str):
+    await interaction.response.defer(thinking=True)
+
+    try:
+        data = get_character_info(캐릭터명)
+
+        embed = discord.Embed(
+            title=f"{캐릭터명} 아툴 조회",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="직업", value=str(data.get("job", "알수없음")), inline=True)
+        embed.add_field(name="아이템레벨", value=str(data.get("ilvl", 0)), inline=True)
+        embed.add_field(name="아툴 점수", value=str(data.get("score", 0)), inline=True)
+
+        await interaction.followup.send(embed=embed)
+
+    except Exception as e:
+        await interaction.followup.send(f"조회 실패: {type(e).__name__}: {e}")
+
 # =========================
 # 관리자 권한 에러
 # =========================
@@ -1072,6 +1098,7 @@ async def on_app_command_error(interaction: discord.Interaction, error):
 
 
 bot.run(TOKEN)
+
 
 
 
