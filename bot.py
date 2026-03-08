@@ -177,11 +177,13 @@ async def send_interaction_message(
 async def send_long_text_followup(
     interaction: discord.Interaction,
     text: str,
-    limit: int = 1900,
+    limit: int = 1800,
 ):
     lines = str(text).split("\n")
-    for chunk in split_lines_by_length(lines, limit=limit):
-        await interaction.followup.send(chunk)
+    chunks = split_lines_by_length(lines, limit=limit)
+
+    for chunk in chunks:
+        await interaction.followup.send(f"```{chunk}```")
 
 
 # =========================
@@ -1283,8 +1285,3 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 
 
 bot.run(TOKEN)
-
-
-
-
-
