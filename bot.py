@@ -566,7 +566,7 @@ async def list_members(interaction: discord.Interaction, 레이드이름: str):
         all_lines.extend(["", "**조회 실패**"])
         all_lines.extend(fail_lines)
 
-    chunks = split_lines_by_length(all_lines, limit=3800)
+    chunks = split_lines_by_length(all_lines, limit=1900)
 
     for page, chunk in enumerate(chunks, start=1):
         title = f"📋 {레이드이름} 신청 목록"
@@ -1283,6 +1283,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 
 
 bot.run(TOKEN)
+
 
 
 
