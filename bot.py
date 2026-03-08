@@ -13,7 +13,11 @@ from discord.ext import commands
 
 from atool import get_character_info
 from models import Character
-from raid_logic import build_balanced_raids, format_raid_result
+from raid_logic import (
+    build_balanced_raids,
+    format_raid_result,
+    format_saved_raid_result,
+)
 from storage import (
     add_raid_member,
     init_db,
@@ -177,13 +181,12 @@ async def send_interaction_message(
 async def send_long_text_followup(
     interaction: discord.Interaction,
     text: str,
-    limit: int = 1800,
+    limit: int = 1900,
+    ephemeral: bool = False,
 ):
     lines = str(text).split("\n")
-    chunks = split_lines_by_length(lines, limit=limit)
-
-    for chunk in chunks:
-        await interaction.followup.send(f"```{chunk}```")
+    for chunk in split_lines_by_length(lines, limit=limit):
+        await interaction.followup.send(chunk, ephemeral=ephemeral)
 
 
 # =========================
@@ -821,17 +824,23 @@ async def party_list(interaction: discord.Interaction, 레이드이름: str):
         return
 
     if not raids and not waiting_members and not excluded_members:
-        embed = make_simple_embed(
-            title="📭 저장된 공대 없음",
-            description=f"레이드: **{레이드이름}**\n먼저 `/공대생성`을 실행해주세요.",
+        await interaction.followup.send(
+            f"[{레이드이름}] 저장된 공대가 없습니다.\n먼저 /공대생성을 실행해주세요.",
+            ephemeral=is_ephemeral,
         )
-        await interaction.followup.send(embed=embed, ephemeral=is_ephemeral)
         return
 
-    embeds = build_party_result_embeds(레이드이름, raids, waiting_members, excluded_members)
-
-    for embed in embeds:
-        await interaction.followup.send(embed=embed, ephemeral=is_ephemeral)
+    result_text = format_saved_raid_result(
+        레이드이름,
+        raids,
+        waiting_members,
+        excluded_members,
+    )
+    await send_long_text_followup(
+        interaction,
+        result_text,
+        ephemeral=is_ephemeral,
+    )
 
 
 # =========================
@@ -1285,3 +1294,4 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 
 
 bot.run(TOKEN)
+
