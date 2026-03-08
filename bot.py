@@ -13,7 +13,7 @@ from discord.ext import commands
 
 from atool import get_character_info
 from models import Character
-from raid_logic import build_balanced_raids
+from raid_logic import build_balanced_raids, format_raid_result
 from storage import (
     add_raid_member,
     init_db,
@@ -35,15 +35,12 @@ from ui_helpers import (
     add_long_text_fields,
     build_party_result_embeds,
     split_lines_by_length,
-    format_member_line,
-    split_lines_by_length,
 )
 from views import (
     ClearPartyView,
     DeleteRaidConfirmView,
     FullPartyResolveView,
 )
-
 
 # =========================
 # 기본 설정
@@ -1286,6 +1283,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 
 
 bot.run(TOKEN)
+
 
 
 
