@@ -518,7 +518,7 @@ def format_raid_result(
             )
             
         result_lines.append("")
-        result_lines.append("==========")
+        result_lines.append("==================================================")
 
     if waiting_members:
         waiting_count = len(waiting_members)
@@ -556,6 +556,7 @@ def format_raid_result(
         result_lines.append(f"- 공대 평균 아툴 차이: {max(raid_avg_scores) - min(raid_avg_scores)}")
 
     return "\n".join(result_lines)
+
 
 
 
