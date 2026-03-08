@@ -353,7 +353,7 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
         )
         return
 
-    await interaction.response.defer(ephemeral=True)
+    await interaction.response.defer(ephemeral=False)
 
     레이드이름 = 레이드이름.strip()
     캐릭터명 = 캐릭터명.strip()
@@ -1276,4 +1276,5 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 
 
 bot.run(TOKEN)
+
 
