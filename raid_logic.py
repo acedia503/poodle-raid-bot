@@ -514,6 +514,8 @@ def format_raid_result(
                 f"템렙 {safe_int(member.get('ilvl'), 0)} | "
                 f"아툴 {safe_int(member.get('score'), 0)}"
             )
+            
+        result_lines.append("")
 
     if waiting_members:
         waiting_count = len(waiting_members)
@@ -551,4 +553,5 @@ def format_raid_result(
         result_lines.append(f"- 공대 평균 아툴 차이: {max(raid_avg_scores) - min(raid_avg_scores)}")
 
     return "\n".join(result_lines)
+
 
