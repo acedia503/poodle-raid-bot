@@ -515,13 +515,6 @@ def format_raid_result(
                 f"아툴 {safe_int(member.get('score'), 0)}"
             )
 
-        result_lines.append("")
-        result_lines.append(
-            f"균형요약 | 파티 총 아툴 차이 {abs(party1_score - party2_score)} | "
-            f"파티 평균 아툴 차이 {abs(party1_avg_score - party2_avg_score)} | "
-            f"파티 평균 템렙 차이 {abs(party1_avg_ilvl - party2_avg_ilvl)}"
-        )
-
     if waiting_members:
         waiting_count = len(waiting_members)
         waiting_score = sum(safe_int(m.get("score"), 0) for m in waiting_members)
@@ -558,3 +551,4 @@ def format_raid_result(
         result_lines.append(f"- 공대 평균 아툴 차이: {max(raid_avg_scores) - min(raid_avg_scores)}")
 
     return "\n".join(result_lines)
+
