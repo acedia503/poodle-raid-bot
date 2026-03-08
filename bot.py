@@ -427,7 +427,7 @@ async def apply_raid(interaction: discord.Interaction, 레이드이름: str, 캐
             f"아툴 점수: **{data['score']}**"
         ),
     )
-    await interaction.followup.send(embed=embed, ephemeral=True)
+    await interaction.followup.send(embed=embed, ephemeral=False)
 
 
 # =========================
@@ -1276,3 +1276,4 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 
 
 bot.run(TOKEN)
+
