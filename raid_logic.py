@@ -448,9 +448,9 @@ def format_raid_result(
     레이드이름: str,
     raids: list[dict[str, list[dict[str, Any]]]],
     waiting_members: list[dict[str, Any]],
-    invalid_members: list[str]
+    invalid_members: list[str],
 ) -> str:
-    result_lines = [f"[{레이드이름}] 공대 생성 결과"]
+    result_lines: list[str] = [f"[{레이드이름}] 공대 생성 결과"]
     raid_scores: list[int] = []
     raid_avg_scores: list[int] = []
     raid_avg_ilvls: list[int] = []
@@ -481,37 +481,45 @@ def format_raid_result(
         party1_avg_ilvl = party1_ilvl // party1_count if party1_count else 0
         party2_avg_ilvl = party2_ilvl // party2_count if party2_count else 0
 
-        party1_jobs = ", ".join(m.get("job", "-") for m in party1 if m) or "-"
-        party2_jobs = ", ".join(m.get("job", "-") for m in party2 if m) or "-"
-
         raid_scores.append(total_score)
         raid_avg_scores.append(avg_score)
         raid_avg_ilvls.append(avg_ilvl)
 
+        result_lines.append("")
         result_lines.append(
-            f"\n[{idx}공대] "
-            f"총 아툴: {total_score} | 평균 아툴: {avg_score} | 평균 템렙: {avg_ilvl}"
+            f"[{idx}공대] 총 아툴 {total_score} | 평균 아툴 {avg_score} | 평균 템렙 {avg_ilvl}"
         )
 
         result_lines.append(
-            f"- 1파티 | 총 아툴: {party1_score} | 평균 아툴: {party1_avg_score} | "
-            f"평균 템렙: {party1_avg_ilvl} | 직업: {party1_jobs}"
+            f"1파티 | 총 아툴 {party1_score} | 평균 아툴 {party1_avg_score} | 평균 템렙 {party1_avg_ilvl}"
         )
         for member in party1:
-            result_lines.append(f"  · {format_member_line(member)}")
+            result_lines.append(
+                f"- {member.get('user_name', '알수없음')} | "
+                f"{member.get('name', '-')} | "
+                f"{member.get('job', '-')} | "
+                f"템렙 {safe_int(member.get('ilvl'), 0)} | "
+                f"아툴 {safe_int(member.get('score'), 0)}"
+            )
 
+        result_lines.append("")
         result_lines.append(
-            f"- 2파티 | 총 아툴: {party2_score} | 평균 아툴: {party2_avg_score} | "
-            f"평균 템렙: {party2_avg_ilvl} | 직업: {party2_jobs}"
+            f"2파티 | 총 아툴 {party2_score} | 평균 아툴 {party2_avg_score} | 평균 템렙 {party2_avg_ilvl}"
         )
         for member in party2:
-            result_lines.append(f"  · {format_member_line(member)}")
+            result_lines.append(
+                f"- {member.get('user_name', '알수없음')} | "
+                f"{member.get('name', '-')} | "
+                f"{member.get('job', '-')} | "
+                f"템렙 {safe_int(member.get('ilvl'), 0)} | "
+                f"아툴 {safe_int(member.get('score'), 0)}"
+            )
 
+        result_lines.append("")
         result_lines.append(
-            "- 균형요약 | "
-            f"파티 총 아툴 차이: {abs(party1_score - party2_score)} | "
-            f"파티 평균 아툴 차이: {abs(party1_avg_score - party2_avg_score)} | "
-            f"파티 평균 템렙 차이: {abs(party1_avg_ilvl - party2_avg_ilvl)}"
+            f"균형요약 | 파티 총 아툴 차이 {abs(party1_score - party2_score)} | "
+            f"파티 평균 아툴 차이 {abs(party1_avg_score - party2_avg_score)} | "
+            f"파티 평균 템렙 차이 {abs(party1_avg_ilvl - party2_avg_ilvl)}"
         )
 
     if waiting_members:
@@ -521,24 +529,32 @@ def format_raid_result(
         waiting_avg_score = waiting_score // waiting_count if waiting_count else 0
         waiting_avg_ilvl = waiting_ilvl // waiting_count if waiting_count else 0
 
+        result_lines.append("")
         result_lines.append(
-            f"\n[대기 인원] 총 아툴: {waiting_score} | "
-            f"평균 아툴: {waiting_avg_score} | 평균 템렙: {waiting_avg_ilvl}"
+            f"[대기 인원] 총 아툴 {waiting_score} | 평균 아툴 {waiting_avg_score} | 평균 템렙 {waiting_avg_ilvl}"
         )
         for member in waiting_members:
-            result_lines.append(format_member_line(member))
+            result_lines.append(
+                f"- {member.get('user_name', '알수없음')} | "
+                f"{member.get('name', '-')} | "
+                f"{member.get('job', '-')} | "
+                f"템렙 {safe_int(member.get('ilvl'), 0)} | "
+                f"아툴 {safe_int(member.get('score'), 0)}"
+            )
 
     if invalid_members:
-        result_lines.append("\n[제외 인원]")
-        result_lines.extend(invalid_members)
+        result_lines.append("")
+        result_lines.append("[제외 인원]")
+        result_lines.extend(f"- {line}" for line in invalid_members)
 
     if raid_scores:
-        result_lines.append("\n[균형 요약]")
-        result_lines.append(f"최고 공대 총 아툴: {max(raid_scores)}")
-        result_lines.append(f"최저 공대 총 아툴: {min(raid_scores)}")
-        result_lines.append(f"공대 총 아툴 차이: {max(raid_scores) - min(raid_scores)}")
-        result_lines.append(f"최고 공대 평균 아툴: {max(raid_avg_scores)}")
-        result_lines.append(f"최저 공대 평균 아툴: {min(raid_avg_scores)}")
-        result_lines.append(f"공대 평균 아툴 차이: {max(raid_avg_scores) - min(raid_avg_scores)}")
+        result_lines.append("")
+        result_lines.append("[전체 균형 요약]")
+        result_lines.append(f"- 최고 공대 총 아툴: {max(raid_scores)}")
+        result_lines.append(f"- 최저 공대 총 아툴: {min(raid_scores)}")
+        result_lines.append(f"- 공대 총 아툴 차이: {max(raid_scores) - min(raid_scores)}")
+        result_lines.append(f"- 최고 공대 평균 아툴: {max(raid_avg_scores)}")
+        result_lines.append(f"- 최저 공대 평균 아툴: {min(raid_avg_scores)}")
+        result_lines.append(f"- 공대 평균 아툴 차이: {max(raid_avg_scores) - min(raid_avg_scores)}")
 
     return "\n".join(result_lines)
