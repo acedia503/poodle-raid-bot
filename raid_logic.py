@@ -485,7 +485,7 @@ def format_raid_result(
         raid_avg_scores.append(avg_score)
         raid_avg_ilvls.append(avg_ilvl)
 
-        result_lines.append("")
+        
         result_lines.append("")
         result_lines.append(
             f"[{idx}공대] 총 아툴 {total_score} | 평균 아툴 {avg_score} | 평균 템렙 {avg_ilvl}"
@@ -518,6 +518,7 @@ def format_raid_result(
             )
             
         result_lines.append("")
+        result_lines.append("==========")
 
     if waiting_members:
         waiting_count = len(waiting_members)
@@ -528,7 +529,7 @@ def format_raid_result(
 
         result_lines.append("")
         result_lines.append(
-            f"[대기 인원] 총 아툴 {waiting_score} | 평균 아툴 {waiting_avg_score} | 평균 템렙 {waiting_avg_ilvl}"
+            f"[대기 인원]"
         )
         for member in waiting_members:
             result_lines.append(
@@ -555,6 +556,7 @@ def format_raid_result(
         result_lines.append(f"- 공대 평균 아툴 차이: {max(raid_avg_scores) - min(raid_avg_scores)}")
 
     return "\n".join(result_lines)
+
 
 
 
