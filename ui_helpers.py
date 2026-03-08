@@ -69,27 +69,40 @@ def split_text_by_lines(text: str, limit: int = SAFE_TEXT_LIMIT) -> list[str]:
     return chunks or ["-"]
 
 
-def split_lines_by_length(lines: list[str], limit: int = 3800) -> list[str]:
+def split_lines_by_length(lines: list[str], limit: int = 1900) -> list[str]:
     chunks: list[str] = []
     current = ""
 
-    for line in lines:
-        line = str(line)
+    for raw_line in lines:
+        line = str(raw_line)
 
         if not current:
-            current = line
+            if len(line) <= limit:
+                current = line
+            else:
+                while len(line) > limit:
+                    chunks.append(line[:limit])
+                    line = line[limit:]
+                current = line
             continue
 
         if len(current) + 1 + len(line) > limit:
             chunks.append(current)
-            current = line
+
+            if len(line) <= limit:
+                current = line
+            else:
+                while len(line) > limit:
+                    chunks.append(line[:limit])
+                    line = line[limit:]
+                current = line
         else:
             current += "\n" + line
 
     if current:
         chunks.append(current)
 
-    return chunks
+    return chunks or ["-"]
 
 
 def add_long_text_fields(
