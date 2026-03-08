@@ -35,6 +35,8 @@ from ui_helpers import (
     add_long_text_fields,
     build_party_result_embeds,
     split_lines_by_length,
+    format_member_line,
+    split_lines_by_length,
 )
 from views import (
     ClearPartyView,
@@ -173,6 +175,16 @@ async def send_interaction_message(
             view=view,
             ephemeral=ephemeral,
         )
+
+
+async def send_long_text_followup(
+    interaction: discord.Interaction,
+    text: str,
+    limit: int = 1900,
+):
+    lines = str(text).split("\n")
+    for chunk in split_lines_by_length(lines, limit=limit):
+        await interaction.followup.send(chunk)
 
 
 # =========================
@@ -694,24 +706,30 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
 
     for member in members:
         try:
-            char_name = getattr(member, "name", "")
-            user_name = getattr(member, "user_name", "알수없음")
+            char_name = str(getattr(member, "name", "")).strip()
+            user_name = str(getattr(member, "user_name", "알수없음")).strip()
+
+            if not char_name:
+                invalid_members.append(f"{user_name} | 캐릭터명없음 | 조회실패")
+                continue
+
             data = safe_character_data(char_name)
 
-            if data["ilvl"] < min_ilvl:
+            if safe_int(data.get("ilvl"), 0) < min_ilvl:
                 invalid_members.append(
-                    f"{user_name} | {char_name} | {data['ilvl']} | 입장불가"
+                    f"{user_name} | {char_name} | {safe_int(data.get('ilvl'), 0)} | 입장불가"
                 )
                 continue
 
             refreshed_members.append({
-                "user_id": getattr(member, "user_id", 0),
-                "user_name": user_name,
+                "user_id": safe_int(getattr(member, "user_id", 0), 0),
+                "user_name": user_name or "알수없음",
                 "name": char_name,
-                "job": data["job"],
-                "ilvl": data["ilvl"],
-                "score": data["score"],
+                "job": str(data.get("job", "-")).strip() or "-",
+                "ilvl": safe_int(data.get("ilvl"), 0),
+                "score": safe_int(data.get("score"), 0),
             })
+
         except Exception:
             logging.exception("공대생성 아툴 조회 실패")
             invalid_members.append(
@@ -720,63 +738,55 @@ async def make_party(interaction: discord.Interaction, 레이드이름: str):
             )
 
     if len(refreshed_members) < 8:
-        embed = make_simple_embed(
-            title="❌ 공대 생성 실패",
-            description=f"유효 인원이 부족합니다.\n현재 인원: **{len(refreshed_members)}명**",
-        )
+        fail_lines = [
+            "❌ 공대 생성 실패",
+            f"유효 인원이 부족합니다. 현재 인원: {len(refreshed_members)}명",
+        ]
+
         if invalid_members:
-            add_long_text_fields(embed, "제외 인원", "\n".join(invalid_members))
-        await interaction.followup.send(embed=embed)
+            fail_lines.append("")
+            fail_lines.append("[제외 인원]")
+            fail_lines.extend(invalid_members)
+
+        await send_long_text_followup(interaction, "\n".join(fail_lines))
         return
 
     raids, waiting_members, build_invalid_members = build_balanced_raids(refreshed_members)
     all_invalid_members = invalid_members + build_invalid_members
 
     if not raids:
-        embed = make_simple_embed(
-            title="❌ 공대 생성 실패",
-            description="공대를 생성할 수 없습니다.",
-        )
+        fail_lines = [
+            "❌ 공대 생성 실패",
+            "공대를 생성할 수 없습니다.",
+        ]
+
         if all_invalid_members:
-            add_long_text_fields(embed, "제외 인원", "\n".join(all_invalid_members))
-        await interaction.followup.send(embed=embed)
+            fail_lines.append("")
+            fail_lines.append("[제외 인원]")
+            fail_lines.extend(all_invalid_members)
+
+        await send_long_text_followup(interaction, "\n".join(fail_lines))
         return
 
-    embeds = build_party_result_embeds(레이드이름, raids, waiting_members, [])
+    result_text = format_raid_result(
+        레이드이름,
+        raids,
+        waiting_members,
+        all_invalid_members,
+    )
 
     try:
         save_generated_parties(레이드이름, raids, waiting_members, [])
     except Exception:
         logging.exception("공대 저장 실패")
-        for embed in embeds:
-            await interaction.followup.send(embed=embed)
-
-        if all_invalid_members:
-            invalid_embed = make_simple_embed(title="🚫 제외 인원")
-            add_long_text_fields(
-                invalid_embed,
-                f"{len(all_invalid_members)}명",
-                "\n".join(all_invalid_members),
-            )
-            await interaction.followup.send(embed=invalid_embed)
-
-        await interaction.followup.send(
-            "공대 생성 결과는 표시했지만 저장 중 오류가 발생했습니다.",
+        result_text += (
+            "\n\n[저장 상태]\n"
+            "공대 생성 결과는 표시했지만 저장 중 오류가 발생했습니다."
         )
+        await send_long_text_followup(interaction, result_text)
         return
 
-    for embed in embeds:
-        await interaction.followup.send(embed=embed)
-
-    if all_invalid_members:
-        invalid_embed = make_simple_embed(title="🚫 제외 인원")
-        add_long_text_fields(
-            invalid_embed,
-            f"{len(all_invalid_members)}명",
-            "\n".join(all_invalid_members),
-        )
-        await interaction.followup.send(embed=invalid_embed)
-
+    await send_long_text_followup(interaction, result_text)
 
 # =========================
 # /공대확인
@@ -1276,5 +1286,6 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 
 
 bot.run(TOKEN)
+
 
 
