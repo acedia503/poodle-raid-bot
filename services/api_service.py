@@ -87,7 +87,7 @@ class HttpApiService:
         params = {
             "keyword": character_name.strip(),
             "page": 1,
-            "size": 1,
+            "size": 10,
         }
 
         if race:
@@ -102,14 +102,29 @@ class HttpApiService:
                 raise InvalidApiResponseError(f"알 수 없는 서버입니다: {server}")
             params["serverId"] = server_id
 
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/136.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json, text/plain, */*",
+            "Referer": "https://aion2.plaync.com/",
+        }
+
         try:
             response = requests.get(
                 self.base_url,
                 params=params,
+                headers=headers,
                 timeout=self.timeout,
             )
         except requests.RequestException as exc:
             raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
+
+        print("AION2 REQUEST URL:", response.url)
+        print("AION2 STATUS:", response.status_code)
+        print("AION2 RESPONSE TEXT:", response.text[:1000])
 
         if response.status_code == 404:
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
@@ -123,26 +138,37 @@ class HttpApiService:
             raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
 
         print("AION2 RAW RESPONSE:", data)
-        return self._extract_character(data)
+        return self._extract_character(data, character_name.strip())
 
-    def _extract_character(self, data: dict[str, Any]) -> dict[str, Any]:
-            char_list = data.get("list", [])
-            if not char_list:
-                raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
-    
-            char = char_list[0]
-            item_level = self._extract_item_level(char)
-    
-            return {
-                "character_name": char.get("characterName", ""),
-                "job": char.get("className", ""),
-                "item_level": item_level,
-                "combat_power": int(char.get("combatPower", 0)),
-                "server": char.get("serverName"),
-                "race": char.get("raceName"),
-                "level": char.get("characterLevel"),
-                "guild_name": char.get("titleName"),
-            }
+    def _extract_character(self, data: dict[str, Any], keyword: str) -> dict[str, Any]:
+        char_list = data.get("list", [])
+        if not char_list:
+            raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
+
+        matched = None
+        for char in char_list:
+            if str(char.get("characterName", "")).strip() == keyword.strip():
+                matched = char
+                break
+
+        if matched is None:
+            matched = char_list[0]
+
+        item_level = self._extract_item_level(matched)
+
+        result = {
+            "character_name": str(matched.get("characterName") or "-"),
+            "job": str(matched.get("className") or "-"),
+            "item_level": int(item_level or 0),
+            "combat_power": int(matched.get("combatPower") or 0),
+            "server": str(matched.get("serverName") or "-"),
+            "race": str(matched.get("raceName") or "-"),
+            "level": str(matched.get("characterLevel") or "-"),
+            "guild_name": str(matched.get("titleName") or "-"),
+        }
+
+        print("AION2 PARSED RESULT:", result)
+        return result
 
     def _extract_item_level(self, char: dict[str, Any]) -> int:
         stat_list = char.get("stat", {}).get("statList", [])
