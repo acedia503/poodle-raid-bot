@@ -20,6 +20,7 @@ class RaceButtonView(discord.ui.View):
 
     @discord.ui.button(label="천족", style=discord.ButtonStyle.primary)
     async def elyos_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        print("RACE BUTTON CLICKED", self.character_name, "천족")
         selected_race = "천족"
         view = ServerSelectView(
             character_name=self.character_name,
@@ -35,6 +36,7 @@ class RaceButtonView(discord.ui.View):
 
     @discord.ui.button(label="마족", style=discord.ButtonStyle.danger)
     async def asmodian_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        print("RACE BUTTON CLICKED", self.character_name, "마족")
         selected_race = "마족"
         view = ServerSelectView(
             character_name=self.character_name,
