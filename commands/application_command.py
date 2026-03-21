@@ -18,7 +18,7 @@ class ApplicationCommand(commands.Cog):
     async def apply(self, interaction: discord.Interaction, character_name: str):
         setting = self.setting_service.get_guild_setting(interaction.guild.id)
 
-        # 기본 설정 없음 → 종족 선택 UI
+        # 기본 설정 없음 → 종족/서버 선택
         if not setting:
             async def race_callback(inter, race):
                 await inter.response.edit_message(
@@ -37,7 +37,7 @@ class ApplicationCommand(commands.Cog):
             )
             return
 
-        # 기본 설정 있음
+        # 기본 설정 있음 → 바로 처리
         await self._process(
             interaction,
             character_name,
@@ -59,11 +59,20 @@ class ApplicationCommand(commands.Cog):
             server=server,
         )
 
-        if result["action"] in ["created", "show_current"]:
+        if result["action"] == "created":
             text = self.message_service.build_application_result_text(
                 result["raid_name"],
                 result["info"],
-                "created" if result["action"] == "created" else "updated",
+                "created",
+                show_identity=show_identity,
+            )
+            await interaction.channel.send(text)
+
+        elif result["action"] == "show_current":
+            text = self.message_service.build_application_result_text(
+                result["raid_name"],
+                result["info"],
+                "updated",
                 show_identity=show_identity,
             )
             await interaction.channel.send(text)
@@ -78,5 +87,10 @@ class ApplicationCommand(commands.Cog):
 
         else:
             await interaction.followup.send(result["message"], ephemeral=True)
+            return
 
-        await interaction.delete_original_response()
+        await interaction.edit_original_response(
+            content="처리가 완료되었습니다.",
+            embed=None,
+            view=None,
+        )
