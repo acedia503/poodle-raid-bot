@@ -14,6 +14,8 @@ from services.application_service import ApplicationService
 from services.message_service import MessageService
 from services.raid_service import RaidService
 from services.setting_service import SettingService
+from services.character_info_service import CharacterInfoService
+from services.api_service import HttpApiService
 
 
 def create_bot() -> commands.Bot:
@@ -25,6 +27,8 @@ def create_bot() -> commands.Bot:
     guild_setting_repository = GuildSettingRepository(database)
     channel_raid_repository = ChannelRaidRepository(database)
     raid_application_repository = RaidApplicationRepository(database)
+    api_service = HttpApiService(timeout=config.api_timeout)
+    character_info_service = CharacterInfoService(api_service)
 
     if config.api_mode == "http":
         api_service = HttpApiService(
@@ -54,6 +58,7 @@ def create_bot() -> commands.Bot:
         await bot.add_cog(SettingCommand(bot, setting_service, message_service))
         await bot.add_cog(RaidCommand(bot, raid_service, message_service))
         await bot.add_cog(ApplicationCommand(bot, application_service, message_service))
+        await bot.add_cog(InfoCommand(bot, character_info_service, message_service))
         await bot.tree.sync()
 
     bot.setup_hook = setup_hook
