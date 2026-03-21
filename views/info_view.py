@@ -20,35 +20,61 @@ class RaceButtonView(discord.ui.View):
 
     @discord.ui.button(label="천족", style=discord.ButtonStyle.primary)
     async def elyos_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        print("RACE BUTTON CLICKED", self.character_name, "천족")
-        selected_race = "천족"
-        view = ServerSelectView(
-            character_name=self.character_name,
-            race=selected_race,
-            info_service=self.info_service,
-            message_service=self.message_service,
-        )
-        await interaction.response.edit_message(
-            content=f"캐릭터명: **{self.character_name}**\n종족: **{selected_race}**\n서버를 선택하세요.",
-            view=view,
-            embed=None,
-        )
+        try:
+            selected_race = "천족"
+            view = ServerSelectView(
+                character_name=self.character_name,
+                race=selected_race,
+                info_service=self.info_service,
+                message_service=self.message_service,
+            )
+            await interaction.response.edit_message(
+                content=f"캐릭터명: **{self.character_name}**\n종족: **{selected_race}**\n서버를 선택하세요.",
+                view=view,
+                embed=None,
+            )
+        except Exception as exc:
+            print("RACE BUTTON ERROR", repr(exc))
+            if interaction.response.is_done():
+                await interaction.edit_original_response(
+                    content=f"종족 선택 중 오류: {exc}",
+                    view=None,
+                    embed=None,
+                )
+            else:
+                await interaction.response.send_message(
+                    f"종족 선택 중 오류: {exc}",
+                    ephemeral=True,
+                )
 
     @discord.ui.button(label="마족", style=discord.ButtonStyle.danger)
     async def asmodian_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        print("RACE BUTTON CLICKED", self.character_name, "마족")
-        selected_race = "마족"
-        view = ServerSelectView(
-            character_name=self.character_name,
-            race=selected_race,
-            info_service=self.info_service,
-            message_service=self.message_service,
-        )
-        await interaction.response.edit_message(
-            content=f"캐릭터명: **{self.character_name}**\n종족: **{selected_race}**\n서버를 선택하세요.",
-            view=view,
-            embed=None,
-        )
+        try:
+            selected_race = "마족"
+            view = ServerSelectView(
+                character_name=self.character_name,
+                race=selected_race,
+                info_service=self.info_service,
+                message_service=self.message_service,
+            )
+            await interaction.response.edit_message(
+                content=f"캐릭터명: **{self.character_name}**\n종족: **{selected_race}**\n서버를 선택하세요.",
+                view=view,
+                embed=None,
+            )
+        except Exception as exc:
+            print("RACE BUTTON ERROR", repr(exc))
+            if interaction.response.is_done():
+                await interaction.edit_original_response(
+                    content=f"종족 선택 중 오류: {exc}",
+                    view=None,
+                    embed=None,
+                )
+            else:
+                await interaction.response.send_message(
+                    f"종족 선택 중 오류: {exc}",
+                    ephemeral=True,
+                )
 
 
 class ServerSelect(discord.ui.Select):
@@ -81,7 +107,7 @@ class ServerSelect(discord.ui.Select):
         selected_server = self.values[0]
         print("INFO CALLBACK START", self.character_name, self.race, selected_server)
 
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer()
 
         try:
             info = await asyncio.to_thread(
