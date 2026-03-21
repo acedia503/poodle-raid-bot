@@ -1,7 +1,7 @@
 from services.api_service import (
+    BaseApiService,
     CharacterNotFoundError,
     ExternalApiRequestError,
-    HttpApiService,
     InvalidApiResponseError,
 )
 
@@ -11,7 +11,7 @@ class CharacterInfoError(Exception):
 
 
 class CharacterInfoService:
-    def __init__(self, api_service: HttpApiService):
+    def __init__(self, api_service: BaseApiService):
         self.api_service = api_service
 
     def get_character_info(
