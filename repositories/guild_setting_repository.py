@@ -31,7 +31,12 @@ class GuildSettingRepository:
                 updated_at=row["updated_at"],
             )
 
-    def upsert(self, guild_id: int, default_race: str | None, default_server: str | None) -> GuildSetting:
+    def upsert(
+        self,
+        guild_id: int,
+        default_race: str | None,
+        default_server: str | None,
+    ) -> GuildSetting:
         existing = self.get_by_guild_id(guild_id)
 
         with self.database.get_connection() as conn:
