@@ -6,15 +6,15 @@ from domain.raid_application import RaidApplication
 
 
 class MessageService:
-    def build_guild_setting_embed(self, setting) -> discord.Embed:
+    def build_guild_setting_embed(self, setting: GuildSetting | None) -> discord.Embed:
         embed = discord.Embed(title="기본 설정")
         if setting is None:
             embed.description = "저장된 기본 설정이 없습니다."
             return embed
     
         embed.description = (
-            f"종족 {setting.default_race or '-'}\n"
-            f"서버 {setting.default_server or '-'}"
+            f"**종족** : {setting.default_race or '-'}\n"
+            f"**서버** : {setting.default_server or '-'}"
         )
         return embed
 
