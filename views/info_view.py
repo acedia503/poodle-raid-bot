@@ -77,6 +77,7 @@ class ServerSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         selected_server = self.values[0]
+        print("INFO CALLBACK START", self.character_name, self.race, selected_server)
 
         await interaction.response.defer(ephemeral=True)
 
@@ -88,6 +89,8 @@ class ServerSelect(discord.ui.Select):
                 selected_server,
             )
 
+            print("INFO CALLBACK DONE", info)
+
             embed = self.message_service.build_character_info_embed(info)
 
             await interaction.edit_original_response(
@@ -97,6 +100,7 @@ class ServerSelect(discord.ui.Select):
             )
 
         except CharacterInfoError as exc:
+            print("INFO CALLBACK CharacterInfoError", repr(exc))
             await interaction.edit_original_response(
                 content=f"조회 실패: {exc}",
                 embed=None,
@@ -104,13 +108,12 @@ class ServerSelect(discord.ui.Select):
             )
 
         except Exception as exc:
-            print("ServerSelect callback unexpected error:", repr(exc))
+            print("INFO CALLBACK unexpected error", repr(exc))
             await interaction.edit_original_response(
                 content=f"예상치 못한 오류: {exc}",
                 embed=None,
                 view=None,
             )
-
 
 class ServerSelectView(discord.ui.View):
     def __init__(
