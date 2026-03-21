@@ -36,7 +36,7 @@ class EntryConditionFailedError(ApplicationError):
 class ApplicationService:
     def __init__(
         self,
-        api_service: ApiService,
+        api_service: BaseApiService,
         setting_service: SettingService,
         raid_service: RaidService,
         raid_application_repository: RaidApplicationRepository,
@@ -77,6 +77,8 @@ class ApplicationService:
                 race=setting.default_race if setting else None,
             )
             info = self.api_service.normalize_character_response(raw_data)
+        except (CharacterNotFoundError, ExternalApiRequestError, InvalidApiResponseError) as exc:
+            raise CharacterLookupError(str(exc)) from exc
         except Exception as exc:
             raise CharacterLookupError("캐릭터 정보를 조회할 수 없습니다.") from exc
 
