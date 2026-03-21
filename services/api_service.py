@@ -44,7 +44,6 @@ class BaseApiService(ABC):
                 "combat_power": int(raw_data.get("combat_power") or 0),
                 "server": str(raw_data.get("server") or "-"),
                 "race": str(raw_data.get("race") or "-"),
-                "level": str(raw_data.get("level") or "-"),
             }
         except (TypeError, ValueError) as exc:
             raise InvalidApiResponseError("캐릭터 API 응답 형식이 예상과 다릅니다.") from exc
@@ -67,7 +66,6 @@ class MockApiService(BaseApiService):
             "combat_power": 34000,
             "server": server or "기본서버",
             "race": race or "기본종족",
-            "level": "45",
         }
 
 
@@ -170,7 +168,6 @@ class HttpApiService(BaseApiService):
         character_name = self._clean_html(
             str(matched.get("characterName") or matched.get("name") or "-")
         )
-        level = matched.get("level") or matched.get("characterLevel") or "-"
         job = matched.get("className") or matched.get("job") or "-"
 
         return {
@@ -180,7 +177,6 @@ class HttpApiService(BaseApiService):
             "combat_power": int(combat_power or 0),
             "server": str(server_name or "-"),
             "race": str(race_name or "-"),
-            "level": str(level or "-"),
         }
 
     def _extract_item_level(self, char: dict[str, Any]) -> int:
