@@ -86,7 +86,8 @@ class ServerSelect(discord.ui.Select):
                 server=selected_server,
             )
             embed = self.message_service.build_character_info_embed(info)
-            await interaction.response.edit_message(
+
+            await interaction.edit_original_response(
                 content=(
                     f"DEBUG\n"
                     f"character_name={info.get('character_name')}\n"
@@ -100,9 +101,17 @@ class ServerSelect(discord.ui.Select):
                 embed=embed,
                 view=None,
             )
+
         except CharacterInfoError as exc:
-            await interaction.response.edit_original_response(
+            await interaction.edit_original_response(
                 content=f"조회 실패: {exc}",
+                embed=None,
+                view=None,
+            )
+
+        except Exception as exc:
+            await interaction.edit_original_response(
+                content=f"예상치 못한 오류: {exc}",
                 embed=None,
                 view=None,
             )
