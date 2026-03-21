@@ -51,36 +51,36 @@ class ApplicationService:
         created_by_user_id: int | None = None,
         source_type: str = "user",
     ) -> RaidApplication:
-        setting = self.setting_service.get_guild_setting(guild_id)
         channel_raid = self.raid_service.get_channel_raid(channel_id)
-
         if channel_raid is None:
-            raise RaidNotLinkedError("현재 채널에 연결된 레이드가 없습니다.")
+            raise RaidNotLinkedError("현재 채널에 연결된 레이드가 없어 신청할 수 없습니다.")
 
         duplicate = self.raid_application_repository.get_by_guild_raid_character(
             guild_id=guild_id,
             raid_name=channel_raid.raid_name,
-            character_name=character_name,
+            character_name=character_name.strip(),
         )
         if duplicate is not None:
             raise DuplicateApplicationError("이미 동일 레이드에 동일 캐릭터명으로 신청되어 있습니다.")
 
+        setting = self.setting_service.get_guild_setting(guild_id)
+
         try:
-            raw_info = self.api_service.get_character_info(
-                character_name=character_name,
+            raw_data = self.api_service.get_character_info(
+                character_name=character_name.strip(),
                 server=setting.default_server if setting else None,
                 race=setting.default_race if setting else None,
             )
-            info = self.api_service.normalize_character_response(raw_info)
+            info = self.api_service.normalize_character_response(raw_data)
         except Exception as exc:
             raise CharacterLookupError("캐릭터 정보를 조회할 수 없습니다.") from exc
 
-        is_valid, errors = self.raid_service.validate_entry_condition(
+        valid, errors = self.raid_service.validate_entry_condition(
             channel_raid=channel_raid,
             item_level=info["item_level"],
             combat_power=info["combat_power"],
         )
-        if not is_valid:
+        if not valid:
             raise EntryConditionFailedError(errors)
 
         application = RaidApplication(
@@ -109,6 +109,7 @@ class ApplicationService:
         channel_raid = self.raid_service.get_channel_raid(channel_id)
         if channel_raid is None:
             return []
+
         return self.raid_application_repository.get_user_application_in_raid(
             guild_id=guild_id,
             user_id=user_id,
@@ -117,20 +118,6 @@ class ApplicationService:
 
     def get_user_applications(self, guild_id: int, user_id: int) -> list[RaidApplication]:
         return self.raid_application_repository.get_user_applications(guild_id, user_id)
-
-    def get_application_detail(self, application_id: int) -> RaidApplication | None:
-        return self.raid_application_repository.get_by_id(application_id)
-
-    def get_raid_applications(self, guild_id: int, raid_name: str) -> list[RaidApplication]:
-        return self.raid_application_repository.get_applications_by_raid(
-            guild_id=guild_id,
-            raid_name=raid_name,
-            statuses=[
-                ApplicationStatus.APPLIED.value,
-                ApplicationStatus.WAITING.value,
-                ApplicationStatus.ASSIGNED.value,
-            ],
-        )
 
     def cancel_application(
         self,
