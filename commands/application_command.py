@@ -12,21 +12,26 @@ class ApplicationCommand(commands.Cog):
         self.message_service = message_service
         self.setting_service = setting_service
 
-    @app_commands.command(name="신청")
-    async def apply(self, interaction: discord.Interaction, 캐릭터명: str):
+    @app_commands.command(name="신청", description="레이드 신청 또는 신청 내역 확인")
+    @app_commands.rename(character_name="캐릭터명")
+    @app_commands.describe(character_name="신청 또는 조회할 캐릭터명")
+    async def apply(self, interaction: discord.Interaction, character_name: str):
         setting = self.setting_service.get_guild_setting(interaction.guild.id)
 
-        # 기본 설정 없음 → 종족 선택
+        # 기본 설정 없음 → 종족 선택 UI
         if not setting:
             async def race_callback(inter, race):
-                await inter.response.send_message(
-                    "서버 선택",
-                    view=ServerView(race, lambda i, r, s: self._process(i, 캐릭터명, r, s)),
-                    ephemeral=True,
+                await inter.response.edit_message(
+                    content=f"종족: **{race}**\n서버를 선택하세요.",
+                    view=ServerView(
+                        race,
+                        lambda i, r, s: self._process(i, character_name, r, s, show_identity=True),
+                    ),
+                    embed=None,
                 )
 
             await interaction.response.send_message(
-                "종족 선택",
+                content="기본 서버 설정이 없습니다.\n종족을 선택하세요.",
                 view=RaceView(race_callback),
                 ephemeral=True,
             )
@@ -35,12 +40,13 @@ class ApplicationCommand(commands.Cog):
         # 기본 설정 있음
         await self._process(
             interaction,
-            캐릭터명,
+            character_name,
             setting.default_race,
             setting.default_server,
+            show_identity=False,
         )
 
-    async def _process(self, interaction, character_name, race, server):
+    async def _process(self, interaction, character_name, race, server, show_identity: bool):
         await interaction.response.defer(ephemeral=True)
 
         result = self.service.process(
@@ -58,13 +64,16 @@ class ApplicationCommand(commands.Cog):
                 result["raid_name"],
                 result["info"],
                 "created" if result["action"] == "created" else "updated",
-                show_identity=False,
+                show_identity=show_identity,
             )
             await interaction.channel.send(text)
 
         elif result["action"] == "show_all":
-            raids = "\n".join(f"- {a.raid_name}" for a in result["applications"])
-            text = f"전체 신청 레이드\n\n{raids}"
+            text = self.message_service.build_application_all_result_text(
+                result["info"],
+                result["applications"],
+                show_identity=show_identity,
+            )
             await interaction.channel.send(text)
 
         else:
