@@ -97,3 +97,27 @@ class MessageService:
         ])
     
         return title + "\n\n" + "\n".join(lines)
+    
+    def build_application_all_result_text(self, info: dict, applications: list, show_identity: bool) -> str:
+        lines = [
+            "전체 레이드 신청 내역",
+            "",
+            f"**캐릭터명** : {info['character_name']}",
+            f"**직업** : {info['job']}",
+        ]
+    
+        if show_identity:
+            lines.append(f"**종족** : {info['race']}")
+            lines.append(f"**서버** : {info['server']}")
+    
+        lines.extend([
+            f"**아이템레벨** : {info['item_level']}",
+            f"**전투력** : {info['combat_power']:,}",
+            "",
+            "**신청 레이드**",
+        ])
+    
+        for app in applications:
+            lines.append(f"- {app.raid_name}")
+    
+        return "\n".join(lines)
