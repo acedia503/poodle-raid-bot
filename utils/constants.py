@@ -66,6 +66,12 @@ SERVER_NAME_TO_ID = {
     for server in race_servers
 }
 
+SERVER_ID_TO_NAME = {
+    int(server["code"]): server["name"]
+    for race_servers in RACE_SERVERS.values()
+    for server in race_servers
+}
+
 SAFE_MESSAGE_LIMIT = 1900
 DEFAULT_APPLICATION_STATUSES = {"applied", "waiting", "assigned"}
 
