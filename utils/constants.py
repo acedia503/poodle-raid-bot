@@ -72,6 +72,21 @@ SERVER_ID_TO_NAME = {
     for server in race_servers
 }
 
+RAID_PRESETS = [
+    {
+        "name": "루드라",
+        "min_item_level": 2700,
+    },
+    {
+        "name": "정화소",
+        "min_item_level": 3500,
+    },
+    {
+        "name": "테스트레이드",
+        "min_item_level": 0,
+    },
+]
+
 SAFE_MESSAGE_LIMIT = 1900
 DEFAULT_APPLICATION_STATUSES = {"applied", "waiting", "assigned"}
 
