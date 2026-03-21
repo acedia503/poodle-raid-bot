@@ -115,10 +115,11 @@ class ServerSelect(discord.ui.Select):
                 view=None,
             )
 
+
 class ServerSelectView(discord.ui.View):
     def __init__(
         self,
-        캐릭터명: str,
+        character_name: str,
         race: str,
         info_service: CharacterInfoService,
         message_service: MessageService,
@@ -126,7 +127,7 @@ class ServerSelectView(discord.ui.View):
         super().__init__(timeout=180)
         self.add_item(
             ServerSelect(
-                캐릭터명=캐릭터명,
+                character_name=character_name,
                 race=race,
                 info_service=info_service,
                 message_service=message_service,
