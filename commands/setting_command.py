@@ -57,6 +57,7 @@ class SettingCommand(commands.Cog):
             message_service=self.message_service,
         )
         await interaction.response.send_message(
+            content="현재 기본 설정입니다.",
             embed=embed,
             view=view,
             ephemeral=True,
