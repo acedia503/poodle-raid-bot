@@ -12,7 +12,7 @@ class ChannelRaidRepository:
         with self.database.get_connection() as conn:
             row = conn.execute(
                 """
-                SELECT *
+                SELECT id, guild_id, channel_id, raid_name, min_item_level, is_active, created_at, updated_at
                 FROM channel_raids
                 WHERE channel_id = ? AND is_active = 1
                 """,
@@ -37,7 +37,7 @@ class ChannelRaidRepository:
         with self.database.get_connection() as conn:
             row = conn.execute(
                 """
-                SELECT *
+                SELECT id, guild_id, channel_id, raid_name, min_item_level, is_active, created_at, updated_at
                 FROM channel_raids
                 WHERE guild_id = ? AND raid_name = ? AND is_active = 1
                 """,
