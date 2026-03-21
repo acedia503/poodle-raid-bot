@@ -83,21 +83,26 @@ class HttpApiService(BaseApiService):
         server: str | None = None,
         race: str | None = None,
     ) -> dict[str, Any]:
-        if not character_name.strip():
-            raise CharacterNotFoundError("캐릭터명이 비어 있습니다.")
-
+    
         search_data = self._search_character(
             character_name=character_name.strip(),
             server=server,
             race=race,
         )
-
+    
         basic = self._extract_basic_character(search_data, character_name.strip())
-        detail_data = self._get_character_detail(basic["character_id"])
-        merged = self._merge_basic_and_detail(basic, detail_data)
-
+    
+        # 🔥 상세 API 시도
+        try:
+            detail_data = self._get_character_detail(basic["character_id"])
+            merged = self._merge_basic_and_detail(basic, detail_data)
+        except Exception as e:
+            print("DETAIL API FAILED → fallback", repr(e))
+            merged = basic  # 🔥 fallback
+    
         normalized = self.normalize_character_response(merged)
-        print("AION2 FINAL RESULT:", normalized)
+        print("FINAL RESULT:", normalized)
+    
         return normalized
 
     def _search_character(
