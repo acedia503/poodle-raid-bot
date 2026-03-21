@@ -34,14 +34,15 @@ def create_bot() -> commands.Bot:
         api_service = MockApiService()
     
     character_info_service = CharacterInfoService(api_service)
-
+    
     setting_service = SettingService(guild_setting_repository)
     raid_service = RaidService(channel_raid_repository)
+    
     application_service = ApplicationService(
-        api_service=api_service,
+        character_info_service=character_info_service,
         setting_service=setting_service,
         raid_service=raid_service,
-        raid_application_repository=raid_application_repository,
+        repository=raid_application_repository,
     )
     message_service = MessageService()
 
