@@ -71,7 +71,7 @@ class MockApiService(BaseApiService):
 
 
 class HttpApiService:
-    def __init__(self, timeout: int = 10):
+    def __init__(self, timeout: int = 5):
         self.base_url = "https://aion2.plaync.com/ko-kr/api/search/aion2/search/v2/character"
         self.timeout = timeout
 
