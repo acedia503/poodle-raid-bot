@@ -45,7 +45,7 @@ class RaidCommand(commands.Cog):
                 message_service=self.message_service,
             )
             await interaction.response.send_message(
-                content="현재 채널에 레이드 설정이 없습니다.\n레이드명을 선택하세요.",
+                content="현재 채널에 레이드 설정이 없습니다.\n레이드 항목을 선택하세요.",
                 view=view,
                 ephemeral=True,
             )
