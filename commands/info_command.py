@@ -27,12 +27,12 @@ class InfoCommand(commands.Cog):
             return
 
         view = RaceButtonView(
-            character_name=character_name,
+            캐릭터명=캐릭터명,
             info_service=self.character_info_service,
             message_service=self.message_service,
         )
         await interaction.response.send_message(
-            content=f"캐릭터명: **{character_name}**\n종족을 선택하세요.",
+            content=f"캐릭터명: **{캐릭터명}**\n종족을 선택하세요.",
             view=view,
             ephemeral=True,
         )
