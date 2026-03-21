@@ -16,16 +16,16 @@ class RaidPresetButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-
+    
         try:
             channel_raid = self.raid_service.save_channel_raid_by_preset(
                 guild_id=self.guild_id,
                 channel_id=self.channel_id,
                 raid_name=self.preset["name"],
             )
-
+    
             embed = self.message_service.build_channel_raid_embed(channel_raid)
-
+    
             if interaction.channel is not None:
                 if self.mode == "update":
                     await interaction.channel.send(
@@ -37,6 +37,22 @@ class RaidPresetButton(discord.ui.Button):
                         content="레이드 설정이 생성되었습니다.",
                         embed=embed,
                     )
+    
+            # 자동 닫힘처럼 처리
+            await interaction.edit_original_response(
+                content="처리가 완료되었습니다.",
+                embed=None,
+                view=None,
+            )
+
+    except RaidDuplicateError as exc:
+        await interaction.followup.send(str(exc), ephemeral=True)
+
+    except RaidPresetNotFoundError as exc:
+        await interaction.followup.send(str(exc), ephemeral=True)
+
+    except Exception as exc:
+        await interaction.followup.send(f"예상치 못한 오류: {exc}", ephemeral=True)
 
         except RaidDuplicateError as exc:
             await interaction.followup.send(str(exc), ephemeral=True)
@@ -95,15 +111,26 @@ class RaidMainView(discord.ui.View):
     @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
-
+    
         ok = self.raid_service.delete_channel_raid(self.channel_id)
-
+    
         if interaction.channel is not None:
             if ok:
                 await interaction.channel.send("레이드 설정이 삭제되었습니다.")
             else:
                 await interaction.channel.send("삭제할 레이드 설정이 없습니다.")
+    
+        await interaction.edit_original_response(
+            content="처리가 완료되었습니다.",
+            embed=None,
+            view=None,
+        )
 
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
+        await interaction.edit_original_response(
+            content="창을 닫았습니다.",
+            embed=None,
+            view=None,
+        )
