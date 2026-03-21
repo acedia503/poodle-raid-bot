@@ -62,7 +62,7 @@ class MockApiService(BaseApiService):
 
         return {
             "character_name": character_name.strip(),
-            "job": "검성",
+            "job": "수호성",
             "item_level": 1250,
             "combat_power": 34000,
             "server": server or "기본서버",
