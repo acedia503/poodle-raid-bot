@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from urllib.parse import unquote
 from abc import ABC, abstractmethod
 from typing import Any
 import re
+from urllib.parse import unquote
 
 import requests
 
@@ -67,14 +67,13 @@ class MockApiService(BaseApiService):
             "combat_power": 247499,
             "server": server or "기본서버",
             "race": race or "기본종족",
-            "level": "45",
         }
 
 
 class HttpApiService(BaseApiService):
     def __init__(self, timeout: int = 5):
         self.search_url = "https://aion2.plaync.com/ko-kr/api/search/aion2/search/v2/character"
-        self.detail_url = "https://aion2.plaync.com/ko-kr/api/character/info"
+        self.detail_url = "https://aion2.plaync.com/api/character/info"
         self.timeout = timeout
 
     def get_character_info(
@@ -83,26 +82,24 @@ class HttpApiService(BaseApiService):
         server: str | None = None,
         race: str | None = None,
     ) -> dict[str, Any]:
-    
+        if not character_name.strip():
+            raise CharacterNotFoundError("캐릭터명이 비어 있습니다.")
+
         search_data = self._search_character(
             character_name=character_name.strip(),
             server=server,
             race=race,
         )
-    
+
         basic = self._extract_basic_character(search_data, character_name.strip())
-    
-        # 🔥 상세 API 시도
-        try:
-            detail_data = self._get_character_detail(basic["character_id"])
-            merged = self._merge_basic_and_detail(basic, detail_data)
-        except Exception as e:
-            print("DETAIL API FAILED → fallback", repr(e))
-            merged = basic  # 🔥 fallback
-    
+        detail_data = self._get_character_detail(
+            character_id=basic["character_id"],
+            server_id=basic["server_id"],
+        )
+        merged = self._merge_basic_and_detail(basic, detail_data)
+
         normalized = self.normalize_character_response(merged)
-        print("FINAL RESULT:", normalized)
-    
+        print("AION2 FINAL RESULT:", normalized)
         return normalized
 
     def _search_character(
@@ -135,10 +132,11 @@ class HttpApiService(BaseApiService):
         print("AION2 SEARCH DATA:", response["data"])
         return response["data"]
 
-    def _get_character_detail(self, character_id: str) -> dict[str, Any]:
+    def _get_character_detail(self, character_id: str, server_id: int) -> dict[str, Any]:
         params = {
             "lang": "ko",
             "characterId": character_id,
+            "serverId": server_id,
         }
 
         response = self._request_json(self.detail_url, params=params)
@@ -192,25 +190,28 @@ class HttpApiService(BaseApiService):
         char_list = data.get("list", [])
         if not char_list:
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
-    
+
         matched = None
         for char in char_list:
             raw_name = self._clean_html(str(char.get("characterName") or char.get("name") or ""))
             if raw_name.strip() == keyword.strip():
                 matched = char
                 break
-    
+
         if matched is None:
             matched = char_list[0]
-    
+
         raw_character_id = str(matched.get("characterId") or "")
         character_id = unquote(raw_character_id)
-    
+        server_id = int(matched.get("serverId") or 0)
+
         print("RAW CHARACTER ID:", raw_character_id)
         print("DECODED CHARACTER ID:", character_id)
-    
+        print("SERVER ID:", server_id)
+
         return {
             "character_id": character_id,
+            "server_id": server_id,
             "character_name": self._clean_html(
                 str(matched.get("characterName") or matched.get("name") or "-")
             ),
@@ -222,7 +223,7 @@ class HttpApiService(BaseApiService):
         profile = detail.get("profile", {}) if isinstance(detail, dict) else {}
         stat = detail.get("stat", {}) if isinstance(detail, dict) else {}
 
-        job = profile.get("className") or basic.get("job") or "-"
+        job = profile.get("className") or detail.get("className") or "-"
         combat_power = profile.get("combatPower") or detail.get("combatPower") or 0
         item_level = self._extract_item_level_from_detail(stat, detail)
 
@@ -242,7 +243,6 @@ class HttpApiService(BaseApiService):
             if entry.get("type") == "ItemLevel":
                 return int(entry.get("value", 0))
 
-        # 혹시 직접 필드로 오는 경우 대비
         return int(detail.get("itemLevel") or 0)
 
     def _extract_race_name(self, char: dict[str, Any]) -> str:
