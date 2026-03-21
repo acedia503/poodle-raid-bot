@@ -59,27 +59,23 @@ class SettingServerSelect(discord.ui.Select):
             options=options,
         )
 
-    async def callback(self, interaction: discord.Interaction):
-        selected_server = self.values[0]
-
-        setting = self.setting_service.save_guild_setting(
-            guild_id=self.guild_id,
-            default_race=self.selected_race,
-            default_server=selected_server,
-        )
-
-        embed = self.message_service.build_guild_setting_embed(setting)
-        view = SettingMainView(
-            guild_id=self.guild_id,
-            setting_service=self.setting_service,
-            message_service=self.message_service,
-        )
-
-        await interaction.response.edit_message(
-            content="기본 설정이 저장되었습니다.",
-            embed=embed,
-            view=view,
-        )
+        async def callback(self, interaction: discord.Interaction):
+            selected_server = self.values[0]
+        
+            setting = self.setting_service.save_guild_setting(
+                guild_id=self.guild_id,
+                default_race=self.selected_race,
+                default_server=selected_server,
+            )
+        
+            embed = self.message_service.build_guild_setting_embed(setting)
+            view = SettingSavedView()
+        
+            await interaction.response.edit_message(
+                content="기본 설정이 저장되었습니다.",
+                embed=embed,
+                view=view,
+            )
 
 
 class SettingServerSelectView(discord.ui.View):
@@ -94,7 +90,18 @@ class SettingServerSelectView(discord.ui.View):
             )
         )
 
+class SettingSavedView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=180)
 
+    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="설정 창을 닫았습니다.",
+            embed=None,
+            view=None,
+        )
+        
 class SettingMainView(discord.ui.View):
     def __init__(self, guild_id, setting_service, message_service):
         super().__init__(timeout=180)
