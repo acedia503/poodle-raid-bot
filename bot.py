@@ -10,12 +10,12 @@ from database import Database
 from repositories.channel_raid_repository import ChannelRaidRepository
 from repositories.guild_setting_repository import GuildSettingRepository
 from repositories.raid_application_repository import RaidApplicationRepository
-from services.api_service import HttpApiService, MockApiService
 from services.application_service import ApplicationService
-from services.message_service import MessageService
-from services.raid_service import RaidService
-from services.setting_service import SettingService
 from services.character_info_service import CharacterInfoService
+from services.message_service import MessageService
+from services.setting_service import SettingService
+from services.raid_service import RaidService
+from services.api_service import HttpApiService, MockApiService
 
 
 def create_bot() -> commands.Bot:
@@ -37,7 +37,6 @@ def create_bot() -> commands.Bot:
     
     setting_service = SettingService(guild_setting_repository)
     raid_service = RaidService(channel_raid_repository)
-    
     application_service = ApplicationService(
         character_info_service=character_info_service,
         setting_service=setting_service,
