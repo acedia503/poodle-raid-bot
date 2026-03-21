@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from urllib.parse import unquote
 from abc import ABC, abstractmethod
 from typing import Any
 import re
@@ -192,20 +193,28 @@ class HttpApiService(BaseApiService):
         char_list = data.get("list", [])
         if not char_list:
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
-
+    
         matched = None
         for char in char_list:
             raw_name = self._clean_html(str(char.get("characterName") or char.get("name") or ""))
             if raw_name.strip() == keyword.strip():
                 matched = char
                 break
-
+    
         if matched is None:
             matched = char_list[0]
-
+    
+        raw_character_id = str(matched.get("characterId") or "")
+        character_id = unquote(raw_character_id)
+    
+        print("RAW CHARACTER ID:", raw_character_id)
+        print("DECODED CHARACTER ID:", character_id)
+    
         return {
-            "character_id": str(matched.get("characterId") or ""),
-            "character_name": self._clean_html(str(matched.get("characterName") or matched.get("name") or "-")),
+            "character_id": character_id,
+            "character_name": self._clean_html(
+                str(matched.get("characterName") or matched.get("name") or "-")
+            ),
             "server": str(matched.get("serverName") or "-"),
             "race": self._extract_race_name(matched),
         }
