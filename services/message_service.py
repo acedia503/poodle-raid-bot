@@ -20,25 +20,14 @@ class MessageService:
 
     def build_channel_raid_embed(self, channel_raid: ChannelRaid | None) -> discord.Embed:
         embed = discord.Embed(title="현재 채널 레이드 설정")
+    
         if channel_raid is None:
             embed.description = "현재 채널에 연결된 레이드가 없습니다."
             return embed
-
-        embed.add_field(name="레이드명", value=channel_raid.raid_name, inline=False)
-        embed.add_field(
-            name="최소 아이템레벨",
-            value=str(channel_raid.min_item_level) if channel_raid.min_item_level is not None else "없음",
-            inline=False,
-        )
-        embed.add_field(
-            name="최소 전투력",
-            value=str(channel_raid.min_combat_power) if channel_raid.min_combat_power is not None else "없음",
-            inline=False,
-        )
-        embed.add_field(
-            name="기타 조건",
-            value=channel_raid.entry_condition_text or "없음",
-            inline=False,
+    
+        embed.description = (
+            f"**레이드명** : {channel_raid.raid_name}\n"
+            f"**최소 아이템레벨** : {channel_raid.min_item_level if channel_raid.min_item_level is not None else '-'}"
         )
         return embed
 
