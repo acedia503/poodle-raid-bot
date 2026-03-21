@@ -22,11 +22,16 @@ class ServerSelect(discord.ui.Select):
             discord.SelectOption(label=s["name"], value=s["name"])
             for s in RACE_SERVERS[race]
         ]
-        super().__init__(options=options)
+        super().__init__(
+            placeholder="서버를 선택하세요",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
         self.callback_func = callback
         self.race = race
 
-    async def callback(self, interaction):
+    async def callback(self, interaction: discord.Interaction):
         await self.callback_func(interaction, self.race, self.values[0])
 
 
