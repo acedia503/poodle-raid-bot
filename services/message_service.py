@@ -26,8 +26,8 @@ class MessageService:
             return embed
     
         embed.description = (
-            f"**레이드명** : {channel_raid.raid_name}\n"
-            f"**최소 아이템레벨** : {channel_raid.min_item_level if channel_raid.min_item_level is not None else '-'}"
+            f"레이드명 {channel_raid.raid_name}\n"
+            f"입장조건 아이템레벨 {channel_raid.min_item_level if channel_raid.min_item_level is not None else '-'}"
         )
         return embed
 
