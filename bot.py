@@ -32,7 +32,7 @@ def create_bot() -> commands.Bot:
         api_service = HttpApiService(timeout=config.api_timeout)
     else:
         api_service = MockApiService()
-
+    
     character_info_service = CharacterInfoService(api_service)
 
     setting_service = SettingService(guild_setting_repository)
