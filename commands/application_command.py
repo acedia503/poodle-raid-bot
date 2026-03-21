@@ -2,94 +2,72 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from services.application_service import (
-    ApplicationError,
-    ApplicationService,
-    CharacterLookupError,
-    DuplicateApplicationError,
-    EntryConditionFailedError,
-    RaidNotLinkedError,
-)
-from services.message_service import MessageService
-from utils.permissions import ensure_guild_only
+from views.application_view import RaceView, ServerView
 
 
 class ApplicationCommand(commands.Cog):
-    def __init__(
-        self,
-        bot: commands.Bot,
-        application_service: ApplicationService,
-        message_service: MessageService,
-    ):
+    def __init__(self, bot, service, message_service, setting_service):
         self.bot = bot
-        self.application_service = application_service
+        self.service = service
         self.message_service = message_service
+        self.setting_service = setting_service
 
-    application_group = app_commands.Group(name="신청", description="레이드 신청 관리")
+    @app_commands.command(name="신청")
+    async def apply(self, interaction: discord.Interaction, 캐릭터명: str):
+        setting = self.setting_service.get_guild_setting(interaction.guild.id)
 
-    @application_group.command(name="생성", description="현재 채널 레이드에 신청")
-    @app_commands.describe(character_name="신청할 캐릭터명")
-    async def application_create(self, interaction: discord.Interaction, character_name: str):
-        if not ensure_guild_only(interaction):
-            await interaction.response.send_message("서버 채널에서만 사용할 수 있습니다.", ephemeral=True)
-            return
+        # 기본 설정 없음 → 종족 선택
+        if not setting:
+            async def race_callback(inter, race):
+                await inter.response.send_message(
+                    "서버 선택",
+                    view=ServerView(race, lambda i, r, s: self._process(i, 캐릭터명, r, s)),
+                    ephemeral=True,
+                )
 
-        try:
-            application = self.application_service.apply(
-                guild_id=interaction.guild.id,
-                channel_id=interaction.channel.id,
-                user_id=interaction.user.id,
-                user_name=interaction.user.display_name,
-                character_name=character_name,
+            await interaction.response.send_message(
+                "종족 선택",
+                view=RaceView(race_callback),
+                ephemeral=True,
             )
-            embed = self.message_service.build_application_embed(application)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except RaidNotLinkedError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
-        except DuplicateApplicationError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
-        except CharacterLookupError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
-        except EntryConditionFailedError as exc:
-            await interaction.response.send_message(f"입장 조건 미달:\n{exc}", ephemeral=True)
-        except ApplicationError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
-
-    @application_group.command(name="조회", description="내 신청 조회")
-    async def application_view(self, interaction: discord.Interaction):
-        if not ensure_guild_only(interaction):
-            await interaction.response.send_message("서버 채널에서만 사용할 수 있습니다.", ephemeral=True)
             return
 
-        applications = self.application_service.get_my_application_in_current_channel(
+        # 기본 설정 있음
+        await self._process(
+            interaction,
+            캐릭터명,
+            setting.default_race,
+            setting.default_server,
+        )
+
+    async def _process(self, interaction, character_name, race, server):
+        await interaction.response.defer(ephemeral=True)
+
+        result = self.service.process(
             guild_id=interaction.guild.id,
             channel_id=interaction.channel.id,
             user_id=interaction.user.id,
+            user_name=interaction.user.name,
+            character_name=character_name,
+            race=race,
+            server=server,
         )
 
-        if not applications:
-            applications = self.application_service.get_user_applications(
-                guild_id=interaction.guild.id,
-                user_id=interaction.user.id,
+        if result["action"] in ["created", "show_current"]:
+            text = self.message_service.build_application_result_text(
+                result["raid_name"],
+                result["info"],
+                "created" if result["action"] == "created" else "updated",
+                show_identity=False,
             )
+            await interaction.channel.send(text)
 
-        embed = self.message_service.build_application_list_embed(applications)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        elif result["action"] == "show_all":
+            raids = "\n".join(f"- {a.raid_name}" for a in result["applications"])
+            text = f"전체 신청 레이드\n\n{raids}"
+            await interaction.channel.send(text)
 
-    @application_group.command(name="취소", description="신청 취소")
-    @app_commands.describe(application_id="취소할 신청 ID")
-    async def application_cancel(self, interaction: discord.Interaction, application_id: int):
-        if not ensure_guild_only(interaction):
-            await interaction.response.send_message("서버 채널에서만 사용할 수 있습니다.", ephemeral=True)
-            return
+        else:
+            await interaction.followup.send(result["message"], ephemeral=True)
 
-        try:
-            ok = self.application_service.cancel_application(
-                application_id=application_id,
-                requester_user_id=interaction.user.id,
-                is_admin=False,
-            )
-            msg = "신청이 취소되었습니다." if ok else "취소할 신청이 없습니다."
-            await interaction.response.send_message(msg, ephemeral=True)
-        except ApplicationError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
+        await interaction.delete_original_response()
