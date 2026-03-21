@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any
+import re
 
 import requests
 
@@ -37,17 +38,16 @@ class BaseApiService(ABC):
     def normalize_character_response(self, raw_data: dict[str, Any]) -> dict[str, Any]:
         try:
             return {
-                "character_name": str(raw_data["character_name"]).strip(),
-                "job": str(raw_data["job"]).strip(),
-                "item_level": int(raw_data["item_level"]),
-                "combat_power": int(raw_data["combat_power"]),
-                "server": raw_data.get("server"),
-                "race": raw_data.get("race"),
+                "character_name": str(raw_data.get("character_name") or "-").strip(),
+                "job": str(raw_data.get("job") or "-").strip(),
+                "item_level": int(raw_data.get("item_level") or 0),
+                "combat_power": int(raw_data.get("combat_power") or 0),
+                "server": str(raw_data.get("server") or "-"),
+                "race": str(raw_data.get("race") or "-"),
+                "level": str(raw_data.get("level") or "-"),
             }
-        except (KeyError, TypeError, ValueError) as exc:
-            raise InvalidApiResponseError(
-                "캐릭터 API 응답 형식이 예상과 다릅니다."
-            ) from exc
+        except (TypeError, ValueError) as exc:
+            raise InvalidApiResponseError("캐릭터 API 응답 형식이 예상과 다릅니다.") from exc
 
 
 class MockApiService(BaseApiService):
@@ -62,15 +62,16 @@ class MockApiService(BaseApiService):
 
         return {
             "character_name": character_name.strip(),
-            "job": "수호성",
+            "job": "검성",
             "item_level": 1250,
             "combat_power": 34000,
             "server": server or "기본서버",
             "race": race or "기본종족",
+            "level": "45",
         }
 
 
-class HttpApiService:
+class HttpApiService(BaseApiService):
     def __init__(self, timeout: int = 5):
         self.base_url = "https://aion2.plaync.com/ko-kr/api/search/aion2/search/v2/character"
         self.timeout = timeout
@@ -84,7 +85,7 @@ class HttpApiService:
         if not character_name.strip():
             raise CharacterNotFoundError("캐릭터명이 비어 있습니다.")
 
-        params = {
+        params: dict[str, Any] = {
             "keyword": character_name.strip(),
             "page": 1,
             "size": 10,
@@ -138,7 +139,12 @@ class HttpApiService:
             raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
 
         print("AION2 RAW RESPONSE:", data)
-        return self._extract_character(data, character_name.strip())
+
+        parsed = self._extract_character(data, character_name.strip())
+        normalized = self.normalize_character_response(parsed)
+
+        print("AION2 PARSED RESULT:", normalized)
+        return normalized
 
     def _extract_character(self, data: dict[str, Any], keyword: str) -> dict[str, Any]:
         char_list = data.get("list", [])
@@ -147,7 +153,10 @@ class HttpApiService:
 
         matched = None
         for char in char_list:
-            if str(char.get("characterName", "")).strip() == keyword.strip():
+            raw_name = self._clean_html(
+                str(char.get("characterName") or char.get("name") or "")
+            )
+            if raw_name.strip() == keyword.strip():
                 matched = char
                 break
 
@@ -155,23 +164,57 @@ class HttpApiService:
             matched = char_list[0]
 
         item_level = self._extract_item_level(matched)
+        combat_power = self._extract_combat_power(matched)
+        race_name = self._extract_race_name(matched)
+        server_name = self._extract_server_name(matched)
+        character_name = self._clean_html(
+            str(matched.get("characterName") or matched.get("name") or "-")
+        )
+        level = matched.get("level") or matched.get("characterLevel") or "-"
+        job = matched.get("className") or matched.get("job") or "-"
 
-        result = {
-            "character_name": str(matched.get("characterName") or "-"),
-            "job": str(matched.get("className") or "-"),
+        return {
+            "character_name": character_name,
+            "job": str(job or "-"),
             "item_level": int(item_level or 0),
-            "combat_power": int(matched.get("combatPower") or 0),
-            "server": str(matched.get("serverName") or "-"),
-            "race": str(matched.get("raceName") or "-"),
-            "level": str(matched.get("characterLevel") or "-"),
+            "combat_power": int(combat_power or 0),
+            "server": str(server_name or "-"),
+            "race": str(race_name or "-"),
+            "level": str(level or "-"),
         }
 
-        print("AION2 PARSED RESULT:", result)
-        return result
-
     def _extract_item_level(self, char: dict[str, Any]) -> int:
+        # 상세 응답 구조 대응
         stat_list = char.get("stat", {}).get("statList", [])
         for stat in stat_list:
             if stat.get("type") == "ItemLevel":
                 return int(stat.get("value", 0))
-        return 0
+
+        # 혹시 직접 필드로 오는 경우 대응
+        return int(char.get("itemLevel") or 0)
+
+    def _extract_combat_power(self, char: dict[str, Any]) -> int:
+        return int(char.get("combatPower") or 0)
+
+    def _extract_race_name(self, char: dict[str, Any]) -> str:
+        if char.get("raceName"):
+            return str(char["raceName"])
+
+        race_value = char.get("race")
+        race_map = {
+            1: "천족",
+            2: "마족",
+            "1": "천족",
+            "2": "마족",
+        }
+        return race_map.get(race_value, "-")
+
+    def _extract_server_name(self, char: dict[str, Any]) -> str:
+        if char.get("serverName"):
+            return str(char["serverName"])
+        return "-"
+
+    def _clean_html(self, text: str) -> str:
+        if not text:
+            return "-"
+        return re.sub(r"<.*?>", "", text).strip()
