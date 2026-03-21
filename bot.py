@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 
+from commands.info_command import InfoCommand
 from commands.application_command import ApplicationCommand
 from commands.raid_command import RaidCommand
 from commands.setting_command import SettingCommand
