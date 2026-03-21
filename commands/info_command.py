@@ -5,7 +5,7 @@ from discord.ext import commands
 from services.character_info_service import CharacterInfoService
 from services.message_service import MessageService
 from utils.permissions import ensure_guild_only
-from views.info_view import RaceSelectView
+from views.info_view import RaceButtonView
 
 
 class InfoCommand(commands.Cog):
@@ -26,7 +26,7 @@ class InfoCommand(commands.Cog):
             await interaction.response.send_message("서버 채널에서만 사용할 수 있습니다.", ephemeral=True)
             return
 
-        view = RaceSelectView(
+        view = RaceButtonView(
             character_name=character_name,
             info_service=self.character_info_service,
             message_service=self.message_service,
