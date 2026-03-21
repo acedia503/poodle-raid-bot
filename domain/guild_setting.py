@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional
 
 
@@ -9,5 +8,5 @@ class GuildSetting:
     guild_id: int
     default_race: Optional[str]
     default_server: Optional[str]
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
