@@ -126,23 +126,26 @@ class HttpApiService:
         return self._extract_character(data)
 
     def _extract_character(self, data: dict[str, Any]) -> dict[str, Any]:
-        char_list = data.get("list", [])
+        char_list = data.get("list") or []
         if not char_list:
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
-
+    
         char = char_list[0]
         item_level = self._extract_item_level(char)
-
-        return {
-            "character_name": char.get("characterName", ""),
-            "job": char.get("className", ""),
-            "item_level": item_level,
-            "combat_power": int(char.get("combatPower", 0)),
-            "server": char.get("serverName"),
-            "race": char.get("raceName"),
-            "level": char.get("characterLevel"),
-            "guild_name": char.get("titleName"),
+    
+        result = {
+            "character_name": str(char.get("characterName") or "-"),
+            "job": str(char.get("className") or "-"),
+            "item_level": int(item_level or 0),
+            "combat_power": int(char.get("combatPower") or 0),
+            "server": str(char.get("serverName") or "-"),
+            "race": str(char.get("raceName") or "-"),
+            "level": str(char.get("characterLevel") or "-"),
+            "guild_name": str(char.get("titleName") or "-"),
         }
+    
+        print("AION2 PARSED RESULT:", result)
+        return result
 
     def _extract_item_level(self, char: dict[str, Any]) -> int:
         stat_list = char.get("stat", {}).get("statList", [])
