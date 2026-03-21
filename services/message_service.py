@@ -62,3 +62,19 @@ class MessageService:
                 inline=False,
             )
         return embed
+
+    def build_character_info_embed(self, info: dict) -> discord.Embed:
+        embed = discord.Embed(title="캐릭터 정보 조회 결과")
+        embed.add_field(name="캐릭터명", value=info.get("character_name", "-"), inline=False)
+        embed.add_field(name="종족", value=info.get("race", "-"), inline=False)
+        embed.add_field(name="서버", value=info.get("server", "-"), inline=False)
+        embed.add_field(name="직업", value=info.get("job", "-"), inline=False)
+        embed.add_field(name="레벨", value=str(info.get("level") or "-"), inline=False)
+        embed.add_field(name="아이템레벨", value=str(info.get("item_level") or 0), inline=False)
+        embed.add_field(name="전투력", value=f"{int(info.get('combat_power') or 0):,}", inline=False)
+
+        guild_name = info.get("guild_name")
+        if guild_name:
+            embed.add_field(name="칭호/소속", value=str(guild_name), inline=False)
+
+        return embed
