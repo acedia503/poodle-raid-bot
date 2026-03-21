@@ -122,6 +122,7 @@ class HttpApiService:
         except ValueError as exc:
             raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
 
+        print("AION2 RAW RESPONSE:", data)
         return self._extract_character(data)
 
     def _extract_character(self, data: dict[str, Any]) -> dict[str, Any]:
