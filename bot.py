@@ -9,7 +9,7 @@ from database import Database
 from repositories.channel_raid_repository import ChannelRaidRepository
 from repositories.guild_setting_repository import GuildSettingRepository
 from repositories.raid_application_repository import RaidApplicationRepository
-from services.api_service import ApiService
+from services.api_service import HttpApiService, MockApiService
 from services.application_service import ApplicationService
 from services.message_service import MessageService
 from services.raid_service import RaidService
@@ -26,10 +26,17 @@ def create_bot() -> commands.Bot:
     channel_raid_repository = ChannelRaidRepository(database)
     raid_application_repository = RaidApplicationRepository(database)
 
-    api_service = ApiService(
-        api_base_url=config.api_base_url,
-        timeout=config.api_timeout,
-    )
+    if config.api_mode == "http":
+        api_service = HttpApiService(
+            base_url=config.api_base_url,
+            timeout=config.api_timeout,
+            api_key=config.api_key,
+            character_path=config.api_character_path,
+            auth_header_name=config.api_auth_header_name,
+        )
+    else:
+        api_service = MockApiService()
+        
     setting_service = SettingService(guild_setting_repository)
     raid_service = RaidService(channel_raid_repository)
     application_service = ApplicationService(
