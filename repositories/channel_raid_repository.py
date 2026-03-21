@@ -12,12 +12,38 @@ class ChannelRaidRepository:
         with self.database.get_connection() as conn:
             row = conn.execute(
                 """
-                SELECT id, guild_id, channel_id, raid_name, min_item_level, min_combat_power,
-                       entry_condition_text, is_active, created_at, updated_at
+                SELECT *
                 FROM channel_raids
                 WHERE channel_id = ? AND is_active = 1
                 """,
                 (channel_id,),
+            ).fetchone()
+
+            if row is None:
+                return None
+
+            return ChannelRaid(
+                id=row["id"],
+                guild_id=row["guild_id"],
+                channel_id=row["channel_id"],
+                raid_name=row["raid_name"],
+                min_item_level=row["min_item_level"],
+                min_combat_power=row["min_combat_power"],
+                entry_condition_text=row["entry_condition_text"],
+                is_active=bool(row["is_active"]),
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
+
+    def get_by_guild_and_raid_name(self, guild_id: int, raid_name: str) -> Optional[ChannelRaid]:
+        with self.database.get_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT *
+                FROM channel_raids
+                WHERE guild_id = ? AND raid_name = ? AND is_active = 1
+                """,
+                (guild_id, raid_name),
             ).fetchone()
 
             if row is None:
@@ -44,8 +70,8 @@ class ChannelRaidRepository:
                 conn.execute(
                     """
                     INSERT INTO channel_raids (
-                        guild_id, channel_id, raid_name, min_item_level, min_combat_power,
-                        entry_condition_text, is_active
+                        guild_id, channel_id, raid_name, min_item_level,
+                        min_combat_power, entry_condition_text, is_active
                     )
                     VALUES (?, ?, ?, ?, ?, ?, 1)
                     """,
@@ -63,8 +89,7 @@ class ChannelRaidRepository:
                     """
                     UPDATE channel_raids
                     SET raid_name = ?, min_item_level = ?, min_combat_power = ?,
-                        entry_condition_text = ?, is_active = 1,
-                        updated_at = CURRENT_TIMESTAMP
+                        entry_condition_text = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE channel_id = ?
                     """,
                     (
