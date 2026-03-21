@@ -72,5 +72,9 @@ def create_bot() -> commands.Bot:
 
 if __name__ == "__main__":
     config = load_config()
+
+    if not config.discord_token:
+        raise ValueError("DISCORD_TOKEN이 설정되지 않았습니다.")
+
     bot = create_bot()
     bot.run(config.discord_token)
