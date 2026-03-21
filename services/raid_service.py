@@ -36,6 +36,7 @@ class RaidService:
             guild_id=guild_id,
             raid_name=raid_name,
         )
+
         if duplicated is not None and duplicated.channel_id != channel_id:
             raise RaidDuplicateError("디스코드 서버 내 동일한 레이드명은 중복 설정할 수 없습니다.")
 
