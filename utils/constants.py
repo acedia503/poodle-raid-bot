@@ -6,6 +6,18 @@ DISCORD_MESSAGE_LIMIT = 2000
 
 VALID_RACES = {"천족", "마족"}
 
-SAFE_MESSAGE_LIMIT = 1900
+RACE_TO_ID = {
+    "천족": 1,
+    "마족": 2,
+}
 
+SERVER_NAME_TO_ID = {
+    "파프니르": 2019,
+}
+
+SERVER_OPTIONS = [
+    "파프니르",
+]
+
+SAFE_MESSAGE_LIMIT = 1900
 DEFAULT_APPLICATION_STATUSES = {"applied", "waiting", "assigned"}
