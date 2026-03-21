@@ -41,8 +41,6 @@ class Database:
                 channel_id INTEGER NOT NULL UNIQUE,
                 raid_name TEXT NOT NULL,
                 min_item_level INTEGER NULL,
-                min_combat_power INTEGER NULL,
-                entry_condition_text TEXT NULL,
                 is_active INTEGER NOT NULL DEFAULT 1,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
