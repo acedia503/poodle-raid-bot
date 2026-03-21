@@ -99,7 +99,6 @@ class HttpApiService(BaseApiService):
         merged = self._merge_basic_and_detail(basic, detail_data)
 
         normalized = self.normalize_character_response(merged)
-        print("AION2 FINAL RESULT:", normalized)
         return normalized
 
     def _search_character(
@@ -128,8 +127,6 @@ class HttpApiService(BaseApiService):
 
         response = self._request_json(self.search_url, params=params)
 
-        print("AION2 SEARCH URL:", response["url"])
-        print("AION2 SEARCH DATA:", response["data"])
         return response["data"]
 
     def _get_character_detail(self, character_id: str, server_id: int) -> dict[str, Any]:
@@ -141,8 +138,6 @@ class HttpApiService(BaseApiService):
 
         response = self._request_json(self.detail_url, params=params)
 
-        print("AION2 DETAIL URL:", response["url"])
-        print("AION2 DETAIL DATA:", response["data"])
         return response["data"]
 
     def _request_json(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -166,9 +161,6 @@ class HttpApiService(BaseApiService):
         except requests.RequestException as exc:
             raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
 
-        print("AION2 REQUEST URL:", res.url)
-        print("AION2 STATUS:", res.status_code)
-        print("AION2 RESPONSE TEXT:", res.text[:1000])
 
         if res.status_code == 404:
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
@@ -204,10 +196,6 @@ class HttpApiService(BaseApiService):
         raw_character_id = str(matched.get("characterId") or "")
         character_id = unquote(raw_character_id)
         server_id = int(matched.get("serverId") or 0)
-
-        print("RAW CHARACTER ID:", raw_character_id)
-        print("DECODED CHARACTER ID:", character_id)
-        print("SERVER ID:", server_id)
 
         return {
             "character_id": character_id,
