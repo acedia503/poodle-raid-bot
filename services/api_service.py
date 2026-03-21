@@ -45,7 +45,6 @@ class BaseApiService(ABC):
                 "combat_power": int(raw_data.get("combat_power") or 0),
                 "server": str(raw_data.get("server") or "-"),
                 "race": str(raw_data.get("race") or "-"),
-                "level": str(raw_data.get("level") or "-"),
             }
         except (TypeError, ValueError) as exc:
             raise InvalidApiResponseError("캐릭터 API 응답 형식이 예상과 다릅니다.") from exc
