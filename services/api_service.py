@@ -164,7 +164,6 @@ class HttpApiService:
             "server": str(matched.get("serverName") or "-"),
             "race": str(matched.get("raceName") or "-"),
             "level": str(matched.get("characterLevel") or "-"),
-            "guild_name": str(matched.get("titleName") or "-"),
         }
 
         print("AION2 PARSED RESULT:", result)
