@@ -65,13 +65,13 @@ class MessageService:
     
     def build_character_info_embed(self, info: dict) -> discord.Embed:
         text = (
-            f"캐릭터명 {info.get('character_name')}\n"
-            f"직업 {info.get('job')}\n"
-            f"종족 {info.get('race')}\n"
-            f"서버 {info.get('server')}\n"
-            f"레벨 {info.get('level')}\n"
-            f"아이템레벨 {info.get('item_level')}\n"
-            f"전투력 {int(info.get('combat_power') or 0):,}"
+            f"**캐릭터명** {info.get('character_name')}\n"
+            f"**직업** {info.get('job')}\n"
+            f"**종족** {info.get('race')}\n"
+            f"**서버** {info.get('server')}\n"
+            f"**레벨** {info.get('level')}\n"
+            f"**아이템레벨** {info.get('item_level')}\n"
+            f"**전투력** {int(info.get('combat_power') or 0):,}"
         )
     
         embed = discord.Embed(
