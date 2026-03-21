@@ -1,5 +1,6 @@
 from domain.guild_setting import GuildSetting
 from repositories.guild_setting_repository import GuildSettingRepository
+from utils.validators import validate_race, validate_server
 
 
 class SettingService:
@@ -15,7 +16,12 @@ class SettingService:
         default_race: str | None,
         default_server: str | None,
     ) -> GuildSetting:
-        self.validate_setting_input(default_race, default_server)
+        if not validate_race(default_race):
+            raise ValueError("유효하지 않은 종족입니다. 천족 또는 마족만 가능합니다.")
+
+        if not validate_server(default_server):
+            raise ValueError("유효하지 않은 서버명입니다.")
+
         return self.guild_setting_repository.upsert(
             guild_id=guild_id,
             default_race=default_race,
@@ -24,11 +30,3 @@ class SettingService:
 
     def delete_guild_setting(self, guild_id: int) -> bool:
         return self.guild_setting_repository.delete_by_guild_id(guild_id)
-
-    def validate_setting_input(
-        self,
-        default_race: str | None,
-        default_server: str | None,
-    ) -> None:
-        # TODO: validators.py 활용
-        pass
