@@ -5,6 +5,8 @@ from typing import Any
 
 import requests
 
+from utils.constants import RACE_TO_ID, SERVER_NAME_TO_ID
+
 
 class ApiServiceError(Exception):
     pass
