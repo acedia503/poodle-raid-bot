@@ -3,6 +3,10 @@ from repositories.channel_raid_repository import ChannelRaidRepository
 from utils.validators import validate_positive_int
 
 
+class RaidDuplicateError(Exception):
+    pass
+
+
 class RaidService:
     def __init__(self, channel_raid_repository: ChannelRaidRepository):
         self.channel_raid_repository = channel_raid_repository
@@ -28,6 +32,14 @@ class RaidService:
         if not validate_positive_int(min_combat_power):
             raise ValueError("최소 전투력은 0 이상이어야 합니다.")
 
+        duplicated = self.channel_raid_repository.get_by_guild_and_raid_name(
+            guild_id=guild_id,
+            raid_name=raid_name.strip(),
+        )
+
+        if duplicated is not None and duplicated.channel_id != channel_id:
+            raise RaidDuplicateError("같은 서버 내에서 동일한 레이드명은 중복 설정할 수 없습니다.")
+
         channel_raid = ChannelRaid(
             id=None,
             guild_id=guild_id,
@@ -42,19 +54,3 @@ class RaidService:
 
     def delete_channel_raid(self, channel_id: int) -> bool:
         return self.channel_raid_repository.delete_by_channel_id(channel_id)
-
-    def validate_entry_condition(
-        self,
-        channel_raid: ChannelRaid,
-        item_level: int,
-        combat_power: int,
-    ) -> tuple[bool, list[str]]:
-        errors: list[str] = []
-
-        if channel_raid.min_item_level is not None and item_level < channel_raid.min_item_level:
-            errors.append(f"최소 아이템레벨 {channel_raid.min_item_level} 이상 필요")
-
-        if channel_raid.min_combat_power is not None and combat_power < channel_raid.min_combat_power:
-            errors.append(f"최소 전투력 {channel_raid.min_combat_power} 이상 필요")
-
-        return (len(errors) == 0, errors)
