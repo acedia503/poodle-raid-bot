@@ -12,7 +12,7 @@ class ApplicationCommand(commands.Cog):
         self.message_service = message_service
         self.setting_service = setting_service
 
-    @app_commands.command(name="신청", description="레이드 신청 또는 신청 내역 확인")
+    @app_commands.command(name="신청", description="레이드 신청 및 확인")
     @app_commands.rename(character_name="캐릭터명")
     @app_commands.describe(character_name="신청 또는 조회할 캐릭터명")
     async def apply(self, interaction: discord.Interaction, character_name: str):
