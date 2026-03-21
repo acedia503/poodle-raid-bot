@@ -1,5 +1,6 @@
 from domain.channel_raid import ChannelRaid
 from repositories.channel_raid_repository import ChannelRaidRepository
+from utils.validators import validate_positive_int
 
 
 class RaidService:
@@ -14,18 +15,27 @@ class RaidService:
         guild_id: int,
         channel_id: int,
         raid_name: str,
-        min_item_level: int | None,
-        min_combat_power: int | None,
-        entry_condition_text: str | None,
+        min_item_level: int | None = None,
+        min_combat_power: int | None = None,
+        entry_condition_text: str | None = None,
     ) -> ChannelRaid:
+        if not raid_name.strip():
+            raise ValueError("레이드명은 비어 있을 수 없습니다.")
+
+        if not validate_positive_int(min_item_level):
+            raise ValueError("최소 아이템레벨은 0 이상이어야 합니다.")
+
+        if not validate_positive_int(min_combat_power):
+            raise ValueError("최소 전투력은 0 이상이어야 합니다.")
+
         channel_raid = ChannelRaid(
             id=None,
             guild_id=guild_id,
             channel_id=channel_id,
-            raid_name=raid_name,
+            raid_name=raid_name.strip(),
             min_item_level=min_item_level,
             min_combat_power=min_combat_power,
-            entry_condition_text=entry_condition_text,
+            entry_condition_text=entry_condition_text.strip() if entry_condition_text else None,
             is_active=True,
         )
         return self.channel_raid_repository.upsert(channel_raid)
