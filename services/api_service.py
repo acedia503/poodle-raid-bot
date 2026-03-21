@@ -68,41 +68,14 @@ class MockApiService(BaseApiService):
         }
 
 
-class HttpApiService(BaseApiService):
-    """
-    기본 가정:
-    - GET {base_url}{character_path}
-    - query params: character_name, server, race
-    - 인증이 필요하면 header 추가
-    - 응답 예시:
-      {
-        "character_name": "아툴",
-        "job": "검성",
-        "item_level": 1250,
-        "combat_power": 34000,
-        "server": "루미네스",
-        "race": "천족"
-      }
+import requests
+from typing import Any
 
-    실제 API 스펙이 다르면 아래 3개만 바꾸면 됨:
-    - _build_url
-    - _build_params
-    - _extract_payload
-    """
 
-    def __init__(
-        self,
-        base_url: str,
-        timeout: int = 10,
-        api_key: str | None = None,
-        character_path: str = "/characters",
-        auth_header_name: str | None = "Authorization",
-    ):
-        self.base_url = base_url.rstrip("/")
+class HttpApiService:
+    def __init__(self, timeout: int = 10):
+        self.base_url = "https://aion2.plaync.com/ko-kr/api/search/aion2/search/v2/character"
         self.timeout = timeout
-        self.api_key = api_key
-        self.character_path = character_path
-        self.auth_header_name = auth_header_name
 
     def get_character_info(
         self,
@@ -110,83 +83,71 @@ class HttpApiService(BaseApiService):
         server: str | None = None,
         race: str | None = None,
     ) -> dict[str, Any]:
-        if not character_name.strip():
-            raise CharacterNotFoundError("캐릭터명이 비어 있습니다.")
 
-        url = self._build_url()
-        headers = self._build_headers()
-        params = self._build_params(
-            character_name=character_name.strip(),
-            server=server,
-            race=race,
+        params = {
+            "keyword": character_name,
+            "page": 1,
+            "size": 1
+        }
+
+        # 👇 race 변환
+        if race == "천족":
+            params["race"] = 1
+        elif race == "마족":
+            params["race"] = 2
+
+        # 👇 server 변환 (현재는 직접 매핑 필요)
+        if server:
+            params["serverId"] = self._convert_server_to_id(server)
+
+        response = requests.get(
+            self.base_url,
+            params=params,
+            timeout=self.timeout,
         )
 
-        try:
-            response = requests.get(
-                url,
-                headers=headers,
-                params=params,
-                timeout=self.timeout,
-            )
-        except requests.RequestException as exc:
-            raise ExternalApiRequestError(
-                f"외부 API 요청에 실패했습니다: {exc}"
-            ) from exc
+        if response.status_code != 200:
+            raise Exception(f"API 오류: {response.status_code}")
 
-        if response.status_code == 404:
-            raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
+        data = response.json()
 
-        if response.status_code >= 400:
-            raise ExternalApiRequestError(
-                f"외부 API 오류가 발생했습니다. status={response.status_code}"
-            )
+        return self._extract_character(data)
 
-        try:
-            data = response.json()
-        except ValueError as exc:
-            raise InvalidApiResponseError("외부 API가 JSON을 반환하지 않았습니다.") from exc
+    # --------------------------------------
 
-        payload = self._extract_payload(data)
-        return self.normalize_character_response(payload)
+    def _extract_character(self, data: dict[str, Any]) -> dict[str, Any]:
+        if "list" not in data or not data["list"]:
+            raise Exception("캐릭터를 찾을 수 없습니다.")
 
-    def _build_url(self) -> str:
-        return f"{self.base_url}{self.character_path}"
+        char = data["list"][0]
 
-    def _build_headers(self) -> dict[str, str]:
-        headers: dict[str, str] = {}
+        item_level = self._extract_item_level(char)
 
-        if self.api_key and self.auth_header_name:
-            if self.auth_header_name.lower() == "authorization":
-                headers[self.auth_header_name] = f"Bearer {self.api_key}"
-            else:
-                headers[self.auth_header_name] = self.api_key
+        return {
+            "character_name": char["characterName"],
+            "job": char["className"],
+            "item_level": item_level,
+            "combat_power": char["combatPower"],
+            "server": char.get("serverName"),
+            "race": char.get("raceName"),
+        }
 
-        return headers
+    # --------------------------------------
 
-    def _build_params(
-        self,
-        character_name: str,
-        server: str | None,
-        race: str | None,
-    ) -> dict[str, str]:
-        params = {"character_name": character_name}
+    def _extract_item_level(self, char: dict) -> int:
+        stat_list = char.get("stat", {}).get("statList", [])
 
-        if server:
-            params["server"] = server
-        if race:
-            params["race"] = race
+        for stat in stat_list:
+            if stat.get("type") == "ItemLevel":
+                return stat.get("value", 0)
 
-        return params
+        return 0
 
-    def _extract_payload(self, data: dict[str, Any]) -> dict[str, Any]:
-        """
-        실제 API가 감싸서 주는 경우 대응:
-        - {"data": {...}}
-        - {"result": {...}}
-        - {...}
-        """
-        if "data" in data and isinstance(data["data"], dict):
-            return data["data"]
-        if "result" in data and isinstance(data["result"], dict):
-            return data["result"]
-        return data
+    # --------------------------------------
+
+    def _convert_server_to_id(self, server_name: str) -> int:
+        # TODO: 서버 목록 확장 필요
+        mapping = {
+            "파프니르": 2019,
+        }
+        return mapping.get(server_name, 2019)
