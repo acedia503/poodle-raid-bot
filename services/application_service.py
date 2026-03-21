@@ -1,7 +1,12 @@
 from domain.enums import ApplicationStatus, SourceType
 from domain.raid_application import RaidApplication
 from repositories.raid_application_repository import RaidApplicationRepository
-from services.api_service import ApiService
+from services.api_service import (
+    BaseApiService,
+    CharacterNotFoundError,
+    ExternalApiRequestError,
+    InvalidApiResponseError,
+)
 from services.raid_service import RaidService
 from services.setting_service import SettingService
 
