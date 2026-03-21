@@ -77,6 +77,8 @@ class ServerSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         selected_server = self.values[0]
 
+        await interaction.response.defer(ephemeral=True)
+
         try:
             info = self.info_service.get_character_info(
                 character_name=self.character_name,
@@ -99,7 +101,7 @@ class ServerSelect(discord.ui.Select):
                 view=None,
             )
         except CharacterInfoError as exc:
-            await interaction.response.edit_message(
+            await interaction.response.edit_original_response(
                 content=f"조회 실패: {exc}",
                 embed=None,
                 view=None,
