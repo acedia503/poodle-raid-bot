@@ -68,10 +68,6 @@ class MockApiService(BaseApiService):
         }
 
 
-import requests
-from typing import Any
-
-
 class HttpApiService:
     def __init__(self, timeout: int = 10):
         self.base_url = "https://aion2.plaync.com/ko-kr/api/search/aion2/search/v2/character"
@@ -83,71 +79,71 @@ class HttpApiService:
         server: str | None = None,
         race: str | None = None,
     ) -> dict[str, Any]:
+        if not character_name.strip():
+            raise CharacterNotFoundError("캐릭터명이 비어 있습니다.")
 
         params = {
-            "keyword": character_name,
+            "keyword": character_name.strip(),
             "page": 1,
-            "size": 1
+            "size": 1,
         }
 
-        # 👇 race 변환
-        if race == "천족":
-            params["race"] = 1
-        elif race == "마족":
-            params["race"] = 2
+        if race:
+            race_id = RACE_TO_ID.get(race)
+            if race_id is None:
+                raise InvalidApiResponseError(f"알 수 없는 종족입니다: {race}")
+            params["race"] = race_id
 
-        # 👇 server 변환 (현재는 직접 매핑 필요)
         if server:
-            params["serverId"] = self._convert_server_to_id(server)
+            server_id = SERVER_NAME_TO_ID.get(server)
+            if server_id is None:
+                raise InvalidApiResponseError(f"알 수 없는 서버입니다: {server}")
+            params["serverId"] = server_id
 
-        response = requests.get(
-            self.base_url,
-            params=params,
-            timeout=self.timeout,
-        )
+        try:
+            response = requests.get(
+                self.base_url,
+                params=params,
+                timeout=self.timeout,
+            )
+        except requests.RequestException as exc:
+            raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
 
-        if response.status_code != 200:
-            raise Exception(f"API 오류: {response.status_code}")
+        if response.status_code == 404:
+            raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
 
-        data = response.json()
+        if response.status_code >= 400:
+            raise ExternalApiRequestError(f"외부 API 오류: {response.status_code}")
+
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
 
         return self._extract_character(data)
 
-    # --------------------------------------
-
     def _extract_character(self, data: dict[str, Any]) -> dict[str, Any]:
-        if "list" not in data or not data["list"]:
-            raise Exception("캐릭터를 찾을 수 없습니다.")
+        char_list = data.get("list", [])
+        if not char_list:
+            raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
 
-        char = data["list"][0]
-
+        char = char_list[0]
         item_level = self._extract_item_level(char)
 
         return {
-            "character_name": char["characterName"],
-            "job": char["className"],
+            "character_name": char.get("characterName", ""),
+            "job": char.get("className", ""),
             "item_level": item_level,
-            "combat_power": char["combatPower"],
+            "combat_power": int(char.get("combatPower", 0)),
             "server": char.get("serverName"),
             "race": char.get("raceName"),
+            "level": char.get("characterLevel"),
+            "guild_name": char.get("titleName"),
         }
 
-    # --------------------------------------
-
-    def _extract_item_level(self, char: dict) -> int:
+    def _extract_item_level(self, char: dict[str, Any]) -> int:
         stat_list = char.get("stat", {}).get("statList", [])
-
         for stat in stat_list:
             if stat.get("type") == "ItemLevel":
-                return stat.get("value", 0)
-
+                return int(stat.get("value", 0))
         return 0
-
-    # --------------------------------------
-
-    def _convert_server_to_id(self, server_name: str) -> int:
-        # TODO: 서버 목록 확장 필요
-        mapping = {
-            "파프니르": 2019,
-        }
-        return mapping.get(server_name, 2019)
