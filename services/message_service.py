@@ -19,7 +19,7 @@ class MessageService:
         return embed
 
     def build_channel_raid_embed(self, channel_raid: ChannelRaid | None) -> discord.Embed:
-        embed = discord.Embed(title="현재 채널 레이드 설정")
+        embed = discord.Embed(title="레이드 설정")
     
         if channel_raid is None:
             embed.description = "현재 채널에 연결된 레이드가 없습니다."
