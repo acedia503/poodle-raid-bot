@@ -20,6 +20,7 @@ class InfoCommand(commands.Cog):
         self.message_service = message_service
 
     @app_commands.command(name="정보", description="캐릭터 정보 조회")
+    @app_commands.rename(character_name="캐릭터명")
     @app_commands.describe(character_name="조회할 캐릭터명")
     async def info(self, interaction: discord.Interaction, character_name: str):
         if not ensure_guild_only(interaction):
