@@ -81,24 +81,17 @@ class ServerSelect(discord.ui.Select):
         await interaction.response.defer(ephemeral=True)
 
         try:
-            info = self.info_service.get_character_info(
-                character_name=self.character_name,
-                race=self.race,
-                server=selected_server,
+            info = await asyncio.to_thread(
+                self.info_service.get_character_info,
+                self.character_name,
+                self.race,
+                selected_server,
             )
+
             embed = self.message_service.build_character_info_embed(info)
 
             await interaction.edit_original_response(
-                content=(
-                    f"DEBUG\n"
-                    f"character_name={info.get('character_name')}\n"
-                    f"job={info.get('job')}\n"
-                    f"race={info.get('race')}\n"
-                    f"server={info.get('server')}\n"
-                    f"level={info.get('level')}\n"
-                    f"item_level={info.get('item_level')}\n"
-                    f"combat_power={info.get('combat_power')}"
-                ),
+                content=None,
                 embed=embed,
                 view=None,
             )
@@ -111,6 +104,7 @@ class ServerSelect(discord.ui.Select):
             )
 
         except Exception as exc:
+            print("ServerSelect callback unexpected error:", repr(exc))
             await interaction.edit_original_response(
                 content=f"예상치 못한 오류: {exc}",
                 embed=None,
