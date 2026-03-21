@@ -3,10 +3,12 @@ from typing import Optional
 
 
 @dataclass
-class GuildSetting:
+class ChannelRaid:
     id: Optional[int]
     guild_id: int
-    default_race: Optional[str]
-    default_server: Optional[str]
+    channel_id: int
+    raid_name: str
+    min_item_level: Optional[int]
+    is_active: bool = True
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
