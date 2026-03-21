@@ -52,7 +52,7 @@ def create_bot() -> commands.Bot:
     async def setup_hook():
         await bot.add_cog(SettingCommand(bot, setting_service, message_service))
         await bot.add_cog(RaidCommand(bot, raid_service, message_service))
-        await bot.add_cog(ApplicationCommand(bot, application_service, message_service))
+        await bot.add_cog(ApplicationCommand(bot, application_service, message_service, setting_service,))
         await bot.add_cog(InfoCommand(bot, character_info_service, message_service))
         await bot.tree.sync()
 
