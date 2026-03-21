@@ -1,19 +1,30 @@
-import os
-from dataclasses import dataclass
+from enum import Enum
 
 
-@dataclass
-class Config:
-    discord_token: str
-    api_base_url: str
-    api_timeout: int
-    db_url: str
+class ApplicationStatus(str, Enum):
+    APPLIED = "applied"
+    WAITING = "waiting"
+    ASSIGNED = "assigned"
+    EXCLUDED = "excluded"
 
 
-def load_config() -> Config:
-    return Config(
-        discord_token=os.getenv("DISCORD_TOKEN", ""),
-        api_base_url=os.getenv("API_BASE_URL", ""),
-        api_timeout=int(os.getenv("API_TIMEOUT", "10")),
-        db_url=os.getenv("DB_URL", "sqlite:///bot.db"),
-    )
+class SourceType(str, Enum):
+    USER = "user"
+    ADMIN = "admin"
+
+
+class SessionStatus(str, Enum):
+    DRAFT = "draft"
+    FINALIZED = "finalized"
+    RESET = "reset"
+
+
+class WaitingStatus(str, Enum):
+    WAITING = "waiting"
+    EXCLUDED = "excluded"
+
+
+class BalanceMode(str, Enum):
+    MIXED = "mixed"
+    POWER_BALANCE = "power_balance"
+    STRICT_ROLE = "strict_role"
