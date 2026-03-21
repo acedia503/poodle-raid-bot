@@ -8,11 +8,23 @@ class ChannelRaidRepository:
     def __init__(self, database: Database):
         self.database = database
 
+    def _to_domain(self, row) -> ChannelRaid:
+        return ChannelRaid(
+            id=row["id"],
+            guild_id=row["guild_id"],
+            channel_id=row["channel_id"],
+            raid_name=row["raid_name"],
+            min_item_level=row["min_item_level"],
+            is_active=bool(row["is_active"]),
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
     def get_active_by_channel_id(self, channel_id: int) -> Optional[ChannelRaid]:
         with self.database.get_connection() as conn:
             row = conn.execute(
                 """
-                SELECT id, guild_id, channel_id, raid_name, min_item_level, is_active, created_at, updated_at
+                SELECT *
                 FROM channel_raids
                 WHERE channel_id = ? AND is_active = 1
                 """,
@@ -21,23 +33,13 @@ class ChannelRaidRepository:
 
             if row is None:
                 return None
-
-            return ChannelRaid(
-                id=row["id"],
-                guild_id=row["guild_id"],
-                channel_id=row["channel_id"],
-                raid_name=row["raid_name"],
-                min_item_level=row["min_item_level"],
-                is_active=bool(row["is_active"]),
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-            )
+            return self._to_domain(row)
 
     def get_by_guild_and_raid_name(self, guild_id: int, raid_name: str) -> Optional[ChannelRaid]:
         with self.database.get_connection() as conn:
             row = conn.execute(
                 """
-                SELECT id, guild_id, channel_id, raid_name, min_item_level, is_active, created_at, updated_at
+                SELECT *
                 FROM channel_raids
                 WHERE guild_id = ? AND raid_name = ? AND is_active = 1
                 """,
@@ -46,17 +48,7 @@ class ChannelRaidRepository:
 
             if row is None:
                 return None
-
-            return ChannelRaid(
-                id=row["id"],
-                guild_id=row["guild_id"],
-                channel_id=row["channel_id"],
-                raid_name=row["raid_name"],
-                min_item_level=row["min_item_level"],
-                is_active=bool(row["is_active"]),
-                created_at=row["created_at"],
-                updated_at=row["updated_at"],
-            )
+            return self._to_domain(row)
 
     def upsert(self, channel_raid: ChannelRaid) -> ChannelRaid:
         existing = self.get_active_by_channel_id(channel_raid.channel_id)
