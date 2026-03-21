@@ -1,3 +1,4 @@
+import asyncio
 import discord
 
 from services.character_info_service import CharacterInfoError, CharacterInfoService
