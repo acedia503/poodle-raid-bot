@@ -69,3 +69,31 @@ class MessageService:
             description=text,
         )
         return embed
+
+    def build_application_result_text(
+        self,
+        raid_name: str,
+        info: dict,
+        result_type: str,
+        show_identity: bool,
+    ):
+        if result_type == "updated":
+            title = f"{raid_name} 신청 정보가 갱신되었습니다."
+        else:
+            title = f"{raid_name} 신청이 완료되었습니다."
+    
+        lines = [
+            f"**캐릭터명** : {info['character_name']}",
+            f"**직업** : {info['job']}",
+        ]
+    
+        if show_identity:
+            lines.append(f"**종족** : {info['race']}")
+            lines.append(f"**서버** : {info['server']}")
+    
+        lines.extend([
+            f"**아이템레벨** : {info['item_level']}",
+            f"**전투력** : {info['combat_power']:,}",
+        ])
+    
+        return title + "\n\n" + "\n".join(lines)
