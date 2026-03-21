@@ -1,25 +1,36 @@
 import discord
+from utils.constants import RACE_SERVERS
 
-from services.application_service import ApplicationService
+
+class RaceView(discord.ui.View):
+    def __init__(self, callback):
+        super().__init__()
+        self.callback_func = callback
+
+    @discord.ui.button(label="천족")
+    async def elyos(self, interaction, button):
+        await self.callback_func(interaction, "천족")
+
+    @discord.ui.button(label="마족")
+    async def asmo(self, interaction, button):
+        await self.callback_func(interaction, "마족")
 
 
-class ApplicationResultView(discord.ui.View):
-    def __init__(self, application_service: ApplicationService, application_id: int, user_id: int):
-        super().__init__(timeout=180)
-        self.application_service = application_service
-        self.application_id = application_id
-        self.user_id = user_id
+class ServerSelect(discord.ui.Select):
+    def __init__(self, race, callback):
+        options = [
+            discord.SelectOption(label=s["name"], value=s["name"])
+            for s in RACE_SERVERS[race]
+        ]
+        super().__init__(options=options)
+        self.callback_func = callback
+        self.race = race
 
-    @discord.ui.button(label="신청 취소", style=discord.ButtonStyle.danger)
-    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            ok = self.application_service.cancel_application(
-                application_id=self.application_id,
-                requester_user_id=self.user_id,
-                is_admin=False,
-            )
-            msg = "신청이 취소되었습니다." if ok else "취소할 신청이 없습니다."
-        except Exception as exc:
-            msg = str(exc)
+    async def callback(self, interaction):
+        await self.callback_func(interaction, self.race, self.values[0])
 
-        await interaction.response.send_message(msg, ephemeral=True)
+
+class ServerView(discord.ui.View):
+    def __init__(self, race, callback):
+        super().__init__()
+        self.add_item(ServerSelect(race, callback))
