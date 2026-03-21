@@ -28,8 +28,6 @@ class ChannelRaidRepository:
                 channel_id=row["channel_id"],
                 raid_name=row["raid_name"],
                 min_item_level=row["min_item_level"],
-                min_combat_power=row["min_combat_power"],
-                entry_condition_text=row["entry_condition_text"],
                 is_active=bool(row["is_active"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
@@ -55,8 +53,6 @@ class ChannelRaidRepository:
                 channel_id=row["channel_id"],
                 raid_name=row["raid_name"],
                 min_item_level=row["min_item_level"],
-                min_combat_power=row["min_combat_power"],
-                entry_condition_text=row["entry_condition_text"],
                 is_active=bool(row["is_active"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
@@ -70,33 +66,27 @@ class ChannelRaidRepository:
                 conn.execute(
                     """
                     INSERT INTO channel_raids (
-                        guild_id, channel_id, raid_name, min_item_level,
-                        min_combat_power, entry_condition_text, is_active
+                        guild_id, channel_id, raid_name, min_item_level, is_active
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, 1)
+                    VALUES (?, ?, ?, ?, 1)
                     """,
                     (
                         channel_raid.guild_id,
                         channel_raid.channel_id,
                         channel_raid.raid_name,
                         channel_raid.min_item_level,
-                        channel_raid.min_combat_power,
-                        channel_raid.entry_condition_text,
                     ),
                 )
             else:
                 conn.execute(
                     """
                     UPDATE channel_raids
-                    SET raid_name = ?, min_item_level = ?, min_combat_power = ?,
-                        entry_condition_text = ?, updated_at = CURRENT_TIMESTAMP
+                    SET raid_name = ?, min_item_level = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE channel_id = ?
                     """,
                     (
                         channel_raid.raid_name,
                         channel_raid.min_item_level,
-                        channel_raid.min_combat_power,
-                        channel_raid.entry_condition_text,
                         channel_raid.channel_id,
                     ),
                 )
