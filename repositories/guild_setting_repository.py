@@ -10,14 +10,16 @@ class GuildSettingRepository:
 
     def get_by_guild_id(self, guild_id: int) -> Optional[GuildSetting]:
         with self.database.get_connection() as conn:
-            row = conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 """
                 SELECT id, guild_id, default_race, default_server, created_at, updated_at
                 FROM guild_settings
-                WHERE guild_id = ?
+                WHERE guild_id = %s
                 """,
                 (guild_id,),
-            ).fetchone()
+            )
+            row = cur.fetchone()
 
             if row is None:
                 return None
@@ -37,33 +39,30 @@ class GuildSettingRepository:
         default_race: str | None,
         default_server: str | None,
     ) -> GuildSetting:
-        existing = self.get_by_guild_id(guild_id)
-
         with self.database.get_connection() as conn:
-            if existing is None:
-                conn.execute(
-                    """
-                    INSERT INTO guild_settings (guild_id, default_race, default_server)
-                    VALUES (?, ?, ?)
-                    """,
-                    (guild_id, default_race, default_server),
-                )
-            else:
-                conn.execute(
-                    """
-                    UPDATE guild_settings
-                    SET default_race = ?, default_server = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE guild_id = ?
-                    """,
-                    (default_race, default_server, guild_id),
-                )
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO guild_settings (guild_id, default_race, default_server)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (guild_id)
+                DO UPDATE SET
+                    default_race = EXCLUDED.default_race,
+                    default_server = EXCLUDED.default_server,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id
+                """,
+                (guild_id, default_race, default_server),
+            )
+            cur.fetchone()
 
         return self.get_by_guild_id(guild_id)
 
     def delete_by_guild_id(self, guild_id: int) -> bool:
         with self.database.get_connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM guild_settings WHERE guild_id = ?",
+            cur = conn.cursor()
+            cur.execute(
+                "DELETE FROM guild_settings WHERE guild_id = %s",
                 (guild_id,),
             )
-            return cursor.rowcount > 0
+            return cur.rowcount > 0
