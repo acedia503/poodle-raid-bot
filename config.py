@@ -17,7 +17,7 @@ class Config:
 def load_config() -> Config:
     return Config(
         discord_token=os.getenv("DISCORD_TOKEN", ""),
-        db_path=os.getenv("DB_PATH", "bot.db"),
+        db_path=os.getenv("DB_PATH", ""),
         api_mode=os.getenv("API_MODE", "http"),  # mock | http
         api_base_url=os.getenv("API_BASE_URL", ""),
         api_timeout=int(os.getenv("API_TIMEOUT", "5")),
