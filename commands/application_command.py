@@ -48,7 +48,7 @@ class ApplicationCommand(commands.Cog):
 
     async def _process(self, interaction, character_name, race, server, show_identity: bool):
         await interaction.response.defer(ephemeral=True)
-
+    
         result = self.service.process(
             guild_id=interaction.guild.id,
             channel_id=interaction.channel.id,
@@ -58,36 +58,51 @@ class ApplicationCommand(commands.Cog):
             race=race,
             server=server,
         )
-
+    
         if result["action"] == "created":
-            text = self.message_service.build_application_result_text(
+            embed = self.message_service.build_application_result_embed(
                 result["raid_name"],
                 result["info"],
                 "created",
                 show_identity=show_identity,
             )
-            await interaction.channel.send(text)
-
+            await interaction.edit_original_response(
+                content=None,
+                embed=embed,
+                view=None,
+            )
+    
         elif result["action"] == "show_current":
-            text = self.message_service.build_application_result_text(
+            embed = self.message_service.build_application_result_embed(
                 result["raid_name"],
                 result["info"],
                 "updated",
                 show_identity=show_identity,
             )
-            await interaction.channel.send(text)
-
+            await interaction.edit_original_response(
+                content=None,
+                embed=embed,
+                view=None,
+            )
+    
         elif result["action"] == "show_all":
-            text = self.message_service.build_application_all_result_text(
+            embed = self.message_service.build_application_all_embed(
                 result["info"],
                 result["applications"],
                 show_identity=show_identity,
             )
-            await interaction.channel.send(text)
-
+            await interaction.edit_original_response(
+                content=None,
+                embed=embed,
+                view=None,
+            )
+    
         else:
-            await interaction.followup.send(result["message"], ephemeral=True)
-            return
+            await interaction.edit_original_response(
+                content=result["message"],
+                embed=None,
+                view=None,
+            )
 
         await interaction.edit_original_response(
             content="처리가 완료되었습니다.",
