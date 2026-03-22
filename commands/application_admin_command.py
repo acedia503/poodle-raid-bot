@@ -49,52 +49,87 @@ class ApplicationAdminCommand(commands.Cog):
             return
 
         async def add_callback(inter: discord.Interaction):
-            async def on_user_selected(user_inter: discord.Interaction, selected_user):
-                async def on_character_submit(char_inter: discord.Interaction, character_name: str):
-                    setting = self.setting_service.get_guild_setting(char_inter.guild.id)
+            async def on_user_search(submit_inter: discord.Interaction, keyword: str):
+                if submit_inter.guild is None:
+                    await submit_inter.response.send_message(
+                        "서버 채널에서만 사용할 수 있습니다.",
+                        ephemeral=True,
+                    )
+                    return
 
-                    if not setting:
-                        async def race_callback(race_inter, race):
-                            await race_inter.response.edit_message(
-                                content=f"종족: **{race}**\n서버를 선택하세요.",
-                                view=ServerView(
-                                    race,
-                                    lambda i, r, s: self._admin_create_application(
-                                        i,
-                                        selected_user,
-                                        character_name,
-                                        r,
-                                        s,
-                                        show_identity=True,
+                keyword_lower = keyword.lower()
+
+                members = [
+                    member
+                    for member in submit_inter.guild.members
+                    if not member.bot
+                    and (
+                        keyword_lower in member.display_name.lower()
+                        or keyword_lower in member.name.lower()
+                    )
+                ]
+
+                if not members:
+                    await submit_inter.response.send_message(
+                        "검색 결과가 없습니다.",
+                        ephemeral=True,
+                    )
+                    return
+
+                async def on_user_selected(user_inter: discord.Interaction, selected_user):
+                    async def on_character_submit(char_inter: discord.Interaction, character_name: str):
+                        setting = self.setting_service.get_guild_setting(char_inter.guild.id)
+
+                        if not setting:
+                            async def race_callback(race_inter, race):
+                                await race_inter.response.edit_message(
+                                    content=f"종족: **{race}**\n서버를 선택하세요.",
+                                    view=ServerView(
+                                        race,
+                                        lambda i, r, s: self._admin_create_application(
+                                            i,
+                                            selected_user,
+                                            character_name,
+                                            r,
+                                            s,
+                                            show_identity=True,
+                                        ),
                                     ),
-                                ),
-                                embed=None,
+                                    embed=None,
+                                )
+
+                            await char_inter.response.send_message(
+                                content="기본 서버 설정이 없습니다.\n종족을 선택하세요.",
+                                view=RaceView(race_callback),
+                                ephemeral=True,
                             )
+                            return
 
-                        await char_inter.response.send_message(
-                            content="기본 서버 설정이 없습니다.\n종족을 선택하세요.",
-                            view=RaceView(race_callback),
-                            ephemeral=True,
+                        await self._admin_create_application(
+                            char_inter,
+                            selected_user,
+                            character_name,
+                            setting.default_race,
+                            setting.default_server,
+                            show_identity=False,
                         )
-                        return
 
-                    await self._admin_create_application(
-                        char_inter,
-                        selected_user,
-                        character_name,
-                        setting.default_race,
-                        setting.default_server,
-                        show_identity=False,
+                    await user_inter.response.send_modal(
+                        AdminApplicationCharacterModal(on_character_submit)
                     )
 
-                await user_inter.response.send_modal(
-                    AdminApplicationCharacterModal(on_character_submit)
+                from views.application_admin_view import AdminApplicationUserResultView
+
+                await submit_inter.response.send_message(
+                    content="검색 결과입니다. 신청할 유저를 선택하세요.",
+                    view=AdminApplicationUserResultView(members, on_user_selected),
+                    ephemeral=True,
                 )
 
-            await inter.response.edit_message(
-                content="신청할 디스코드 유저를 선택하세요.",
-                view=AdminApplicationUserSelectView(on_user_selected),
-                embed=None,
+            from views.application_admin_view import AdminApplicationUserSearchModal
+
+            await inter.response.send_modal(
+                AdminApplicationUserSearchModal(on_user_search)
             )
 
         async def list_callback(inter: discord.Interaction):
