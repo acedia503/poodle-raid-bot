@@ -5,6 +5,7 @@ from commands.application_command import ApplicationCommand
 from commands.info_command import InfoCommand
 from commands.raid_command import RaidCommand
 from commands.setting_command import SettingCommand
+from commands.application_admin_command import ApplicationAdminCommand
 
 from config import load_config
 from database import Database
@@ -69,6 +70,15 @@ def create_bot() -> commands.Bot:
                 application_service,
                 message_service,
                 setting_service,
+            )
+        )
+        await bot.add_cog(
+            ApplicationAdminCommand(
+                bot,
+                application_service,
+                setting_service,
+                raid_service,
+                message_service,
             )
         )
         await bot.add_cog(InfoCommand(bot, character_info_service, message_service))
