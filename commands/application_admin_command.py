@@ -65,17 +65,7 @@ class ApplicationAdminCommand(commands.Cog):
                     )
                     return
 
-                keyword_lower = keyword.lower()
-
-                members = [
-                    member
-                    for member in submit_inter.guild.members
-                    if not member.bot
-                    and (
-                        keyword_lower in member.display_name.lower()
-                        or keyword_lower in member.name.lower()
-                    )
-                ]
+                members = await self._search_guild_members(submit_inter.guild, keyword)
 
                 if not members:
                     await submit_inter.response.send_message(
@@ -84,12 +74,12 @@ class ApplicationAdminCommand(commands.Cog):
                     )
                     return
 
-                async def on_user_selected(user_inter: discord.Interaction, selected_user):
+                async def on_user_selected(user_inter: discord.Interaction, selected_user: discord.Member):
                     async def on_character_submit(char_inter: discord.Interaction, character_name: str):
                         setting = self.setting_service.get_guild_setting(char_inter.guild.id)
 
                         if not setting:
-                            async def race_callback(race_inter, race):
+                            async def race_callback(race_inter: discord.Interaction, race: str):
                                 await race_inter.response.edit_message(
                                     content=f"종족: **{race}**\n서버를 선택하세요.",
                                     view=ServerView(
@@ -180,17 +170,7 @@ class ApplicationAdminCommand(commands.Cog):
                         )
                         return
 
-                    keyword_lower = keyword.lower()
-
-                    members = [
-                        member
-                        for member in submit_inter.guild.members
-                        if not member.bot
-                        and (
-                            keyword_lower in member.display_name.lower()
-                            or keyword_lower in member.name.lower()
-                        )
-                    ]
+                    members = await self._search_guild_members(submit_inter.guild, keyword)
 
                     if not members:
                         await submit_inter.response.send_message(
@@ -199,7 +179,7 @@ class ApplicationAdminCommand(commands.Cog):
                         )
                         return
 
-                    async def on_user_selected(select_inter: discord.Interaction, selected_user):
+                    async def on_user_selected(select_inter: discord.Interaction, selected_user: discord.Member):
                         result = await asyncio.to_thread(
                             self.application_service.search_current_raid_applications_by_user,
                             select_inter.channel.id,
@@ -209,7 +189,7 @@ class ApplicationAdminCommand(commands.Cog):
                         applications = result["applications"]
                         selected_ids = set()
 
-                        async def refresh_manage_view(refresh_inter, apps, ids):
+                        async def refresh_manage_view(refresh_inter: discord.Interaction, apps, ids):
                             setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
                             show_identity = not bool(
                                 setting and setting.default_race and setting.default_server
@@ -275,7 +255,7 @@ class ApplicationAdminCommand(commands.Cog):
                     applications = result["applications"]
                     selected_ids = set()
 
-                    async def refresh_manage_view(refresh_inter, apps, ids):
+                    async def refresh_manage_view(refresh_inter: discord.Interaction, apps, ids):
                         setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
                         show_identity = not bool(
                             setting and setting.default_race and setting.default_server
@@ -347,7 +327,7 @@ class ApplicationAdminCommand(commands.Cog):
     async def _admin_create_application(
         self,
         interaction: discord.Interaction,
-        selected_user,
+        selected_user: discord.Member,
         character_name: str,
         race: str,
         server: str,
@@ -412,8 +392,28 @@ class ApplicationAdminCommand(commands.Cog):
             view=None,
         )
 
-    def _resolve_guild_display_name(self, guild: discord.Guild, selected_user) -> str:
+    async def _search_guild_members(
+        self,
+        guild: discord.Guild,
+        keyword: str,
+    ) -> list[discord.Member]:
+        keyword_lower = keyword.lower()
+        members: list[discord.Member] = []
+
+        async for member in guild.fetch_members(limit=None):
+            if member.bot:
+                continue
+
+            display_name = (member.display_name or "").lower()
+            username = (member.name or "").lower()
+
+            if keyword_lower in display_name or keyword_lower in username:
+                members.append(member)
+
+        return members[:25]
+
+    def _resolve_guild_display_name(self, guild: discord.Guild, selected_user: discord.Member) -> str:
         member = guild.get_member(selected_user.id)
         if member is not None:
             return member.display_name
-        return getattr(selected_user, "display_name", None) or selected_user.name
+        return selected_user.display_name
