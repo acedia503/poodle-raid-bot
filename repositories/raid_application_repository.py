@@ -238,3 +238,82 @@ class RaidApplicationRepository:
                 (guild_id, raid_name),
             )
             return cur.rowcount
+
+    def get_by_guild_and_raid_name(
+        self,
+        guild_id: int,
+        raid_name: str,
+    ) -> list[RaidApplication]:
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT *
+                FROM raid_applications
+                WHERE guild_id = %s
+                  AND raid_name = %s
+                ORDER BY created_at ASC
+                """,
+                (guild_id, raid_name),
+            )
+            rows = cur.fetchall()
+            return [self._to_domain(row) for row in rows]
+
+    def get_by_guild_raid_and_user_id(
+        self,
+        guild_id: int,
+        raid_name: str,
+        user_id: int,
+    ) -> list[RaidApplication]:
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT *
+                FROM raid_applications
+                WHERE guild_id = %s
+                  AND raid_name = %s
+                  AND user_id = %s
+                ORDER BY created_at ASC
+                """,
+                (guild_id, raid_name, user_id),
+            )
+            rows = cur.fetchall()
+            return [self._to_domain(row) for row in rows]
+
+    def get_by_guild_raid_and_character_name(
+        self,
+        guild_id: int,
+        raid_name: str,
+        character_name: str,
+    ) -> list[RaidApplication]:
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT *
+                FROM raid_applications
+                WHERE guild_id = %s
+                  AND raid_name = %s
+                  AND character_name = %s
+                ORDER BY created_at ASC
+                """,
+                (guild_id, raid_name, character_name),
+            )
+            rows = cur.fetchall()
+            return [self._to_domain(row) for row in rows]
+
+    def delete_by_ids(self, application_ids: list[int]) -> int:
+        if not application_ids:
+            return 0
+
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                DELETE FROM raid_applications
+                WHERE id = ANY(%s)
+                """,
+                (application_ids,),
+            )
+            return cur.rowcount
