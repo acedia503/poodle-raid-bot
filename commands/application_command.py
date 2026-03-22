@@ -80,12 +80,14 @@ class ApplicationCommand(commands.Cog):
                 )
                 return
 
+            guild_display_name = interaction.user.display_name
+
             result = await asyncio.to_thread(
                 self.service.process,
                 interaction.guild.id,
                 interaction.channel.id,
                 interaction.user.id,
-                interaction.user.name,
+                guild_display_name,
                 character_name,
                 race,
                 server,
@@ -99,13 +101,26 @@ class ApplicationCommand(commands.Cog):
                     show_identity=show_identity,
                 )
 
-                await interaction.channel.send(embed=embed)
+                sent_to_channel = False
+                if interaction.channel is not None:
+                    try:
+                        await interaction.channel.send(embed=embed)
+                        sent_to_channel = True
+                    except discord.Forbidden:
+                        sent_to_channel = False
 
-                await interaction.edit_original_response(
-                    content="신청이 완료되었습니다.",
-                    embed=None,
-                    view=None,
-                )
+                if sent_to_channel:
+                    await interaction.edit_original_response(
+                        content="신청이 완료되었습니다.",
+                        embed=None,
+                        view=None,
+                    )
+                else:
+                    await interaction.edit_original_response(
+                        content="신청이 완료되었습니다. 채널 전송 권한이 없어 여기 표시합니다.",
+                        embed=embed,
+                        view=None,
+                    )
 
             elif result["action"] == "show_current":
                 embed = self.message_service.build_application_result_embed(
