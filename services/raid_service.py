@@ -1,6 +1,7 @@
 from domain.channel_raid import ChannelRaid
 from repositories.channel_raid_repository import ChannelRaidRepository
 from utils.constants import RAID_PRESETS
+from repositories.raid_application_repository import RaidApplicationRepository
 
 
 class RaidDuplicateError(Exception):
@@ -11,9 +12,18 @@ class RaidPresetNotFoundError(Exception):
     pass
 
 
+class RaidDeleteBlockedError(Exception):
+    pass
+    
+
 class RaidService:
-    def __init__(self, channel_raid_repository: ChannelRaidRepository):
+    def __init__(
+        self,
+        channel_raid_repository: ChannelRaidRepository,
+        raid_application_repository: RaidApplicationRepository,
+    ):
         self.channel_raid_repository = channel_raid_repository
+        self.raid_application_repository = raid_application_repository
 
     def get_channel_raid(self, channel_id: int) -> ChannelRaid | None:
         return self.channel_raid_repository.get_active_by_channel_id(channel_id)
@@ -51,4 +61,18 @@ class RaidService:
         return self.channel_raid_repository.upsert(channel_raid)
 
     def delete_channel_raid(self, channel_id: int) -> bool:
+        channel_raid = self.channel_raid_repository.get_active_by_channel_id(channel_id)
+        if channel_raid is None:
+            return False
+    
+        application_count = self.raid_application_repository.count_by_guild_and_raid_name(
+            guild_id=channel_raid.guild_id,
+            raid_name=channel_raid.raid_name,
+        )
+    
+        if application_count > 0:
+            raise RaidDeleteBlockedError(
+                f"현재 레이드에 신청자 {application_count}명이 있어 삭제할 수 없습니다."
+            )
+    
         return self.channel_raid_repository.delete_by_channel_id(channel_id)
