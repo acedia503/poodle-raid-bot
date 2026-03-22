@@ -111,31 +111,6 @@ class MessageService:
             description="\n".join(lines),
         )
 
-    def build_admin_application_created_embed(
-        self,
-        raid_name: str,
-        target_user_name: str,
-        info: dict,
-        show_identity: bool,
-    ) -> discord.Embed:
-        lines = [
-            f"**대상 유저** : {target_user_name}",
-            f"**캐릭터명** : {info['character_name']}",
-        ]
-
-        if show_identity:
-            lines.append(f"**종족** : {info['race']}")
-            lines.append(f"**서버** : {info['server']}")
-
-        lines.extend([
-            f"**직업** : {info['job']}",
-            f"**아이템레벨** : {info['item_level']}",
-            f"**전투력** : {info['combat_power']:,}",
-        ])
-
-        return discord.Embed(
-            description=f"{raid_name} 신청이 완료되었습니다.\n\n" + "\n".join(lines)
-        )
 
     def build_admin_application_list_embed(
         self,
