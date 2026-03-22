@@ -1,7 +1,7 @@
 from domain.channel_raid import ChannelRaid
 from repositories.channel_raid_repository import ChannelRaidRepository
-from utils.constants import RAID_PRESETS
 from repositories.raid_application_repository import RaidApplicationRepository
+from utils.constants import RAID_PRESETS
 
 
 class RaidDuplicateError(Exception):
@@ -13,8 +13,13 @@ class RaidPresetNotFoundError(Exception):
 
 
 class RaidDeleteBlockedError(Exception):
-    pass
-    
+    def __init__(self, raid_name: str, application_count: int):
+        self.raid_name = raid_name
+        self.application_count = application_count
+        super().__init__(
+            f"현재 레이드에 신청자 {application_count}명이 있어 삭제할 수 없습니다."
+        )
+
 
 class RaidService:
     def __init__(
@@ -64,15 +69,37 @@ class RaidService:
         channel_raid = self.channel_raid_repository.get_active_by_channel_id(channel_id)
         if channel_raid is None:
             return False
-    
+
         application_count = self.raid_application_repository.count_by_guild_and_raid_name(
             guild_id=channel_raid.guild_id,
             raid_name=channel_raid.raid_name,
         )
-    
+
         if application_count > 0:
             raise RaidDeleteBlockedError(
-                f"현재 레이드에 신청자 {application_count}명이 있어 삭제할 수 없습니다."
+                raid_name=channel_raid.raid_name,
+                application_count=application_count,
             )
-    
+
         return self.channel_raid_repository.delete_by_channel_id(channel_id)
+
+    def force_delete_channel_raid_with_applications(self, channel_id: int) -> dict:
+        channel_raid = self.channel_raid_repository.get_active_by_channel_id(channel_id)
+        if channel_raid is None:
+            return {
+                "deleted_raid": False,
+                "deleted_applications": 0,
+                "raid_name": None,
+            }
+
+        deleted_applications = self.raid_application_repository.delete_by_guild_and_raid_name(
+            guild_id=channel_raid.guild_id,
+            raid_name=channel_raid.raid_name,
+        )
+        deleted_raid = self.channel_raid_repository.delete_by_channel_id(channel_id)
+
+        return {
+            "deleted_raid": deleted_raid,
+            "deleted_applications": deleted_applications,
+            "raid_name": channel_raid.raid_name,
+        }
