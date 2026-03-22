@@ -103,9 +103,15 @@ class ApplicationAdminCommand(commands.Cog):
                 inter.channel.id,
             )
 
+            setting = self.setting_service.get_guild_setting(inter.guild.id)
+            show_identity = not bool(
+                setting and setting.default_race and setting.default_server
+            )
+
             embed = self.message_service.build_admin_application_list_embed(
                 result["raid_name"],
                 result["applications"],
+                show_identity=show_identity,
             )
 
             await inter.response.edit_message(
@@ -138,15 +144,22 @@ class ApplicationAdminCommand(commands.Cog):
                     selected_ids = set()
 
                     async def refresh_manage_view(refresh_inter, apps, ids):
+                        setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
+                        show_identity = not bool(
+                            setting and setting.default_race and setting.default_server
+                        )
+
                         embed = self.message_service.build_admin_delete_search_embed(
                             "삭제 대상 선택",
                             apps,
+                            show_identity=show_identity,
                         )
                         view = AdminApplicationDeleteManageView(
                             applications=apps,
                             selected_ids=ids,
                             refresh_callback=refresh_manage_view,
                             delete_callback=delete_selected,
+                            allow_select_all=True,
                         )
 
                         if refresh_inter.response.is_done():
@@ -193,15 +206,22 @@ class ApplicationAdminCommand(commands.Cog):
                     selected_ids = set()
 
                     async def refresh_manage_view(refresh_inter, apps, ids):
+                        setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
+                        show_identity = not bool(
+                            setting and setting.default_race and setting.default_server
+                        )
+
                         embed = self.message_service.build_admin_delete_search_embed(
                             "삭제 대상 선택",
                             apps,
+                            show_identity=show_identity,
                         )
                         view = AdminApplicationDeleteManageView(
                             applications=apps,
                             selected_ids=ids,
                             refresh_callback=refresh_manage_view,
                             delete_callback=delete_selected,
+                            allow_select_all=False,
                         )
 
                         if refresh_inter.response.is_done():
