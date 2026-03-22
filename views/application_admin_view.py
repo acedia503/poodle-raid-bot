@@ -222,3 +222,47 @@ class ApplicationAdminDeleteModeView(discord.ui.View):
             embed=None,
             view=None,
         )
+
+    class AdminApplicationUserSearchModal(discord.ui.Modal, title="디코 유저 검색"):
+        keyword = discord.ui.TextInput(
+            label="디코 이름 또는 닉네임",
+            required=True,
+            max_length=30,
+        )
+    
+        def __init__(self, callback_func):
+            super().__init__()
+            self.callback_func = callback_func
+    
+        async def on_submit(self, interaction: discord.Interaction):
+            await self.callback_func(interaction, str(self.keyword.value).strip())
+    
+    
+    class AdminApplicationUserResultSelect(discord.ui.Select):
+        def __init__(self, members, callback_func):
+            options = [
+                discord.SelectOption(
+                    label=f"{member.display_name} | {member.name}",
+                    value=str(member.id),
+                )
+                for member in members[:25]
+            ]
+    
+            super().__init__(
+                placeholder="신청할 디스코드 유저를 선택하세요",
+                min_values=1,
+                max_values=1,
+                options=options,
+            )
+            self.members = {str(member.id): member for member in members[:25]}
+            self.callback_func = callback_func
+    
+        async def callback(self, interaction: discord.Interaction):
+            selected_member = self.members[self.values[0]]
+            await self.callback_func(interaction, selected_member)
+    
+    
+    class AdminApplicationUserResultView(discord.ui.View):
+        def __init__(self, members, callback_func):
+            super().__init__(timeout=180)
+            self.add_item(AdminApplicationUserResultSelect(members, callback_func))
