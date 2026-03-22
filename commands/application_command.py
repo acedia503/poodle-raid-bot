@@ -103,9 +103,4 @@ class ApplicationCommand(commands.Cog):
                 embed=None,
                 view=None,
             )
-
-        await interaction.edit_original_response(
-            content="처리가 완료되었습니다.",
-            embed=None,
-            view=None,
         )
