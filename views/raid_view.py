@@ -1,7 +1,11 @@
 import discord
 
 from utils.constants import RAID_PRESETS
-from services.raid_service import RaidDuplicateError, RaidPresetNotFoundError, RaidDeleteBlockedError
+from services.raid_service import (
+    RaidDeleteBlockedError,
+    RaidDuplicateError,
+    RaidPresetNotFoundError,
+)
 
 
 class RaidPresetButton(discord.ui.Button):
@@ -20,7 +24,7 @@ class RaidPresetButton(discord.ui.Button):
         self.preset = preset
         self.raid_service = raid_service
         self.message_service = message_service
-        self.mode = mode  # create | update
+        self.mode = mode
 
     async def callback(self, interaction: discord.Interaction):
         try:
@@ -32,10 +36,11 @@ class RaidPresetButton(discord.ui.Button):
 
             embed = self.message_service.build_channel_raid_embed(channel_raid)
 
-            if self.mode == "update":
-                content = "레이드 설정이 수정되었습니다."
-            else:
-                content = "레이드 설정이 생성되었습니다."
+            content = (
+                "레이드 설정이 수정되었습니다."
+                if self.mode == "update"
+                else "레이드 설정이 생성되었습니다."
+            )
 
             await interaction.response.edit_message(
                 content=content,
@@ -88,6 +93,50 @@ class RaidInitView(discord.ui.View):
         )
 
 
+class RaidDeleteConfirmView(discord.ui.View):
+    def __init__(self, guild_id, channel_id, raid_service):
+        super().__init__(timeout=180)
+        self.guild_id = guild_id
+        self.channel_id = channel_id
+        self.raid_service = raid_service
+
+    @discord.ui.button(label="같이 삭제", style=discord.ButtonStyle.danger)
+    async def force_delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            result = self.raid_service.force_delete_channel_raid_with_applications(self.channel_id)
+
+            if not result["deleted_raid"]:
+                await interaction.response.edit_message(
+                    content="삭제할 레이드 설정이 없습니다.",
+                    embed=None,
+                    view=None,
+                )
+                return
+
+            await interaction.response.edit_message(
+                content=(
+                    f"{result['raid_name']} 레이드와 신청자 "
+                    f"{result['deleted_applications']}명을 함께 삭제했습니다."
+                ),
+                embed=None,
+                view=None,
+            )
+
+        except Exception as exc:
+            await interaction.response.send_message(
+                f"예상치 못한 오류: {exc}",
+                ephemeral=True,
+            )
+
+    @discord.ui.button(label="취소", style=discord.ButtonStyle.secondary)
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="레이드 삭제를 취소했습니다.",
+            embed=None,
+            view=None,
+        )
+
+
 class RaidMainView(discord.ui.View):
     def __init__(
         self,
@@ -121,7 +170,7 @@ class RaidMainView(discord.ui.View):
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             ok = self.raid_service.delete_channel_raid(self.channel_id)
-    
+
             if ok:
                 await interaction.response.edit_message(
                     content="레이드 설정이 삭제되었습니다.",
@@ -135,12 +184,20 @@ class RaidMainView(discord.ui.View):
                     view=None,
                 )
 
-    except RaidDeleteBlockedError as exc:
-        await interaction.response.edit_message(
-            content=str(exc),
-            embed=None,
-            view=None,
-        )
+        except RaidDeleteBlockedError as exc:
+            view = RaidDeleteConfirmView(
+                guild_id=self.guild_id,
+                channel_id=self.channel_id,
+                raid_service=self.raid_service,
+            )
+            await interaction.response.edit_message(
+                content=(
+                    f"현재 레이드에 신청자 {exc.application_count}명이 있어 삭제할 수 없습니다.\n"
+                    f"신청자도 같이 삭제하시겠습니까?"
+                ),
+                embed=None,
+                view=view,
+            )
 
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
