@@ -131,3 +131,93 @@ class ApplicationService:
             raise ValueError("본인의 신청만 취소할 수 있습니다.")
 
         return self.repository.delete_by_id(application_id)
+
+    def admin_create_application(
+        self,
+        guild_id: int,
+        channel_id: int,
+        target_user_id: int,
+        target_user_name: str,
+        character_name: str,
+        race: str,
+        server: str,
+    ) -> dict:
+        return self.process(
+            guild_id=guild_id,
+            channel_id=channel_id,
+            user_id=target_user_id,
+            user_name=target_user_name,
+            character_name=character_name,
+            race=race,
+            server=server,
+        )
+
+    def get_current_raid_application_list(
+        self,
+        channel_id: int,
+    ) -> dict:
+        channel_raid = self.raid_service.get_channel_raid(channel_id)
+        if channel_raid is None:
+            return {
+                "raid_name": None,
+                "applications": [],
+            }
+
+        applications = self.repository.get_by_guild_and_raid_name(
+            guild_id=channel_raid.guild_id,
+            raid_name=channel_raid.raid_name,
+        )
+
+        return {
+            "raid_name": channel_raid.raid_name,
+            "applications": applications,
+        }
+
+    def search_current_raid_applications_by_user(
+        self,
+        channel_id: int,
+        user_id: int,
+    ) -> dict:
+        channel_raid = self.raid_service.get_channel_raid(channel_id)
+        if channel_raid is None:
+            return {
+                "raid_name": None,
+                "applications": [],
+            }
+
+        applications = self.repository.get_by_guild_raid_and_user_id(
+            guild_id=channel_raid.guild_id,
+            raid_name=channel_raid.raid_name,
+            user_id=user_id,
+        )
+
+        return {
+            "raid_name": channel_raid.raid_name,
+            "applications": applications,
+        }
+
+    def search_current_raid_applications_by_character(
+        self,
+        channel_id: int,
+        character_name: str,
+    ) -> dict:
+        channel_raid = self.raid_service.get_channel_raid(channel_id)
+        if channel_raid is None:
+            return {
+                "raid_name": None,
+                "applications": [],
+            }
+
+        applications = self.repository.get_by_guild_raid_and_character_name(
+            guild_id=channel_raid.guild_id,
+            raid_name=channel_raid.raid_name,
+            character_name=character_name,
+        )
+
+        return {
+            "raid_name": channel_raid.raid_name,
+            "applications": applications,
+        }
+
+    def admin_delete_applications(self, application_ids: list[int]) -> int:
+        return self.repository.delete_by_ids(application_ids)
