@@ -143,28 +143,32 @@ class MessageService:
         applications: list[RaidApplication],
         show_identity: bool,
     ) -> discord.Embed:
-        embed = discord.Embed(title=f"{raid_name} 신청자 목록")
-
+        total_count = len(applications)
+    
+        embed = discord.Embed(
+            title=f"{raid_name} 신청자 목록 (총 {total_count}명)"
+        )
+    
         if not applications:
             embed.description = "신청자가 없습니다."
             return embed
-
+    
         lines = []
-        for app in applications:
+        for idx, app in enumerate(applications, start=1):
             if show_identity:
                 lines.append(
-                    f"{app.user_name} | {app.character_name} | {app.race} | {app.server} | "
+                    f"{idx}. {app.user_name} | {app.character_name} | {app.race} | {app.server} | "
                     f"{app.job} | {app.item_level} | {app.combat_power:,}"
                 )
             else:
                 lines.append(
-                    f"{app.user_name} | {app.character_name} | "
+                    f"{idx}. {app.user_name} | {app.character_name} | "
                     f"{app.job} | {app.item_level} | {app.combat_power:,}"
                 )
-
+    
         embed.description = "\n".join(lines)
         return embed
-
+    
     def build_admin_delete_search_embed(
         self,
         title: str,
