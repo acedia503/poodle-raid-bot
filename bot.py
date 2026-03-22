@@ -59,6 +59,7 @@ def create_bot() -> commands.Bot:
     message_service = MessageService()
 
     intents = discord.Intents.default()
+    intents.members = True
     bot = commands.Bot(command_prefix="!", intents=intents)
 
     async def setup_hook():
