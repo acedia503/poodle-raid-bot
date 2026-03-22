@@ -1,7 +1,7 @@
 import discord
 
 from utils.constants import RAID_PRESETS
-from services.raid_service import RaidDuplicateError, RaidPresetNotFoundError
+from services.raid_service import RaidDuplicateError, RaidPresetNotFoundError, RaidDeleteBlockedError
 
 
 class RaidPresetButton(discord.ui.Button):
@@ -119,20 +119,28 @@ class RaidMainView(discord.ui.View):
 
     @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        ok = self.raid_service.delete_channel_raid(self.channel_id)
+        try:
+            ok = self.raid_service.delete_channel_raid(self.channel_id)
+    
+            if ok:
+                await interaction.response.edit_message(
+                    content="레이드 설정이 삭제되었습니다.",
+                    embed=None,
+                    view=None,
+                )
+            else:
+                await interaction.response.edit_message(
+                    content="삭제할 레이드 설정이 없습니다.",
+                    embed=None,
+                    view=None,
+                )
 
-        if ok:
-            await interaction.response.edit_message(
-                content="레이드 설정이 삭제되었습니다.",
-                embed=None,
-                view=None,
-            )
-        else:
-            await interaction.response.edit_message(
-                content="삭제할 레이드 설정이 없습니다.",
-                embed=None,
-                view=None,
-            )
+    except RaidDeleteBlockedError as exc:
+        await interaction.response.edit_message(
+            content=str(exc),
+            embed=None,
+            view=None,
+        )
 
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
