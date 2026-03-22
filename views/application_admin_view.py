@@ -1,5 +1,3 @@
-import asyncio
-
 import discord
 
 from views.application_view import RaceView, ServerView
@@ -84,37 +82,6 @@ class AdminApplicationDeleteMultiSelect(discord.ui.Select):
         await self.refresh_callback(interaction, self.applications, self.selected_ids)
 
 
-class AdminApplicationDeleteManageView(discord.ui.View):
-    def __init__(
-        self,
-        applications,
-        selected_ids,
-        refresh_callback,
-        delete_callback,
-        allow_select_all: bool,
-    ):
-        super().__init__(timeout=180)
-        self.applications = applications
-        self.selected_ids = selected_ids
-        self.refresh_callback = refresh_callback
-        self.delete_callback = delete_callback
-        self.allow_select_all = allow_select_all
-
-        if applications:
-            self.add_item(
-                AdminApplicationDeleteMultiSelect(
-                    applications=applications,
-                    selected_ids=selected_ids,
-                    refresh_callback=refresh_callback,
-                )
-            )
-
-        if self.allow_select_all:
-            self.add_item(SelectAllButton(self))
-        self.add_item(ForceDeleteButton(self))
-        self.add_item(CancelManageButton())
-
-
 class SelectAllButton(discord.ui.Button):
     def __init__(self, parent_view):
         super().__init__(label="전체 선택", style=discord.ButtonStyle.primary, row=3)
@@ -133,8 +100,13 @@ class SelectAllButton(discord.ui.Button):
 
 
 class ForceDeleteButton(discord.ui.Button):
-    def __init__(self, parent_view):
-        super().__init__(label="강제 삭제", style=discord.ButtonStyle.danger, row=3)
+    def __init__(self, parent_view, disabled: bool):
+        super().__init__(
+            label="강제 삭제",
+            style=discord.ButtonStyle.danger,
+            row=3,
+            disabled=disabled,
+        )
         self.parent_view_ref = parent_view
 
     async def callback(self, interaction: discord.Interaction):
@@ -154,6 +126,47 @@ class CancelManageButton(discord.ui.Button):
             embed=None,
             view=None,
         )
+
+
+class AdminApplicationDeleteManageView(discord.ui.View):
+    def __init__(
+        self,
+        applications,
+        selected_ids,
+        refresh_callback,
+        delete_callback,
+        allow_select_all: bool,
+    ):
+        super().__init__(timeout=180)
+        self.applications = applications
+        self.selected_ids = selected_ids
+        self.refresh_callback = refresh_callback
+        self.delete_callback = delete_callback
+        self.allow_select_all = allow_select_all
+
+        has_applications = len(applications) > 0
+        has_selected = len(selected_ids) > 0
+
+        if has_applications:
+            self.add_item(
+                AdminApplicationDeleteMultiSelect(
+                    applications=applications,
+                    selected_ids=selected_ids,
+                    refresh_callback=refresh_callback,
+                )
+            )
+
+        if self.allow_select_all and has_applications:
+            self.add_item(SelectAllButton(self))
+
+        self.add_item(
+            ForceDeleteButton(
+                self,
+                disabled=(not has_applications or not has_selected),
+            )
+        )
+        self.add_item(CancelManageButton())
+
 
 class ApplicationAdminMainView(discord.ui.View):
     def __init__(self, add_callback, list_callback, delete_callback):
