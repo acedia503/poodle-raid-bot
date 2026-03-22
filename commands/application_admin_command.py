@@ -297,18 +297,18 @@ class ApplicationAdminCommand(commands.Cog):
         )
 
         if result["action"] == "created":
-            embed = self.message_service.build_admin_application_created_embed(
+            embed = self.message_service.build_application_result_embed(
                 result["raid_name"],
-                selected_user.display_name,
                 result["info"],
+                "created",
                 show_identity=show_identity,
             )
-
+        
             if interaction.channel is not None:
                 await interaction.channel.send(embed=embed)
-
+        
             await interaction.edit_original_response(
-                content="신청이 완료되었습니다.",
+                content=f"{result['raid_name']} 신청이 추가되었습니다.",
                 embed=None,
                 view=None,
             )
