@@ -21,11 +21,11 @@ class MessageService:
 
     def build_channel_raid_embed(self, channel_raid: ChannelRaid | None) -> discord.Embed:
         embed = discord.Embed(title="레이드 설정")
-
+    
         if channel_raid is None:
             embed.description = "현재 채널에 연결된 레이드가 없습니다."
             return embed
-
+    
         embed.description = (
             f"**레이드명** : {channel_raid.raid_name}\n"
             f"**입장조건** : {channel_raid.min_item_level if channel_raid.min_item_level is not None else '-'}"
