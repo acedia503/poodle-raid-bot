@@ -1,7 +1,14 @@
 import discord
 
 
-class AdminApplicationCharacterModal(discord.ui.Modal, title="캐릭터명 입력"):
+class AdminApplicationAddModal(discord.ui.Modal, title="신청 추가"):
+    target_user = discord.ui.TextInput(
+        label="대상 유저 (멘션 또는 ID)",
+        placeholder="@버터와플 또는 123456789012345678",
+        required=True,
+        max_length=50,
+    )
+
     character_name = discord.ui.TextInput(
         label="캐릭터명",
         required=True,
@@ -13,7 +20,11 @@ class AdminApplicationCharacterModal(discord.ui.Modal, title="캐릭터명 입�
         self.callback_func = callback_func
 
     async def on_submit(self, interaction: discord.Interaction):
-        await self.callback_func(interaction, str(self.character_name.value).strip())
+        await self.callback_func(
+            interaction,
+            str(self.target_user.value).strip(),
+            str(self.character_name.value).strip(),
+        )
 
 
 class AdminApplicationDeleteCharacterModal(discord.ui.Modal, title="캐릭터명 검색"):
