@@ -45,7 +45,10 @@ def create_bot() -> commands.Bot:
     # Services
     character_info_service = CharacterInfoService(api_service)
     setting_service = SettingService(guild_setting_repository)
-    raid_service = RaidService(channel_raid_repository)
+    raid_service = RaidService(
+        channel_raid_repository=channel_raid_repository,
+        raid_application_repository=raid_application_repository,
+    )
     application_service = ApplicationService(
         character_info_service=character_info_service,
         setting_service=setting_service,
