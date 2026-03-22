@@ -47,7 +47,7 @@ class ApplicationCommand(commands.Cog):
 
     async def _process(self, interaction, character_name, race, server, show_identity: bool):
         await interaction.response.defer(ephemeral=True)
-
+    
         result = self.service.process(
             guild_id=interaction.guild.id,
             channel_id=interaction.channel.id,
@@ -57,7 +57,7 @@ class ApplicationCommand(commands.Cog):
             race=race,
             server=server,
         )
-
+    
         if result["action"] == "created":
             embed = self.message_service.build_application_result_embed(
                 result["raid_name"],
@@ -65,12 +65,16 @@ class ApplicationCommand(commands.Cog):
                 "created",
                 show_identity=show_identity,
             )
+    
+            if interaction.channel is not None:
+                await interaction.channel.send(embed=embed)
+    
             await interaction.edit_original_response(
-                content=None,
-                embed=embed,
+                content="신청이 완료되었습니다.",
+                embed=None,
                 view=None,
             )
-
+    
         elif result["action"] == "show_current":
             embed = self.message_service.build_application_result_embed(
                 result["raid_name"],
@@ -88,7 +92,7 @@ class ApplicationCommand(commands.Cog):
                 embed=embed,
                 view=view,
             )
-
+    
         elif result["action"] == "show_all":
             embed = self.message_service.build_application_all_embed(
                 result["info"],
@@ -100,7 +104,7 @@ class ApplicationCommand(commands.Cog):
                 embed=embed,
                 view=None,
             )
-
+    
         else:
             await interaction.edit_original_response(
                 content=result["message"],
