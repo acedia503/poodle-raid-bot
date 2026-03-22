@@ -201,3 +201,22 @@ class RaidApplicationRepository:
                 (application_id,),
             )
             return cur.rowcount > 0
+
+    def count_by_guild_and_raid_name(
+        self,
+        guild_id: int,
+        raid_name: str,
+    ) -> int:
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM raid_applications
+                WHERE guild_id = %s
+                  AND raid_name = %s
+                """,
+                (guild_id, raid_name),
+            )
+            row = cur.fetchone()
+            return int(row["cnt"]) if row else 0
