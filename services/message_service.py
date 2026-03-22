@@ -58,7 +58,7 @@ class MessageService:
         if result_type == "updated":
             title = f"{raid_name} 신청 정보가 조회되었습니다."
         else:
-            title = f"✅{raid_name} 신청 완료"
+            title = f"✅ {raid_name} 신청 완료"
     
         lines = [
             f"**캐릭터명** : {info['character_name']}",
