@@ -21,7 +21,7 @@ from services.api_service import HttpApiService, MockApiService
 def create_bot() -> commands.Bot:
     config = load_config()
 
-    database = Database(config.db_path)
+    database = Database(config.database_url)
     database.initialize()
 
     guild_setting_repository = GuildSettingRepository(database)
