@@ -6,7 +6,7 @@ from discord.ext import commands
 
 from utils.permissions import ensure_guild_only, is_admin
 from views.application_admin_view import (
-    AdminApplicationCharacterModal,
+    AdminApplicationAddModal,
     AdminApplicationDeleteCharacterModal,
     AdminApplicationDeleteManageView,
     AdminApplicationUserSearchModal,
@@ -57,7 +57,11 @@ class ApplicationAdminCommand(commands.Cog):
             return
 
         async def add_callback(inter: discord.Interaction):
-            async def on_user_search(submit_inter: discord.Interaction, keyword: str):
+            async def on_add_submit(
+                submit_inter: discord.Interaction,
+                raw_target_user: str,
+                character_name: str,
+            ):
                 if submit_inter.guild is None:
                     await submit_inter.response.send_message(
                         "서버 채널에서만 사용할 수 있습니다.",
@@ -65,65 +69,56 @@ class ApplicationAdminCommand(commands.Cog):
                     )
                     return
 
-                members = await self._search_guild_members(submit_inter.guild, keyword)
+                selected_user = self._resolve_member_from_input(
+                    submit_inter.guild,
+                    raw_target_user,
+                )
 
-                if not members:
+                if selected_user is None or selected_user.bot:
                     await submit_inter.response.send_message(
-                        "검색 결과가 없습니다.",
+                        "대상 유저를 찾을 수 없습니다. 멘션 또는 유저 ID를 확인해 주세요.",
                         ephemeral=True,
                     )
                     return
 
-                async def on_user_selected(user_inter: discord.Interaction, selected_user: discord.Member):
-                    async def on_character_submit(char_inter: discord.Interaction, character_name: str):
-                        setting = self.setting_service.get_guild_setting(char_inter.guild.id)
+                setting = self.setting_service.get_guild_setting(submit_inter.guild.id)
 
-                        if not setting:
-                            async def race_callback(race_inter: discord.Interaction, race: str):
-                                await race_inter.response.edit_message(
-                                    content=f"종족: **{race}**\n서버를 선택하세요.",
-                                    view=ServerView(
-                                        race,
-                                        lambda i, r, s: self._admin_create_application(
-                                            i,
-                                            selected_user,
-                                            character_name,
-                                            r,
-                                            s,
-                                            show_identity=True,
-                                        ),
-                                    ),
-                                    embed=None,
-                                )
-
-                            await char_inter.response.send_message(
-                                content="기본 서버 설정이 없습니다.\n종족을 선택하세요.",
-                                view=RaceView(race_callback),
-                                ephemeral=True,
-                            )
-                            return
-
-                        await self._admin_create_application(
-                            char_inter,
-                            selected_user,
-                            character_name,
-                            setting.default_race,
-                            setting.default_server,
-                            show_identity=False,
+                if not setting:
+                    async def race_callback(race_inter: discord.Interaction, race: str):
+                        await race_inter.response.edit_message(
+                            content=f"종족: **{race}**\n서버를 선택하세요.",
+                            view=ServerView(
+                                race,
+                                lambda i, r, s: self._admin_create_application(
+                                    i,
+                                    selected_user,
+                                    character_name,
+                                    r,
+                                    s,
+                                    show_identity=True,
+                                ),
+                            ),
+                            embed=None,
                         )
 
-                    await user_inter.response.send_modal(
-                        AdminApplicationCharacterModal(on_character_submit)
+                    await submit_inter.response.send_message(
+                        content="기본 서버 설정이 없습니다.\n종족을 선택하세요.",
+                        view=RaceView(race_callback),
+                        ephemeral=True,
                     )
+                    return
 
-                await submit_inter.response.send_message(
-                    content="검색 결과입니다. 신청할 유저를 선택하세요.",
-                    view=AdminApplicationUserResultView(members, on_user_selected),
-                    ephemeral=True,
+                await self._admin_create_application(
+                    submit_inter,
+                    selected_user,
+                    character_name,
+                    setting.default_race,
+                    setting.default_server,
+                    show_identity=False,
                 )
 
             await inter.response.send_modal(
-                AdminApplicationUserSearchModal(on_user_search)
+                AdminApplicationAddModal(on_add_submit)
             )
 
         async def list_callback(inter: discord.Interaction):
@@ -411,6 +406,21 @@ class ApplicationAdminCommand(commands.Cog):
                 members.append(member)
 
         return members[:25]
+
+    def _resolve_member_from_input(
+        self,
+        guild: discord.Guild,
+        raw_value: str,
+    ) -> discord.Member | None:
+        value = raw_value.strip()
+
+        if value.startswith("<@") and value.endswith(">"):
+            value = value.replace("<@", "").replace("!", "").replace(">", "").strip()
+
+        if value.isdigit():
+            return guild.get_member(int(value))
+
+        return None
 
     def _resolve_guild_display_name(self, guild: discord.Guild, selected_user: discord.Member) -> str:
         member = guild.get_member(selected_user.id)
