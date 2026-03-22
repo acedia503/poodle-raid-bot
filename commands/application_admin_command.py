@@ -9,7 +9,8 @@ from views.application_admin_view import (
     AdminApplicationCharacterModal,
     AdminApplicationDeleteCharacterModal,
     AdminApplicationDeleteManageView,
-    AdminApplicationUserSelectView,
+    AdminApplicationUserSearchModal,
+    AdminApplicationUserResultView,
     ApplicationAdminDeleteModeView,
     ApplicationAdminMainView,
 )
@@ -36,6 +37,13 @@ class ApplicationAdminCommand(commands.Cog):
         if not is_admin(interaction):
             await interaction.response.send_message(
                 "관리자만 사용할 수 있습니다.",
+                ephemeral=True,
+            )
+            return
+
+        if interaction.guild is None or interaction.channel is None:
+            await interaction.response.send_message(
+                "서버 채널에서만 사용할 수 있습니다.",
                 ephemeral=True,
             )
             return
@@ -118,15 +126,11 @@ class ApplicationAdminCommand(commands.Cog):
                         AdminApplicationCharacterModal(on_character_submit)
                     )
 
-                from views.application_admin_view import AdminApplicationUserResultView
-
                 await submit_inter.response.send_message(
                     content="검색 결과입니다. 신청할 유저를 선택하세요.",
                     view=AdminApplicationUserResultView(members, on_user_selected),
                     ephemeral=True,
                 )
-
-            from views.application_admin_view import AdminApplicationUserSearchModal
 
             await inter.response.send_modal(
                 AdminApplicationUserSearchModal(on_user_search)
@@ -168,65 +172,96 @@ class ApplicationAdminCommand(commands.Cog):
                 )
 
             async def by_user_callback(user_inter: discord.Interaction):
-                async def on_user_selected(select_inter: discord.Interaction, selected_user):
-                    result = await asyncio.to_thread(
-                        self.application_service.search_current_raid_applications_by_user,
-                        select_inter.channel.id,
-                        selected_user.id,
+                async def on_user_search(submit_inter: discord.Interaction, keyword: str):
+                    if submit_inter.guild is None:
+                        await submit_inter.response.send_message(
+                            "서버 채널에서만 사용할 수 있습니다.",
+                            ephemeral=True,
+                        )
+                        return
+
+                    keyword_lower = keyword.lower()
+
+                    members = [
+                        member
+                        for member in submit_inter.guild.members
+                        if not member.bot
+                        and (
+                            keyword_lower in member.display_name.lower()
+                            or keyword_lower in member.name.lower()
+                        )
+                    ]
+
+                    if not members:
+                        await submit_inter.response.send_message(
+                            "검색 결과가 없습니다.",
+                            ephemeral=True,
+                        )
+                        return
+
+                    async def on_user_selected(select_inter: discord.Interaction, selected_user):
+                        result = await asyncio.to_thread(
+                            self.application_service.search_current_raid_applications_by_user,
+                            select_inter.channel.id,
+                            selected_user.id,
+                        )
+
+                        applications = result["applications"]
+                        selected_ids = set()
+
+                        async def refresh_manage_view(refresh_inter, apps, ids):
+                            setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
+                            show_identity = not bool(
+                                setting and setting.default_race and setting.default_server
+                            )
+
+                            embed = self.message_service.build_admin_delete_search_embed(
+                                "삭제 대상 선택",
+                                apps,
+                                show_identity=show_identity,
+                            )
+                            view = AdminApplicationDeleteManageView(
+                                applications=apps,
+                                selected_ids=ids,
+                                refresh_callback=refresh_manage_view,
+                                delete_callback=delete_selected,
+                                allow_select_all=True,
+                            )
+
+                            if refresh_inter.response.is_done():
+                                await refresh_inter.edit_original_response(
+                                    content=None,
+                                    embed=embed,
+                                    view=view,
+                                )
+                            else:
+                                await refresh_inter.response.edit_message(
+                                    content=None,
+                                    embed=embed,
+                                    view=view,
+                                )
+
+                        async def delete_selected(delete_inter: discord.Interaction, ids: list[int]):
+                            deleted_count = await asyncio.to_thread(
+                                self.application_service.admin_delete_applications,
+                                ids,
+                            )
+                            await delete_inter.response.edit_message(
+                                content=f"신청 {deleted_count}건을 강제 삭제했습니다.",
+                                embed=None,
+                                view=None,
+                            )
+
+                        await refresh_manage_view(select_inter, applications, selected_ids)
+
+                    await submit_inter.response.send_message(
+                        content="검색 결과입니다. 삭제할 유저를 선택하세요.",
+                        view=AdminApplicationUserResultView(members, on_user_selected),
+                        ephemeral=True,
                     )
 
-                    applications = result["applications"]
-                    selected_ids = set()
-
-                    async def refresh_manage_view(refresh_inter, apps, ids):
-                        setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
-                        show_identity = not bool(
-                            setting and setting.default_race and setting.default_server
-                        )
-
-                        embed = self.message_service.build_admin_delete_search_embed(
-                            "삭제 대상 선택",
-                            apps,
-                            show_identity=show_identity,
-                        )
-                        view = AdminApplicationDeleteManageView(
-                            applications=apps,
-                            selected_ids=ids,
-                            refresh_callback=refresh_manage_view,
-                            delete_callback=delete_selected,
-                            allow_select_all=True,
-                        )
-
-                        if refresh_inter.response.is_done():
-                            await refresh_inter.edit_original_response(
-                                content=None,
-                                embed=embed,
-                                view=view,
-                            )
-                        else:
-                            await refresh_inter.response.edit_message(
-                                content=None,
-                                embed=embed,
-                                view=view,
-                            )
-
-                    async def delete_selected(delete_inter: discord.Interaction, ids: list[int]):
-                        deleted_count = await asyncio.to_thread(
-                            self.application_service.admin_delete_applications,
-                            ids,
-                        )
-                        await delete_inter.response.edit_message(
-                            content=f"신청 {deleted_count}건을 강제 삭제했습니다.",
-                            embed=None,
-                            view=None,
-                        )
-
-                    await refresh_manage_view(select_inter, applications, selected_ids)
-
-                await user_inter.response.edit_message(
-                    content="삭제할 디스코드 유저를 선택하세요.",
-                    view=AdminApplicationUserSelectView(on_user_selected),
-                    embed=None,
+                await user_inter.response.send_modal(
+                    AdminApplicationUserSearchModal(on_user_search)
                 )
 
             async def by_character_callback(char_inter: discord.Interaction):
@@ -320,12 +355,17 @@ class ApplicationAdminCommand(commands.Cog):
     ):
         await interaction.response.defer(ephemeral=True)
 
+        guild_display_name = self._resolve_guild_display_name(
+            interaction.guild,
+            selected_user,
+        )
+
         result = await asyncio.to_thread(
             self.application_service.admin_create_application,
             interaction.guild.id,
             interaction.channel.id,
             selected_user.id,
-            selected_user.display_name,
+            guild_display_name,
             character_name,
             race,
             server,
@@ -338,10 +378,13 @@ class ApplicationAdminCommand(commands.Cog):
                 "created",
                 show_identity=show_identity,
             )
-        
+
             if interaction.channel is not None:
-                await interaction.channel.send(embed=embed)
-        
+                try:
+                    await interaction.channel.send(embed=embed)
+                except discord.Forbidden:
+                    pass
+
             await interaction.edit_original_response(
                 content=f"{result['raid_name']} 신청이 추가되었습니다.",
                 embed=None,
@@ -352,12 +395,12 @@ class ApplicationAdminCommand(commands.Cog):
         if result["action"] == "show_current":
             embed = self.message_service.build_admin_application_created_embed(
                 result["raid_name"],
-                selected_user.display_name,
+                guild_display_name,
                 result["info"],
                 show_identity=show_identity,
             )
             await interaction.edit_original_response(
-                content="이미 신청 내역이 있어 최신 정보로 갱신되었습니다.",
+                content=f"{result['raid_name']} 신청 내역이 이미 있어 최신 정보로 갱신되었습니다.",
                 embed=embed,
                 view=None,
             )
@@ -368,3 +411,9 @@ class ApplicationAdminCommand(commands.Cog):
             embed=None,
             view=None,
         )
+
+    def _resolve_guild_display_name(self, guild: discord.Guild, selected_user) -> str:
+        member = guild.get_member(selected_user.id)
+        if member is not None:
+            return member.display_name
+        return getattr(selected_user, "display_name", None) or selected_user.name
