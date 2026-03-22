@@ -108,3 +108,69 @@ class MessageService:
             title="전체 레이드 신청 내역",
             description="\n".join(lines),
         )
+
+    def build_admin_application_created_embed(
+        self,
+        raid_name: str,
+        target_user_name: str,
+        info: dict,
+        show_identity: bool,
+    ) -> discord.Embed:
+        lines = [
+            f"**대상 유저** : {target_user_name}",
+            f"**캐릭터명** : {info['character_name']}",
+        ]
+
+        if show_identity:
+            lines.append(f"**종족** : {info['race']}")
+            lines.append(f"**서버** : {info['server']}")
+
+        lines.extend([
+            f"**직업** : {info['job']}",
+            f"**아이템레벨** : {info['item_level']}",
+            f"**전투력** : {info['combat_power']:,}",
+        ])
+
+        return discord.Embed(
+            description=f"{raid_name} 신청이 완료되었습니다.\n\n" + "\n".join(lines)
+        )
+
+    def build_admin_application_list_embed(
+        self,
+        raid_name: str,
+        applications: list[RaidApplication],
+    ) -> discord.Embed:
+        embed = discord.Embed(title=f"{raid_name} 신청자 목록")
+
+        if not applications:
+            embed.description = "신청자가 없습니다."
+            return embed
+
+        lines = []
+        for app in applications:
+            lines.append(
+                f"{app.user_name} | {app.character_name} | {app.job} | {app.item_level} | {app.combat_power:,}"
+            )
+
+        embed.description = "\n".join(lines)
+        return embed
+
+    def build_admin_delete_search_embed(
+        self,
+        title: str,
+        applications: list[RaidApplication],
+    ) -> discord.Embed:
+        embed = discord.Embed(title=title)
+
+        if not applications:
+            embed.description = "검색 결과가 없습니다."
+            return embed
+
+        lines = []
+        for app in applications:
+            lines.append(
+                f"{app.user_name} | {app.character_name} | {app.job} | {app.item_level} | {app.combat_power:,}"
+            )
+
+        embed.description = "\n".join(lines)
+        return embed
