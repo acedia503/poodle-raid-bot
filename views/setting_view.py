@@ -72,9 +72,9 @@ class SettingServerSelect(discord.ui.Select):
         view = SettingSavedView()
 
         await interaction.response.edit_message(
-            content="기본 설정이 저장되었습니다.\n\n닫기를 눌러 종료하세요.",
+            content="기본 설정이 저장되었습니다.",
             embed=embed,
-            view=view,
+            view=None,
         )
 
 
