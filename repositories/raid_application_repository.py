@@ -28,14 +28,16 @@ class RaidApplicationRepository:
 
     def create(self, application: RaidApplication) -> RaidApplication:
         with self.database.get_connection() as conn:
-            cursor = conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 """
                 INSERT INTO raid_applications (
                     guild_id, channel_id, user_id, user_name,
                     character_name, race, server,
                     job, item_level, combat_power, raid_name
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
                 """,
                 (
                     application.guild_id,
@@ -51,20 +53,22 @@ class RaidApplicationRepository:
                     application.raid_name,
                 ),
             )
-            application_id = cursor.lastrowid
+            application_id = cur.fetchone()["id"]
 
         return self.get_by_id(application_id)
 
     def get_by_id(self, application_id: int) -> Optional[RaidApplication]:
         with self.database.get_connection() as conn:
-            row = conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 """
                 SELECT *
                 FROM raid_applications
-                WHERE id = ?
+                WHERE id = %s
                 """,
                 (application_id,),
-            ).fetchone()
+            )
+            row = cur.fetchone()
 
             if row is None:
                 return None
@@ -79,18 +83,20 @@ class RaidApplicationRepository:
         server: str,
     ) -> Optional[RaidApplication]:
         with self.database.get_connection() as conn:
-            row = conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 """
                 SELECT *
                 FROM raid_applications
-                WHERE guild_id = ?
-                  AND raid_name = ?
-                  AND character_name = ?
-                  AND race = ?
-                  AND server = ?
+                WHERE guild_id = %s
+                  AND raid_name = %s
+                  AND character_name = %s
+                  AND race = %s
+                  AND server = %s
                 """,
                 (guild_id, raid_name, character_name, race, server),
-            ).fetchone()
+            )
+            row = cur.fetchone()
 
             if row is None:
                 return None
@@ -106,21 +112,23 @@ class RaidApplicationRepository:
         raid_name: str,
     ) -> Optional[RaidApplication]:
         with self.database.get_connection() as conn:
-            row = conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 """
                 SELECT *
                 FROM raid_applications
-                WHERE guild_id = ?
-                  AND user_id = ?
-                  AND character_name = ?
-                  AND race = ?
-                  AND server = ?
-                  AND raid_name = ?
+                WHERE guild_id = %s
+                  AND user_id = %s
+                  AND character_name = %s
+                  AND race = %s
+                  AND server = %s
+                  AND raid_name = %s
                 ORDER BY created_at DESC
                 LIMIT 1
                 """,
                 (guild_id, user_id, character_name, race, server, raid_name),
-            ).fetchone()
+            )
+            row = cur.fetchone()
 
             if row is None:
                 return None
@@ -135,19 +143,21 @@ class RaidApplicationRepository:
         server: str,
     ) -> list[RaidApplication]:
         with self.database.get_connection() as conn:
-            rows = conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 """
                 SELECT *
                 FROM raid_applications
-                WHERE guild_id = ?
-                  AND user_id = ?
-                  AND character_name = ?
-                  AND race = ?
-                  AND server = ?
+                WHERE guild_id = %s
+                  AND user_id = %s
+                  AND character_name = %s
+                  AND race = %s
+                  AND server = %s
                 ORDER BY created_at DESC
                 """,
                 (guild_id, user_id, character_name, race, server),
-            ).fetchall()
+            )
+            rows = cur.fetchall()
 
             return [self._to_domain(row) for row in rows]
 
@@ -165,26 +175,29 @@ class RaidApplicationRepository:
         if not ids:
             return 0
 
-        placeholders = ",".join("?" for _ in ids)
-
         with self.database.get_connection() as conn:
-            cursor = conn.execute(
-                f"""
+            cur = conn.cursor()
+            cur.execute(
+                """
                 UPDATE raid_applications
-                SET job = ?, item_level = ?, combat_power = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id IN ({placeholders})
+                SET job = %s,
+                    item_level = %s,
+                    combat_power = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ANY(%s)
                 """,
-                [job, item_level, combat_power, *ids],
+                (job, item_level, combat_power, ids),
             )
-            return cursor.rowcount
+            return cur.rowcount
 
     def delete_by_id(self, application_id: int) -> bool:
         with self.database.get_connection() as conn:
-            cursor = conn.execute(
+            cur = conn.cursor()
+            cur.execute(
                 """
                 DELETE FROM raid_applications
-                WHERE id = ?
+                WHERE id = %s
                 """,
                 (application_id,),
             )
-            return cursor.rowcount > 0
+            return cur.rowcount > 0
