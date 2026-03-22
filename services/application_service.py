@@ -132,25 +132,6 @@ class ApplicationService:
 
         return self.repository.delete_by_id(application_id)
 
-    def admin_create_application(
-        self,
-        guild_id: int,
-        channel_id: int,
-        target_user_id: int,
-        target_user_name: str,
-        character_name: str,
-        race: str,
-        server: str,
-    ) -> dict:
-        return self.process(
-            guild_id=guild_id,
-            channel_id=channel_id,
-            user_id=target_user_id,
-            user_name=target_user_name,
-            character_name=character_name,
-            race=race,
-            server=server,
-        )
 
     def get_current_raid_application_list(
         self,
