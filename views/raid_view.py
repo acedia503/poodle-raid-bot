@@ -49,15 +49,24 @@ class RaidPresetButton(discord.ui.Button):
             )
 
         except RaidDuplicateError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
+            await interaction.response.edit_message(
+                content=str(exc),
+                embed=None,
+                view=None,
+            )
 
         except RaidPresetNotFoundError as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
+            await interaction.response.edit_message(
+                content=str(exc),
+                embed=None,
+                view=None,
+            )
 
         except Exception as exc:
-            await interaction.response.send_message(
-                f"예상치 못한 오류: {exc}",
-                ephemeral=True,
+            await interaction.response.edit_message(
+                content=f"예상치 못한 오류: {exc}",
+                embed=None,
+                view=None,
             )
 
 
