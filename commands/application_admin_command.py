@@ -6,7 +6,6 @@ from discord.ext import commands
 
 from utils.permissions import ensure_guild_only, is_admin
 from views.application_admin_view import (
-    AdminApplicationAddModal,
     AdminApplicationDeleteCharacterModal,
     AdminApplicationDeleteManageView,
     AdminApplicationUserSearchModal,
@@ -14,7 +13,6 @@ from views.application_admin_view import (
     ApplicationAdminDeleteModeView,
     ApplicationAdminMainView,
 )
-from views.application_view import RaceView, ServerView
 
 
 class ApplicationAdminCommand(commands.Cog):
@@ -56,71 +54,6 @@ class ApplicationAdminCommand(commands.Cog):
             )
             return
 
-        async def add_callback(inter: discord.Interaction):
-            async def on_add_submit(
-                submit_inter: discord.Interaction,
-                raw_target_user: str,
-                character_name: str,
-            ):
-                if submit_inter.guild is None:
-                    await submit_inter.response.send_message(
-                        "서버 채널에서만 사용할 수 있습니다.",
-                        ephemeral=True,
-                    )
-                    return
-
-                selected_user = self._resolve_member_from_input(
-                    submit_inter.guild,
-                    raw_target_user,
-                )
-
-                if selected_user is None or selected_user.bot:
-                    await submit_inter.response.send_message(
-                        "대상 유저를 찾을 수 없습니다. 멘션 또는 유저 ID를 확인해 주세요.",
-                        ephemeral=True,
-                    )
-                    return
-
-                setting = self.setting_service.get_guild_setting(submit_inter.guild.id)
-
-                if not setting:
-                    async def race_callback(race_inter: discord.Interaction, race: str):
-                        await race_inter.response.edit_message(
-                            content=f"종족: **{race}**\n서버를 선택하세요.",
-                            view=ServerView(
-                                race,
-                                lambda i, r, s: self._admin_create_application(
-                                    i,
-                                    selected_user,
-                                    character_name,
-                                    r,
-                                    s,
-                                    show_identity=True,
-                                ),
-                            ),
-                            embed=None,
-                        )
-
-                    await submit_inter.response.send_message(
-                        content="기본 서버 설정이 없습니다.\n종족을 선택하세요.",
-                        view=RaceView(race_callback),
-                        ephemeral=True,
-                    )
-                    return
-
-                await self._admin_create_application(
-                    submit_inter,
-                    selected_user,
-                    character_name,
-                    setting.default_race,
-                    setting.default_server,
-                    show_identity=False,
-                )
-
-            await inter.response.send_modal(
-                AdminApplicationAddModal(on_add_submit)
-            )
-
         async def list_callback(inter: discord.Interaction):
             result = await asyncio.to_thread(
                 self.application_service.get_current_raid_application_list,
@@ -149,7 +82,6 @@ class ApplicationAdminCommand(commands.Cog):
                 await back_inter.response.edit_message(
                     content="신청 관리 항목을 선택하세요.",
                     view=ApplicationAdminMainView(
-                        add_callback=add_callback,
                         list_callback=list_callback,
                         delete_callback=delete_callback,
                     ),
@@ -312,79 +244,10 @@ class ApplicationAdminCommand(commands.Cog):
         await interaction.response.send_message(
             content="신청 관리 항목을 선택하세요.",
             view=ApplicationAdminMainView(
-                add_callback=add_callback,
                 list_callback=list_callback,
                 delete_callback=delete_callback,
             ),
             ephemeral=True,
-        )
-
-    async def _admin_create_application(
-        self,
-        interaction: discord.Interaction,
-        selected_user: discord.Member,
-        character_name: str,
-        race: str,
-        server: str,
-        show_identity: bool,
-    ):
-        await interaction.response.defer(ephemeral=True)
-
-        guild_display_name = self._resolve_guild_display_name(
-            interaction.guild,
-            selected_user,
-        )
-
-        result = await asyncio.to_thread(
-            self.application_service.admin_create_application,
-            interaction.guild.id,
-            interaction.channel.id,
-            selected_user.id,
-            guild_display_name,
-            character_name,
-            race,
-            server,
-        )
-
-        if result["action"] == "created":
-            embed = self.message_service.build_application_result_embed(
-                result["raid_name"],
-                result["info"],
-                "created",
-                show_identity=show_identity,
-            )
-
-            if interaction.channel is not None:
-                try:
-                    await interaction.channel.send(embed=embed)
-                except discord.Forbidden:
-                    pass
-
-            await interaction.edit_original_response(
-                content=f"{result['raid_name']} 신청이 추가되었습니다.",
-                embed=None,
-                view=None,
-            )
-            return
-
-        if result["action"] == "show_current":
-            embed = self.message_service.build_admin_application_created_embed(
-                result["raid_name"],
-                guild_display_name,
-                result["info"],
-                show_identity=show_identity,
-            )
-            await interaction.edit_original_response(
-                content=f"{result['raid_name']} 신청 내역이 이미 있어 최신 정보로 갱신되었습니다.",
-                embed=embed,
-                view=None,
-            )
-            return
-
-        await interaction.edit_original_response(
-            content=result["message"],
-            embed=None,
-            view=None,
         )
 
     async def _search_guild_members(
@@ -406,24 +269,3 @@ class ApplicationAdminCommand(commands.Cog):
                 members.append(member)
 
         return members[:25]
-
-    def _resolve_member_from_input(
-        self,
-        guild: discord.Guild,
-        raw_value: str,
-    ) -> discord.Member | None:
-        value = raw_value.strip()
-
-        if value.startswith("<@") and value.endswith(">"):
-            value = value.replace("<@", "").replace("!", "").replace(">", "").strip()
-
-        if value.isdigit():
-            return guild.get_member(int(value))
-
-        return None
-
-    def _resolve_guild_display_name(self, guild: discord.Guild, selected_user: discord.Member) -> str:
-        member = guild.get_member(selected_user.id)
-        if member is not None:
-            return member.display_name
-        return selected_user.display_name
