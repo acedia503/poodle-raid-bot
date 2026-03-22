@@ -139,38 +139,51 @@ class MessageService:
         self,
         raid_name: str,
         applications: list[RaidApplication],
+        show_identity: bool,
     ) -> discord.Embed:
         embed = discord.Embed(title=f"{raid_name} 신청자 목록")
-
+    
         if not applications:
             embed.description = "신청자가 없습니다."
             return embed
-
+    
         lines = []
         for app in applications:
-            lines.append(
-                f"{app.user_name} | {app.character_name} | {app.job} | {app.item_level} | {app.combat_power:,}"
-            )
-
+            if show_identity:
+                lines.append(
+                    f"{app.user_name} | {app.character_name} | {app.race} | {app.server} | {app.job} | {app.item_level} | {app.combat_power:,}"
+                )
+            else:
+                lines.append(
+                    f"{app.user_name} | {app.character_name} | {app.job} | {app.item_level} | {app.combat_power:,}"
+                )
+    
         embed.description = "\n".join(lines)
         return embed
-
+    
+    
     def build_admin_delete_search_embed(
         self,
         title: str,
         applications: list[RaidApplication],
+        show_identity: bool,
     ) -> discord.Embed:
         embed = discord.Embed(title=title)
-
+    
         if not applications:
             embed.description = "검색 결과가 없습니다."
             return embed
-
+    
         lines = []
         for app in applications:
-            lines.append(
-                f"{app.user_name} | {app.character_name} | {app.job} | {app.item_level} | {app.combat_power:,}"
-            )
-
+            if show_identity:
+                lines.append(
+                    f"{app.user_name} | {app.character_name} | {app.race} | {app.server} | {app.job} | {app.item_level} | {app.combat_power:,}"
+                )
+            else:
+                lines.append(
+                    f"{app.user_name} | {app.character_name} | {app.job} | {app.item_level} | {app.combat_power:,}"
+                )
+    
         embed.description = "\n".join(lines)
         return embed
