@@ -100,12 +100,12 @@ class RaidMainView(discord.ui.View):
             message_service=self.message_service,
             mode="update",
         )
-        await interaction.response.send_message(
+        await interaction.response.edit_message(
             content="수정할 레이드 항목을 선택하세요.",
-            view=view,
-            ephemeral=True,
+            view=RaidInitView(..., mode="update"),
+            embed=None,
         )
-
+        
     @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
