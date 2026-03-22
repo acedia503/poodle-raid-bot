@@ -56,9 +56,9 @@ class MessageService:
         show_identity: bool,
     ) -> discord.Embed:
         if result_type == "updated":
-            title = f"{raid_name} 신청 정보가 갱신되었습니다."
+            title = f"{raid_name} 신청 정보가 조회되었습니다."
         else:
-            title = f"{raid_name} 신청이 완료되었습니다."
+            title = f"✅ {raid_name} 신청 완료"
 
         lines = [
             f"**캐릭터명** : {info['character_name']}",
