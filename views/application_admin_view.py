@@ -1,32 +1,6 @@
 import discord
 
 
-class AdminApplicationAddModal(discord.ui.Modal, title="신청 추가"):
-    target_user = discord.ui.TextInput(
-        label="대상 유저 (멘션 또는 ID)",
-        placeholder="@버터와플 또는 123456789012345678",
-        required=True,
-        max_length=50,
-    )
-
-    character_name = discord.ui.TextInput(
-        label="캐릭터명",
-        required=True,
-        max_length=30,
-    )
-
-    def __init__(self, callback_func):
-        super().__init__()
-        self.callback_func = callback_func
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await self.callback_func(
-            interaction,
-            str(self.target_user.value).strip(),
-            str(self.character_name.value).strip(),
-        )
-
-
 class AdminApplicationDeleteCharacterModal(discord.ui.Modal, title="캐릭터명 검색"):
     character_name = discord.ui.TextInput(
         label="캐릭터명",
@@ -211,15 +185,10 @@ class AdminApplicationDeleteManageView(discord.ui.View):
 
 
 class ApplicationAdminMainView(discord.ui.View):
-    def __init__(self, add_callback, list_callback, delete_callback):
+    def __init__(self, list_callback, delete_callback):
         super().__init__(timeout=180)
-        self.add_callback_func = add_callback
         self.list_callback_func = list_callback
         self.delete_callback_func = delete_callback
-
-    @discord.ui.button(label="추가", style=discord.ButtonStyle.primary)
-    async def add_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.add_callback_func(interaction)
 
     @discord.ui.button(label="목록", style=discord.ButtonStyle.primary)
     async def list_button(self, interaction: discord.Interaction, button: discord.ui.Button):
