@@ -22,8 +22,8 @@ class RaidApplicationRepository:
             item_level=row["item_level"],
             combat_power=row["combat_power"],
             raid_name=row["raid_name"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
+            created_at=row.get("created_at"),
+            updated_at=row.get("updated_at"),
         )
 
     def create(self, application: RaidApplication) -> RaidApplication:
