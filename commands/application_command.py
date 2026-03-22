@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from views.application_view import RaceView, ServerView
+from views.application_result_view import ApplicationResultView
 
 
 class ApplicationCommand(commands.Cog):
@@ -18,7 +19,6 @@ class ApplicationCommand(commands.Cog):
     async def apply(self, interaction: discord.Interaction, character_name: str):
         setting = self.setting_service.get_guild_setting(interaction.guild.id)
 
-        # 기본 설정 없음 → 종족/서버 선택
         if not setting:
             async def race_callback(inter, race):
                 await inter.response.edit_message(
@@ -37,7 +37,6 @@ class ApplicationCommand(commands.Cog):
             )
             return
 
-        # 기본 설정 있음 → 바로 처리
         await self._process(
             interaction,
             character_name,
