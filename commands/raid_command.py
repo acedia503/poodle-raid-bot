@@ -1,67 +1,178 @@
 import discord
-from discord import app_commands
-from discord.ext import commands
 
-from services.message_service import MessageService
-from services.raid_service import RaidService
-from utils.permissions import ensure_guild_only, is_admin
-from views.raid_view import RaidInitView, RaidMainView
+from utils.constants import RAID_PRESETS
+from services.raid_service import RaidDuplicateError, RaidPresetNotFoundError
 
 
-class RaidCommand(commands.Cog):
+class RaidPresetButton(discord.ui.Button):
     def __init__(
         self,
-        bot: commands.Bot,
-        raid_service: RaidService,
-        message_service: MessageService,
+        owner_user_id,
+        guild_id,
+        channel_id,
+        preset,
+        raid_service,
+        message_service,
+        mode="create",
     ):
-        self.bot = bot
+        super().__init__(label=preset["name"], style=discord.ButtonStyle.primary)
+        self.owner_user_id = owner_user_id
+        self.guild_id = guild_id
+        self.channel_id = channel_id
+        self.preset = preset
+        self.raid_service = raid_service
+        self.message_service = message_service
+        self.mode = mode
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_user_id:
+            await interaction.response.send_message(
+                "이 버튼은 명령 실행자만 사용할 수 있습니다.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            channel_raid = self.raid_service.save_channel_raid_by_preset(
+                guild_id=self.guild_id,
+                channel_id=self.channel_id,
+                raid_name=self.preset["name"],
+            )
+
+            embed = self.message_service.build_channel_raid_embed(channel_raid)
+
+            if self.mode == "update":
+                content = "레이드 설정이 수정되었습니다."
+            else:
+                content = "레이드 설정이 생성되었습니다."
+
+            await interaction.response.edit_message(
+                content=content,
+                embed=embed,
+                view=None,
+            )
+
+        except RaidDuplicateError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+
+        except RaidPresetNotFoundError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+
+        except Exception as exc:
+            await interaction.response.send_message(
+                f"예상치 못한 오류: {exc}",
+                ephemeral=True,
+            )
+
+
+class RaidInitView(discord.ui.View):
+    def __init__(
+        self,
+        owner_user_id,
+        guild_id,
+        channel_id,
+        raid_service,
+        message_service,
+        mode="create",
+    ):
+        super().__init__(timeout=180)
+
+        for preset in RAID_PRESETS:
+            self.add_item(
+                RaidPresetButton(
+                    owner_user_id=owner_user_id,
+                    guild_id=guild_id,
+                    channel_id=channel_id,
+                    preset=preset,
+                    raid_service=raid_service,
+                    message_service=message_service,
+                    mode=mode,
+                )
+            )
+
+    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary, row=4)
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="레이드 설정 창을 닫았습니다.",
+            embed=None,
+            view=None,
+        )
+
+
+class RaidMainView(discord.ui.View):
+    def __init__(
+        self,
+        owner_user_id,
+        guild_id,
+        channel_id,
+        raid_service,
+        message_service,
+    ):
+        super().__init__(timeout=180)
+        self.owner_user_id = owner_user_id
+        self.guild_id = guild_id
+        self.channel_id = channel_id
         self.raid_service = raid_service
         self.message_service = message_service
 
-    @app_commands.command(name="레이드", description="현재 채널 레이드 설정")
-    async def raid(self, interaction: discord.Interaction):
-        if not ensure_guild_only(interaction):
+    @discord.ui.button(label="수정", style=discord.ButtonStyle.primary)
+    async def update_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_user_id:
             await interaction.response.send_message(
-                "서버 채널에서만 사용할 수 있습니다.",
+                "이 버튼은 명령 실행자만 사용할 수 있습니다.",
                 ephemeral=True,
             )
             return
 
-        if not is_admin(interaction):
-            await interaction.response.send_message(
-                "관리자만 사용할 수 있습니다.",
-                ephemeral=True,
-            )
-            return
-
-        channel_raid = self.raid_service.get_channel_raid(interaction.channel.id)
-
-        if channel_raid is None:
-            view = RaidInitView(
-                owner_user_id=interaction.user.id,
-                guild_id=interaction.guild.id,
-                channel_id=interaction.channel.id,
-                raid_service=self.raid_service,
-                message_service=self.message_service,
-                mode="create",
-            )
-            await interaction.response.send_message(
-                content="현재 채널에 레이드 설정이 없습니다.\n레이드 항목을 선택하세요.",
-                view=view,
-            )
-            return
-
-        embed = self.message_service.build_channel_raid_embed(channel_raid)
-        view = RaidMainView(
-            owner_user_id=interaction.user.id,
-            guild_id=interaction.guild.id,
-            channel_id=interaction.channel.id,
+        view = RaidInitView(
+            owner_user_id=self.owner_user_id,
+            guild_id=self.guild_id,
+            channel_id=self.channel_id,
             raid_service=self.raid_service,
             message_service=self.message_service,
+            mode="update",
         )
-        await interaction.response.send_message(
-            content="현재 채널 레이드 설정입니다.",
-            embed=embed,
+        await interaction.response.edit_message(
+            content="수정할 레이드 항목을 선택하세요.",
+            embed=None,
             view=view,
+        )
+
+    @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
+    async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_user_id:
+            await interaction.response.send_message(
+                "이 버튼은 명령 실행자만 사용할 수 있습니다.",
+                ephemeral=True,
+            )
+            return
+
+        ok = self.raid_service.delete_channel_raid(self.channel_id)
+
+        if ok:
+            await interaction.response.edit_message(
+                content="레이드 설정이 삭제되었습니다.",
+                embed=None,
+                view=None,
+            )
+        else:
+            await interaction.response.edit_message(
+                content="삭제할 레이드 설정이 없습니다.",
+                embed=None,
+                view=None,
+            )
+
+    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_user_id:
+            await interaction.response.send_message(
+                "이 버튼은 명령 실행자만 사용할 수 있습니다.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.edit_message(
+            content="레이드 설정 창을 닫았습니다.",
+            embed=None,
+            view=None,
         )
