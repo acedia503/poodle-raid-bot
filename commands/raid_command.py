@@ -39,6 +39,7 @@ class RaidCommand(commands.Cog):
 
         if channel_raid is None:
             view = RaidInitView(
+                owner_user_id=interaction.user.id,
                 guild_id=interaction.guild.id,
                 channel_id=interaction.channel.id,
                 raid_service=self.raid_service,
@@ -48,12 +49,12 @@ class RaidCommand(commands.Cog):
             await interaction.response.send_message(
                 content="현재 채널에 레이드 설정이 없습니다.\n레이드 항목을 선택하세요.",
                 view=view,
-                ephemeral=True,
             )
             return
 
         embed = self.message_service.build_channel_raid_embed(channel_raid)
         view = RaidMainView(
+            owner_user_id=interaction.user.id,
             guild_id=interaction.guild.id,
             channel_id=interaction.channel.id,
             raid_service=self.raid_service,
@@ -63,5 +64,4 @@ class RaidCommand(commands.Cog):
             content="현재 채널 레이드 설정입니다.",
             embed=embed,
             view=view,
-            ephemeral=True,
         )
