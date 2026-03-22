@@ -7,7 +7,6 @@ from services.raid_service import RaidDuplicateError, RaidPresetNotFoundError
 class RaidPresetButton(discord.ui.Button):
     def __init__(
         self,
-        owner_user_id,
         guild_id,
         channel_id,
         preset,
@@ -16,22 +15,14 @@ class RaidPresetButton(discord.ui.Button):
         mode="create",
     ):
         super().__init__(label=preset["name"], style=discord.ButtonStyle.primary)
-        self.owner_user_id = owner_user_id
         self.guild_id = guild_id
         self.channel_id = channel_id
         self.preset = preset
         self.raid_service = raid_service
         self.message_service = message_service
-        self.mode = mode
+        self.mode = mode  # create | update
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.owner_user_id:
-            await interaction.response.send_message(
-                "이 버튼은 명령 실행자만 사용할 수 있습니다.",
-                ephemeral=True,
-            )
-            return
-
         try:
             channel_raid = self.raid_service.save_channel_raid_by_preset(
                 guild_id=self.guild_id,
@@ -68,7 +59,6 @@ class RaidPresetButton(discord.ui.Button):
 class RaidInitView(discord.ui.View):
     def __init__(
         self,
-        owner_user_id,
         guild_id,
         channel_id,
         raid_service,
@@ -80,7 +70,6 @@ class RaidInitView(discord.ui.View):
         for preset in RAID_PRESETS:
             self.add_item(
                 RaidPresetButton(
-                    owner_user_id=owner_user_id,
                     guild_id=guild_id,
                     channel_id=channel_id,
                     preset=preset,
@@ -102,14 +91,12 @@ class RaidInitView(discord.ui.View):
 class RaidMainView(discord.ui.View):
     def __init__(
         self,
-        owner_user_id,
         guild_id,
         channel_id,
         raid_service,
         message_service,
     ):
         super().__init__(timeout=180)
-        self.owner_user_id = owner_user_id
         self.guild_id = guild_id
         self.channel_id = channel_id
         self.raid_service = raid_service
@@ -117,15 +104,7 @@ class RaidMainView(discord.ui.View):
 
     @discord.ui.button(label="수정", style=discord.ButtonStyle.primary)
     async def update_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.owner_user_id:
-            await interaction.response.send_message(
-                "이 버튼은 명령 실행자만 사용할 수 있습니다.",
-                ephemeral=True,
-            )
-            return
-
         view = RaidInitView(
-            owner_user_id=self.owner_user_id,
             guild_id=self.guild_id,
             channel_id=self.channel_id,
             raid_service=self.raid_service,
@@ -140,13 +119,6 @@ class RaidMainView(discord.ui.View):
 
     @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.owner_user_id:
-            await interaction.response.send_message(
-                "이 버튼은 명령 실행자만 사용할 수 있습니다.",
-                ephemeral=True,
-            )
-            return
-
         ok = self.raid_service.delete_channel_raid(self.channel_id)
 
         if ok:
@@ -164,13 +136,6 @@ class RaidMainView(discord.ui.View):
 
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.owner_user_id:
-            await interaction.response.send_message(
-                "이 버튼은 명령 실행자만 사용할 수 있습니다.",
-                ephemeral=True,
-            )
-            return
-
         await interaction.response.edit_message(
             content="레이드 설정 창을 닫았습니다.",
             embed=None,
