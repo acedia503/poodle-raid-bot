@@ -220,3 +220,21 @@ class RaidApplicationRepository:
             )
             row = cur.fetchone()
             return int(row["cnt"]) if row else 0
+    
+    
+    def delete_by_guild_and_raid_name(
+        self,
+        guild_id: int,
+        raid_name: str,
+    ) -> int:
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                DELETE FROM raid_applications
+                WHERE guild_id = %s
+                  AND raid_name = %s
+                """,
+                (guild_id, raid_name),
+            )
+            return cur.rowcount
