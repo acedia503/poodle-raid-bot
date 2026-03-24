@@ -46,13 +46,13 @@ class PartyCommand(commands.Cog):
             channel_id=channel.id,
             raid_name=raid.raid_name,
         )
-
+        
         embed = build_rule_detail_embed(rule)
         view = PartyRuleDetailView(
             rule=rule,
             party_rule_service=self.party_rule_service,
         )
-
+        
         await interaction.response.send_message(
             embed=embed,
             view=view,
