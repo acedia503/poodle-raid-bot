@@ -2,6 +2,7 @@ import json
 from typing import Optional
 
 from domain.raid_rule import RaidRule
+from utils.constants import JOB_OPTIONS
 from database import Database
 
 
