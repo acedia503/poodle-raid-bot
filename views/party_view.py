@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import discord
 from discord.ui import View, Select, Button
 
@@ -124,7 +126,7 @@ class SaveRuleButton(Button):
         super().__init__(label="저장", style=discord.ButtonStyle.primary)
 
     async def callback(self, interaction: discord.Interaction):
-        view: PartyRuleEditView = self.view
+        view = self.view
 
         updated_rule = view.party_rule_service.update_rule(
             guild_id=view.rule.guild_id,
@@ -153,7 +155,7 @@ class CancelEditButton(Button):
         super().__init__(label="취소", style=discord.ButtonStyle.secondary)
 
     async def callback(self, interaction: discord.Interaction):
-        view: PartyRuleEditView = self.view
+        view = self.view
 
         latest_rule = view.party_rule_service.get_or_create_rule(
             guild_id=view.rule.guild_id,
