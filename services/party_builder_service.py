@@ -86,7 +86,7 @@ class PartyBuilderService:
         character_info_service,
         party_build_session_repository,
         party_slot_repository,
-        party_waiting_member_repository,
+        party_waiting_repository,
         max_refresh_concurrency: int = 5,
     ):
         self.raid_service = raid_service
@@ -95,7 +95,7 @@ class PartyBuilderService:
         self.character_info_service = character_info_service
         self.party_build_session_repository = party_build_session_repository
         self.party_slot_repository = party_slot_repository
-        self.party_waiting_member_repository = party_waiting_member_repository
+        self.party_waiting_repository = party_waiting_repository
         self.max_refresh_concurrency = max_refresh_concurrency
 
     async def build_parties(
@@ -640,7 +640,7 @@ class PartyBuilderService:
             )
 
         self.party_slot_repository.save_all(slots)
-        self.party_waiting_member_repository.save_all(waiting_rows)
+        self.party_waiting_repository.save_all(waiting_rows)
 
         return session
 
