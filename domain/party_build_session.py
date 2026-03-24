@@ -1,17 +1,15 @@
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
-
-from domain.enums import SessionStatus
 
 
 @dataclass
 class PartyBuildSession:
-    id: Optional[int]
+    id: int | None
     guild_id: int
     channel_id: int
     raid_name: str
-    session_status: SessionStatus
-    created_by_user_id: int
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    total_applicants: int
+    full_group_count: int
+    temp_group_count: int
+    waiting_count: int
+    created_by: int
+    is_active: bool = True
