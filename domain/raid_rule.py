@@ -7,13 +7,20 @@ from domain.enums import BalanceMode
 
 @dataclass
 class RaidRule:
-    id: Optional[int]
-    guild_id: int
-    raid_name: str
-    group_size: int
-    party_count: int
-    slots_per_party: int
-    balance_mode: BalanceMode
-    rule_data_json: Optional[str]
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    def __init__(
+        self,
+        guild_id: int,
+        channel_id: int,
+        raid_name: str,
+        party1_priority_jobs: list[str] | None = None,
+        party1_preferred_jobs: list[str] | None = None,
+        party2_priority_jobs: list[str] | None = None,
+        party2_preferred_jobs: list[str] | None = None,
+    ):
+        self.guild_id = guild_id
+        self.channel_id = channel_id
+        self.raid_name = raid_name
+        self.party1_priority_jobs = party1_priority_jobs or []
+        self.party1_preferred_jobs = party1_preferred_jobs or []
+        self.party2_priority_jobs = party2_priority_jobs or []
+        self.party2_preferred_jobs = party2_preferred_jobs or []
