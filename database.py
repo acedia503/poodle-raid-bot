@@ -119,3 +119,74 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_raid_rules_lookup
             ON raid_rules(guild_id, channel_id, raid_name)
             """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS party_build_sessions (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                raid_name TEXT NOT NULL,
+                total_applicants INTEGER NOT NULL,
+                full_group_count INTEGER NOT NULL DEFAULT 0,
+                temp_group_count INTEGER NOT NULL DEFAULT 0,
+                waiting_count INTEGER NOT NULL DEFAULT 0,
+                created_by BIGINT NOT NULL,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+            cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_party_build_sessions_lookup
+            ON party_build_sessions(guild_id, channel_id, raid_name, is_active)
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS party_slots (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER NOT NULL REFERENCES party_build_sessions(id) ON DELETE CASCADE,
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                raid_name TEXT NOT NULL,
+                group_no INTEGER NOT NULL,
+                party_no INTEGER NOT NULL,
+                slot_no INTEGER NOT NULL,
+                is_temp_group BOOLEAN NOT NULL DEFAULT FALSE,
+                application_id INTEGER NOT NULL,
+                user_id BIGINT NOT NULL,
+                user_name TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                job TEXT NOT NULL,
+                item_level INTEGER NOT NULL,
+                combat_power INTEGER NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+            cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_party_slots_session
+            ON party_slots(session_id, group_no, party_no, slot_no)
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS party_waiting_members (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER NOT NULL REFERENCES party_build_sessions(id) ON DELETE CASCADE,
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                raid_name TEXT NOT NULL,
+                application_id INTEGER NOT NULL,
+                user_id BIGINT NOT NULL,
+                user_name TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                job TEXT NOT NULL,
+                item_level INTEGER NOT NULL,
+                combat_power INTEGER NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+            cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_party_waiting_members_session
+            ON party_waiting_members(session_id)
+            """)
