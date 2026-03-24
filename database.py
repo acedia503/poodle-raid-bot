@@ -98,3 +98,24 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_raid_applications_raid_lookup
             ON raid_applications(guild_id, raid_name, character_name, race, server)
             """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS raid_rules (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                raid_name TEXT NOT NULL,
+                party1_priority_jobs TEXT NOT NULL DEFAULT '[]',
+                party1_preferred_jobs TEXT NOT NULL DEFAULT '[]',
+                party2_priority_jobs TEXT NOT NULL DEFAULT '[]',
+                party2_preferred_jobs TEXT NOT NULL DEFAULT '[]',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(guild_id, channel_id, raid_name)
+            )
+            """)
+
+            cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_raid_rules_lookup
+            ON raid_rules(guild_id, channel_id, raid_name)
+            """)
