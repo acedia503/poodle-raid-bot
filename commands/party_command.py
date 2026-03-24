@@ -1,9 +1,10 @@
+# command/party_command.py
+
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from services.party_rule_service import PartyRuleService
-# from services.raid_service import RaidService
 from view.party_view import PartyRuleDetailView, build_rule_detail_embed
 
 
@@ -46,31 +47,17 @@ class PartyCommand(commands.Cog):
             channel_id=channel.id,
             raid_name=raid.raid_name,
         )
-        
+
         embed = build_rule_detail_embed(rule)
         view = PartyRuleDetailView(
             rule=rule,
             party_rule_service=self.party_rule_service,
         )
-        
+
         await interaction.response.send_message(
             embed=embed,
             view=view,
             ephemeral=True,
-        )
-
-    def _build_rule_text(self, rule) -> str:
-        def jobs_to_text(jobs: list[str]) -> str:
-            return ", ".join(jobs) if jobs else "없음"
-
-        return (
-            "공대 생성 규칙\n\n"
-            "1파티\n"
-            f"우선 직업: {jobs_to_text(rule.party1_priority_jobs)}\n"
-            f"선호 직업: {jobs_to_text(rule.party1_preferred_jobs)}\n\n"
-            "2파티\n"
-            f"우선 직업: {jobs_to_text(rule.party2_priority_jobs)}\n"
-            f"선호 직업: {jobs_to_text(rule.party2_preferred_jobs)}"
         )
 
 
@@ -79,9 +66,16 @@ async def setup(bot: commands.Bot):
     from repository.raid_rule_repository import RaidRuleRepository
     from services.party_rule_service import PartyRuleService
     from services.raid_service import RaidService
+    # 필요하면 기존 raid repository도 import
 
     raid_rule_repository = RaidRuleRepository(db)
     party_rule_service = PartyRuleService(raid_rule_repository)
+
+    # TODO:
+    # 여기 부분은 기존 프로젝트의 RaidService 생성 방식에 맞게 바꿔야 함
+    # 예:
+    # channel_raid_repository = ChannelRaidRepository(db)
+    # raid_service = RaidService(channel_raid_repository)
     raid_service = RaidService(...)
 
     await bot.add_cog(
