@@ -90,5 +90,14 @@ RAID_PRESETS = [
 SAFE_MESSAGE_LIMIT = 1900
 DEFAULT_APPLICATION_STATUSES = {"applied", "waiting", "assigned"}
 
-SAFE_MESSAGE_LIMIT = 1900
-DEFAULT_APPLICATION_STATUSES = {"applied", "waiting", "assigned"}
+JOB_OPTIONS = [
+    "없음",
+    "수호성",
+    "검성",
+    "살성",
+    "마도성",
+    "궁성",
+    "정령성",
+    "호법성",
+    "치유성",
+]
