@@ -1,6 +1,5 @@
 from domain.raid_rule import RaidRule
-from repository.raid_rule_repository import RaidRuleRepository
-
+from repositories.raid_rule_repository import RaidRuleRepository
 
 class PartyRuleService:
     JOB_NONE = "없음"
