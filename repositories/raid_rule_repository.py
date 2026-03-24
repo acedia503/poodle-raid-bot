@@ -2,10 +2,11 @@ import json
 from typing import Optional
 
 from domain.raid_rule import RaidRule
+from database import Database
 
 
 class RaidRuleRepository:
-    def __init__(self, db):
+    def __init__(self, db: Database):
         self.db = db
 
     def find_by_channel_and_raid(
@@ -15,19 +16,26 @@ class RaidRuleRepository:
         raid_name: str,
     ) -> Optional[RaidRule]:
         query = """
-        SELECT
-            guild_id,
-            channel_id,
-            raid_name,
-            party1_priority_jobs,
-            party1_preferred_jobs,
-            party2_priority_jobs,
-            party2_preferred_jobs
-        FROM raid_rules
-        WHERE guild_id = ? AND channel_id = ? AND raid_name = ?
+            SELECT
+                guild_id,
+                channel_id,
+                raid_name,
+                party1_priority_jobs,
+                party1_preferred_jobs,
+                party2_priority_jobs,
+                party2_preferred_jobs
+            FROM raid_rules
+            WHERE guild_id = %s
+              AND channel_id = %s
+              AND raid_name = %s
         """
-        row = self.db.fetchone(query, (guild_id, channel_id, raid_name))
-        if not row:
+
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(query, (guild_id, channel_id, raid_name))
+            row = cur.fetchone()
+
+        if row is None:
             return None
 
         return RaidRule(
@@ -42,59 +50,92 @@ class RaidRuleRepository:
 
     def save(self, rule: RaidRule) -> None:
         query = """
-        INSERT INTO raid_rules (
-            guild_id,
-            channel_id,
-            raid_name,
-            party1_priority_jobs,
-            party1_preferred_jobs,
-            party2_priority_jobs,
-            party2_preferred_jobs
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO raid_rules (
+                guild_id,
+                channel_id,
+                raid_name,
+                party1_priority_jobs,
+                party1_preferred_jobs,
+                party2_priority_jobs,
+                party2_preferred_jobs
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
-        self.db.execute(
-            query,
-            (
-                rule.guild_id,
-                rule.channel_id,
-                rule.raid_name,
-                json.dumps(rule.party1_priority_jobs, ensure_ascii=False),
-                json.dumps(rule.party1_preferred_jobs, ensure_ascii=False),
-                json.dumps(rule.party2_priority_jobs, ensure_ascii=False),
-                json.dumps(rule.party2_preferred_jobs, ensure_ascii=False),
-            ),
-        )
+
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                query,
+                (
+                    rule.guild_id,
+                    rule.channel_id,
+                    rule.raid_name,
+                    json.dumps(rule.party1_priority_jobs, ensure_ascii=False),
+                    json.dumps(rule.party1_preferred_jobs, ensure_ascii=False),
+                    json.dumps(rule.party2_priority_jobs, ensure_ascii=False),
+                    json.dumps(rule.party2_preferred_jobs, ensure_ascii=False),
+                ),
+            )
 
     def update(self, rule: RaidRule) -> None:
         query = """
-        UPDATE raid_rules
-        SET
-            party1_priority_jobs = ?,
-            party1_preferred_jobs = ?,
-            party2_priority_jobs = ?,
-            party2_preferred_jobs = ?
-        WHERE guild_id = ? AND channel_id = ? AND raid_name = ?
+            UPDATE raid_rules
+            SET
+                party1_priority_jobs = %s,
+                party1_preferred_jobs = %s,
+                party2_priority_jobs = %s,
+                party2_preferred_jobs = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE guild_id = %s
+              AND channel_id = %s
+              AND raid_name = %s
         """
-        self.db.execute(
-            query,
-            (
-                json.dumps(rule.party1_priority_jobs, ensure_ascii=False),
-                json.dumps(rule.party1_preferred_jobs, ensure_ascii=False),
-                json.dumps(rule.party2_priority_jobs, ensure_ascii=False),
-                json.dumps(rule.party2_preferred_jobs, ensure_ascii=False),
-                rule.guild_id,
-                rule.channel_id,
-                rule.raid_name,
-            ),
-        )
+
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                query,
+                (
+                    json.dumps(rule.party1_priority_jobs, ensure_ascii=False),
+                    json.dumps(rule.party1_preferred_jobs, ensure_ascii=False),
+                    json.dumps(rule.party2_priority_jobs, ensure_ascii=False),
+                    json.dumps(rule.party2_preferred_jobs, ensure_ascii=False),
+                    rule.guild_id,
+                    rule.channel_id,
+                    rule.raid_name,
+                ),
+            )
 
     def upsert(self, rule: RaidRule) -> None:
-        existing = self.find_by_channel_and_raid(
-            guild_id=rule.guild_id,
-            channel_id=rule.channel_id,
-            raid_name=rule.raid_name,
-        )
-        if existing is None:
-            self.save(rule)
-        else:
-            self.update(rule)
+        query = """
+            INSERT INTO raid_rules (
+                guild_id,
+                channel_id,
+                raid_name,
+                party1_priority_jobs,
+                party1_preferred_jobs,
+                party2_priority_jobs,
+                party2_preferred_jobs
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (guild_id, channel_id, raid_name)
+            DO UPDATE SET
+                party1_priority_jobs = EXCLUDED.party1_priority_jobs,
+                party1_preferred_jobs = EXCLUDED.party1_preferred_jobs,
+                party2_priority_jobs = EXCLUDED.party2_priority_jobs,
+                party2_preferred_jobs = EXCLUDED.party2_preferred_jobs,
+                updated_at = CURRENT_TIMESTAMP
+        """
+
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                query,
+                (
+                    rule.guild_id,
+                    rule.channel_id,
+                    rule.raid_name,
+                    json.dumps(rule.party1_priority_jobs, ensure_ascii=False),
+                    json.dumps(rule.party1_preferred_jobs, ensure_ascii=False),
+                    json.dumps(rule.party2_priority_jobs, ensure_ascii=False),
+                    json.dumps(rule.party2_preferred_jobs, ensure_ascii=False),
+                ),
+            )
