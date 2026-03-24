@@ -1,27 +1,59 @@
-from typing import Optional
-
 from domain.party_waiting_member import PartyWaitingMember
-from repositories.base_repository import BaseRepository
+from database import Database
 
 
-class PartyWaitingRepository(BaseRepository):
-    def bulk_create(self, waiting_members: list[PartyWaitingMember]) -> list[PartyWaitingMember]:
-        raise NotImplementedError
+class PartyWaitingMemberRepository:
+    def __init__(self, db: Database):
+        self.db = db
 
-    def create(self, waiting_member: PartyWaitingMember) -> PartyWaitingMember:
-        raise NotImplementedError
+    def save_all(self, waiting_members: list[PartyWaitingMember]) -> None:
+        if not waiting_members:
+            return
 
-    def get_by_session_id(self, session_id: int) -> list[PartyWaitingMember]:
-        raise NotImplementedError
+        query = """
+            INSERT INTO party_waiting_members (
+                session_id,
+                guild_id,
+                channel_id,
+                raid_name,
+                application_id,
+                user_id,
+                user_name,
+                character_name,
+                job,
+                item_level,
+                combat_power
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
 
-    def get_by_session_and_status(self, session_id: int, status: str) -> list[PartyWaitingMember]:
-        raise NotImplementedError
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            for member in waiting_members:
+                cur.execute(
+                    query,
+                    (
+                        member.session_id,
+                        member.guild_id,
+                        member.channel_id,
+                        member.raid_name,
+                        member.application_id,
+                        member.user_id,
+                        member.user_name,
+                        member.character_name,
+                        member.job,
+                        member.item_level,
+                        member.combat_power,
+                    ),
+                )
 
-    def get_by_id(self, waiting_id: int) -> Optional[PartyWaitingMember]:
-        raise NotImplementedError
-
-    def delete_by_session_id(self, session_id: int) -> int:
-        raise NotImplementedError
-
-    def delete_by_id(self, waiting_id: int) -> bool:
-        raise NotImplementedError
+    def get_by_session_id(self, session_id: int) -> list[dict]:
+        query = """
+            SELECT *
+            FROM party_waiting_members
+            WHERE session_id = %s
+            ORDER BY combat_power DESC, character_name ASC
+        """
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(query, (session_id,))
+            return cur.fetchall()
