@@ -6,6 +6,7 @@ from commands.info_command import InfoCommand
 from commands.raid_command import RaidCommand
 from commands.setting_command import SettingCommand
 from commands.application_admin_command import ApplicationAdminCommand
+from commands.party_command import PartyCommand
 
 from config import load_config
 from database import Database
@@ -13,6 +14,7 @@ from database import Database
 from repositories.channel_raid_repository import ChannelRaidRepository
 from repositories.guild_setting_repository import GuildSettingRepository
 from repositories.raid_application_repository import RaidApplicationRepository
+from repositories.raid_rule_repository import RaidRuleRepository
 
 from services.api_service import HttpApiService, MockApiService
 from services.application_service import ApplicationService
@@ -20,6 +22,7 @@ from services.character_info_service import CharacterInfoService
 from services.message_service import MessageService
 from services.raid_service import RaidService
 from services.setting_service import SettingService
+from services.party_rule_service import PartyRuleService
 
 
 def create_bot() -> commands.Bot:
@@ -36,6 +39,7 @@ def create_bot() -> commands.Bot:
     guild_setting_repository = GuildSettingRepository(database)
     channel_raid_repository = ChannelRaidRepository(database)
     raid_application_repository = RaidApplicationRepository(database)
+    raid_rule_repository = RaidRuleRepository(database)
 
     # External API
     if config.api_mode == "http":
@@ -50,6 +54,8 @@ def create_bot() -> commands.Bot:
         channel_raid_repository=channel_raid_repository,
         raid_application_repository=raid_application_repository,
     )
+    party_rule_service = PartyRuleService(raid_rule_repository)
+
     application_service = ApplicationService(
         character_info_service=character_info_service,
         setting_service=setting_service,
@@ -65,6 +71,7 @@ def create_bot() -> commands.Bot:
     async def setup_hook():
         await bot.add_cog(SettingCommand(bot, setting_service, message_service))
         await bot.add_cog(RaidCommand(bot, raid_service, message_service))
+        await bot.add_cog(PartyCommand(bot, raid_service, party_rule_service))
         await bot.add_cog(
             ApplicationCommand(
                 bot,
