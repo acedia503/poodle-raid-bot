@@ -1,78 +1,66 @@
 import discord
+from discord.ui import View, Button, Select
 
-from services.message_service import MessageService
-from services.party_builder_service import PartyBuilderService
-from services.party_manage_service import PartyManageService
-from services.raid_service import RaidService
+from constants.jobs import JOB_OPTIONS
 
 
-class PartyMainView(discord.ui.View):
-    def __init__(
-        self,
-        raid_service: RaidService,
-        party_builder_service: PartyBuilderService,
-        party_manage_service: PartyManageService,
-        message_service: MessageService,
-        guild_id: int,
-        channel_id: int,
-        user_id: int,
-    ):
-        super().__init__(timeout=180)
-        self.raid_service = raid_service
-        self.party_builder_service = party_builder_service
-        self.party_manage_service = party_manage_service
-        self.message_service = message_service
-        self.guild_id = guild_id
-        self.channel_id = channel_id
-        self.user_id = user_id
+def jobs_to_text(jobs: list[str]) -> str:
+    return ", ".join(jobs) if jobs else "없음"
 
-    @discord.ui.button(label="공대 생성", style=discord.ButtonStyle.primary)
-    async def build_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            session = self.party_builder_service.build_party(
-                guild_id=self.guild_id,
-                channel_id=self.channel_id,
-                created_by_user_id=self.user_id,
-            )
-            await interaction.response.send_message(
-                f"공대 생성 완료: session_id={session.id}",
-                ephemeral=True,
-            )
-        except Exception as exc:
-            await interaction.response.send_message(str(exc), ephemeral=True)
 
-    @discord.ui.button(label="결과 확인", style=discord.ButtonStyle.secondary)
-    async def result_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        channel_raid = self.raid_service.get_channel_raid(self.channel_id)
-        if channel_raid is None:
-            await interaction.response.send_message("현재 채널에 레이드가 없습니다.", ephemeral=True)
-            return
+def build_rule_detail_embed(rule) -> discord.Embed:
+    embed = discord.Embed(
+        title="공대 생성 규칙",
+        description=(
+            "각 파티에 우선 배치할 직업과 선호 직업을 확인할 수 있습니다."
+        ),
+    )
+    embed.add_field(
+        name="1파티",
+        value=(
+            f"우선 직업: {jobs_to_text(rule.party1_priority_jobs)}\n"
+            f"선호 직업: {jobs_to_text(rule.party1_preferred_jobs)}"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="2파티",
+        value=(
+            f"우선 직업: {jobs_to_text(rule.party2_priority_jobs)}\n"
+            f"선호 직업: {jobs_to_text(rule.party2_preferred_jobs)}"
+        ),
+        inline=False,
+    )
+    return embed
 
-        session = self.party_manage_service.get_latest_session(
-            guild_id=self.guild_id,
-            channel_id=self.channel_id,
-            raid_name=channel_raid.raid_name,
-        )
-        if session is None:
-            await interaction.response.send_message("공대 생성 결과가 없습니다.", ephemeral=True)
-            return
 
-        await interaction.response.send_message(
-            f"최신 공대 세션: {session.id}",
-            ephemeral=True,
-        )
-
-    @discord.ui.button(label="초기화", style=discord.ButtonStyle.danger)
-    async def reset_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        channel_raid = self.raid_service.get_channel_raid(self.channel_id)
-        if channel_raid is None:
-            await interaction.response.send_message("현재 채널에 레이드가 없습니다.", ephemeral=True)
-            return
-
-        ok = self.party_manage_service.reset_latest_party(
-            guild_id=self.guild_id,
-            channel_id=self.channel_id,
-            raid_name=channel_raid.raid_name,
-        )
-        msg = "공대 생성 결과가 초기화되었습니다." if ok else "초기화할 공대 결과가 없습니다."
-        await interaction.response.send_message(msg, ephemeral=True)
+def build_rule_edit_embed(
+    party1_priority_jobs: list[str],
+    party1_preferred_jobs: list[str],
+    party2_priority_jobs: list[str],
+    party2_preferred_jobs: list[str],
+) -> discord.Embed:
+    embed = discord.Embed(
+        title="공대 생성 규칙 수정",
+        description=(
+            "각 파티에 우선 배치할 직업과 선호 직업을 설정해주세요.\n"
+            "선호 직업은 필요한 경우에만 선택하면 됩니다."
+        ),
+    )
+    embed.add_field(
+        name="1파티",
+        value=(
+            f"우선 직업: {jobs_to_text(party1_priority_jobs)}\n"
+            f"선호 직업: {jobs_to_text(party1_preferred_jobs)}"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="2파티",
+        value=(
+            f"우선 직업: {jobs_to_text(party2_priority_jobs)}\n"
+            f"선호 직업: {jobs_to_text(party2_preferred_jobs)}"
+        ),
+        inline=False,
+    )
+    return embed
