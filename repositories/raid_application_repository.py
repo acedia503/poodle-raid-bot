@@ -317,3 +317,42 @@ class RaidApplicationRepository:
                 (application_ids,),
             )
             return cur.rowcount
+
+    def get_by_guild_channel_and_raid(
+        self,
+        guild_id: int,
+        channel_id: int,
+        raid_name: str,
+    ):
+        query = """
+            SELECT *
+            FROM raid_applications
+            WHERE guild_id = %s
+              AND channel_id = %s
+              AND raid_name = %s
+            ORDER BY created_at ASC
+        """
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(query, (guild_id, channel_id, raid_name))
+            return cur.fetchall()
+    
+    def update_character_snapshot(
+        self,
+        application_id: int,
+        job: str,
+        item_level: int,
+        combat_power: int,
+    ) -> None:
+        query = """
+            UPDATE raid_applications
+            SET
+                job = %s,
+                item_level = %s,
+                combat_power = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(query, (job, item_level, combat_power, application_id))
