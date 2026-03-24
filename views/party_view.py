@@ -85,10 +85,7 @@ class JobMultiSelect(Select):
     ):
         options = []
         for job in JOB_OPTIONS:
-            if job == "없음":
-                is_default = len(current_values) == 0
-            else:
-                is_default = job in current_values
+            is_default = job in current_values
 
             options.append(
                 discord.SelectOption(
