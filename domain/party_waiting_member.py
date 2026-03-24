@@ -1,16 +1,17 @@
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
-
-from domain.enums import WaitingStatus
 
 
 @dataclass
 class PartyWaitingMember:
-    id: Optional[int]
+    id: int | None
     session_id: int
+    guild_id: int
+    channel_id: int
+    raid_name: str
     application_id: int
-    waiting_status: WaitingStatus
-    sort_order: int = 0
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    user_id: int
+    user_name: str
+    character_name: str
+    job: str
+    item_level: int
+    combat_power: int
