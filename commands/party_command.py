@@ -1,5 +1,3 @@
-# command/party_command.py
-
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -56,30 +54,3 @@ class PartyCommand(commands.Cog):
             view=view,
             ephemeral=True,
         )
-
-
-async def setup(bot: commands.Bot):
-    from database import db
-    from repositories.channel_raid_repository import ChannelRaidRepository
-    from repositories.raid_application_repository import RaidApplicationRepository
-    from repository.raid_rule_repository import RaidRuleRepository
-    from services.raid_service import RaidService
-    from services.party_rule_service import PartyRuleService
-
-    channel_raid_repository = ChannelRaidRepository(db)
-    raid_application_repository = RaidApplicationRepository(db)
-    raid_rule_repository = RaidRuleRepository(db)
-
-    raid_service = RaidService(
-        channel_raid_repository=channel_raid_repository,
-        raid_application_repository=raid_application_repository,
-    )
-    party_rule_service = PartyRuleService(raid_rule_repository)
-
-    await bot.add_cog(
-        PartyCommand(
-            bot=bot,
-            raid_service=raid_service,
-            party_rule_service=party_rule_service,
-        )
-    )
