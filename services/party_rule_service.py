@@ -1,70 +1,77 @@
-import json
-
-from domain.enums import BalanceMode
 from domain.raid_rule import RaidRule
-from repositories.raid_rule_repository import RaidRuleRepository
-from utils.constants import DEFAULT_GROUP_SIZE, DEFAULT_PARTY_COUNT, DEFAULT_SLOTS_PER_PARTY
+from repository.raid_rule_repository import RaidRuleRepository
 
 
 class PartyRuleService:
+    JOB_NONE = "없음"
+
     def __init__(self, raid_rule_repository: RaidRuleRepository):
         self.raid_rule_repository = raid_rule_repository
 
-    def get_rule(self, guild_id: int, raid_name: str) -> RaidRule | None:
-        return self.raid_rule_repository.get_by_guild_and_raid(guild_id, raid_name)
-
-    def get_or_create_default_rule(self, guild_id: int, raid_name: str) -> RaidRule:
-        rule = self.get_rule(guild_id, raid_name)
-        if rule:
-            return rule
-
-        default_rule_data = {
-            "preferred_jobs_per_group": {},
-            "max_same_job_per_group": 99,
-            "sort_priority": ["combat_power", "item_level"],
-            "allow_under_condition": False,
-        }
-
-        return RaidRule(
-            id=None,
+    def get_rule(self, guild_id: int, channel_id: int, raid_name: str) -> RaidRule | None:
+        return self.raid_rule_repository.find_by_channel_and_raid(
             guild_id=guild_id,
+            channel_id=channel_id,
             raid_name=raid_name,
-            group_size=DEFAULT_GROUP_SIZE,
-            party_count=DEFAULT_PARTY_COUNT,
-            slots_per_party=DEFAULT_SLOTS_PER_PARTY,
-            balance_mode=BalanceMode.MIXED,
-            rule_data_json=json.dumps(default_rule_data, ensure_ascii=False),
         )
 
-    def save_rule(
+    def create_default_rule(self, guild_id: int, channel_id: int, raid_name: str) -> RaidRule:
+        rule = RaidRule.empty(
+            guild_id=guild_id,
+            channel_id=channel_id,
+            raid_name=raid_name,
+        )
+        self.raid_rule_repository.save(rule)
+        return rule
+
+    def get_or_create_rule(self, guild_id: int, channel_id: int, raid_name: str) -> RaidRule:
+        rule = self.get_rule(guild_id, channel_id, raid_name)
+        if rule is not None:
+            return rule
+        return self.create_default_rule(guild_id, channel_id, raid_name)
+
+    def reset_rule(self, guild_id: int, channel_id: int, raid_name: str) -> RaidRule:
+        rule = RaidRule.empty(
+            guild_id=guild_id,
+            channel_id=channel_id,
+            raid_name=raid_name,
+        )
+        self.raid_rule_repository.upsert(rule)
+        return rule
+
+    def update_rule(
         self,
         guild_id: int,
+        channel_id: int,
         raid_name: str,
-        group_size: int,
-        party_count: int,
-        slots_per_party: int,
-        balance_mode: str,
-        rule_data_json: str | None,
+        party1_priority_jobs: list[str],
+        party1_preferred_jobs: list[str],
+        party2_priority_jobs: list[str],
+        party2_preferred_jobs: list[str],
     ) -> RaidRule:
-        self.validate_rule(group_size, party_count, slots_per_party)
-
         rule = RaidRule(
-            id=None,
             guild_id=guild_id,
+            channel_id=channel_id,
             raid_name=raid_name,
-            group_size=group_size,
-            party_count=party_count,
-            slots_per_party=slots_per_party,
-            balance_mode=BalanceMode(balance_mode),
-            rule_data_json=rule_data_json,
+            party1_priority_jobs=self._normalize_jobs(party1_priority_jobs),
+            party1_preferred_jobs=self._normalize_jobs(party1_preferred_jobs),
+            party2_priority_jobs=self._normalize_jobs(party2_priority_jobs),
+            party2_preferred_jobs=self._normalize_jobs(party2_preferred_jobs),
         )
-        return self.raid_rule_repository.upsert(rule)
+        self.raid_rule_repository.upsert(rule)
+        return rule
 
-    def delete_rule(self, guild_id: int, raid_name: str) -> bool:
-        return self.raid_rule_repository.delete_by_guild_and_raid(guild_id, raid_name)
+    def _normalize_jobs(self, jobs: list[str] | None) -> list[str]:
+        if not jobs:
+            return []
 
-    def validate_rule(self, group_size: int, party_count: int, slots_per_party: int) -> None:
-        if group_size <= 0 or party_count <= 0 or slots_per_party <= 0:
-            raise ValueError("공대 규칙 값은 0보다 커야 합니다.")
-        if party_count * slots_per_party != group_size:
-            raise ValueError("party_count * slots_per_party 는 group_size 와 같아야 합니다.")
+        cleaned = []
+        for job in jobs:
+            if not job:
+                continue
+            if job == self.JOB_NONE:
+                return []
+            if job not in cleaned:
+                cleaned.append(job)
+
+        return cleaned
