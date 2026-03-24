@@ -31,10 +31,7 @@ class PartyCommand(commands.Cog):
             )
             return
 
-        raid = self.raid_service.get_channel_raid(
-            guild_id=guild.id,
-            channel_id=channel.id,
-        )
+        raid = self.raid_service.get_channel_raid(channel.id)
         if raid is None:
             await interaction.response.send_message(
                 "설정된 레이드가 없습니다.",
@@ -63,20 +60,21 @@ class PartyCommand(commands.Cog):
 
 async def setup(bot: commands.Bot):
     from database import db
+    from repositories.channel_raid_repository import ChannelRaidRepository
+    from repositories.raid_application_repository import RaidApplicationRepository
     from repository.raid_rule_repository import RaidRuleRepository
-    from services.party_rule_service import PartyRuleService
     from services.raid_service import RaidService
-    # 필요하면 기존 raid repository도 import
+    from services.party_rule_service import PartyRuleService
 
+    channel_raid_repository = ChannelRaidRepository(db)
+    raid_application_repository = RaidApplicationRepository(db)
     raid_rule_repository = RaidRuleRepository(db)
-    party_rule_service = PartyRuleService(raid_rule_repository)
 
-    # TODO:
-    # 여기 부분은 기존 프로젝트의 RaidService 생성 방식에 맞게 바꿔야 함
-    # 예:
-    # channel_raid_repository = ChannelRaidRepository(db)
-    # raid_service = RaidService(channel_raid_repository)
-    raid_service = RaidService(...)
+    raid_service = RaidService(
+        channel_raid_repository=channel_raid_repository,
+        raid_application_repository=raid_application_repository,
+    )
+    party_rule_service = PartyRuleService(raid_rule_repository)
 
     await bot.add_cog(
         PartyCommand(
