@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from services.party_rule_service import PartyRuleService
-from view.party_view import PartyRuleDetailView, build_rule_detail_embed
+from views.party_view import PartyRuleDetailView, build_rule_detail_embed
 
 
 class PartyCommand(commands.Cog):
