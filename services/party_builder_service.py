@@ -201,8 +201,8 @@ class PartyBuilderService:
                     latest_info = await asyncio.to_thread(
                         self.character_info_service.get_character_info,
                         applicant.character_name,
-                        applicant.server,
                         applicant.race,
+                        applicant.server,
                     )
 
                     # NOTE:
