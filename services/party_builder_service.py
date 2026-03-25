@@ -185,50 +185,46 @@ class PartyBuilderService:
         self,
         applicants: list[BuildApplicant],
     ) -> RefreshSummary:
-        """
-        신청자 최신 정보 병렬 갱신.
-        실패자는 기존 정보 유지.
-        """
         summary = RefreshSummary()
         semaphore = asyncio.Semaphore(self.max_refresh_concurrency)
-
-async def refresh_one(applicant: BuildApplicant):
-    async with semaphore:
-        try:
-            latest_info = await asyncio.to_thread(
-                self.character_info_service.get_character_info,
-                applicant.character_name,
-                applicant.race,
-                applicant.server,
-            )
-
-            self.raid_application_repository.update_character_snapshot(
-                application_id=applicant.application_id,
-                job=latest_info["job"],
-                item_level=latest_info["item_level"],
-                combat_power=latest_info["combat_power"],
-            )
-
-            print(
-                f"[PARTY BUILD][REFRESH OK] "
-                f"character={applicant.character_name}, "
-                f"job={latest_info['job']}, "
-                f"item_level={latest_info['item_level']}, "
-                f"combat_power={latest_info['combat_power']}"
-            )
-
-            return ("ok", applicant.character_name, None)
-
-        except Exception as e:
-            print(
-                f"[PARTY BUILD][REFRESH FAIL] "
-                f"character={applicant.character_name}, "
-                f"error={repr(e)}"
-            )
-            return ("fail", applicant.character_name, str(e))
-
+    
+        async def refresh_one(applicant: BuildApplicant):
+            async with semaphore:
+                try:
+                    latest_info = await asyncio.to_thread(
+                        self.character_info_service.get_character_info,
+                        applicant.character_name,
+                        applicant.race,
+                        applicant.server,
+                    )
+    
+                    self.raid_application_repository.update_character_snapshot(
+                        application_id=applicant.application_id,
+                        job=latest_info["job"],
+                        item_level=latest_info["item_level"],
+                        combat_power=latest_info["combat_power"],
+                    )
+    
+                    print(
+                        f"[PARTY BUILD][REFRESH OK] "
+                        f"character={applicant.character_name}, "
+                        f"job={latest_info['job']}, "
+                        f"item_level={latest_info['item_level']}, "
+                        f"combat_power={latest_info['combat_power']}"
+                    )
+    
+                    return ("ok", applicant.character_name, None)
+    
+                except Exception as e:
+                    print(
+                        f"[PARTY BUILD][REFRESH FAIL] "
+                        f"character={applicant.character_name}, "
+                        f"error={repr(e)}"
+                    )
+                    return ("fail", applicant.character_name, str(e))
+    
         results = await asyncio.gather(*(refresh_one(a) for a in applicants))
-
+    
         for status, character_name, error in results:
             if status == "ok":
                 summary.updated_count += 1
@@ -236,7 +232,7 @@ async def refresh_one(applicant: BuildApplicant):
                 summary.failed_count += 1
                 summary.failed_characters.append(character_name)
                 print(f"[PARTY BUILD][REFRESH ERROR DETAIL] {character_name}: {error}")
-
+    
         return summary
 
     def calculate_build_plan(self, total_count: int) -> BuildPlan:
