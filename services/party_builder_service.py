@@ -654,25 +654,6 @@ async def refresh_one(applicant: BuildApplicant):
 
         return session
 
-    def _to_build_applicant(self, row: Any) -> BuildApplicant:
-        """
-        RealDictRow / 객체 둘 다 대응
-        """
-        return BuildApplicant(
-            application_id=row.id if hasattr(row, "id") else row["id"],
-            guild_id=row.guild_id if hasattr(row, "guild_id") else row["guild_id"],
-            channel_id=row.channel_id if hasattr(row, "channel_id") else row["channel_id"],
-            user_id=row.user_id if hasattr(row, "user_id") else row["user_id"],
-            user_name=row.user_name if hasattr(row, "user_name") else row["user_name"],
-            character_name=row.character_name if hasattr(row, "character_name") else row["character_name"],
-            race=row.race if hasattr(row, "race") else row["race"],
-            server=row.server if hasattr(row, "server") else row["server"],
-            job=row.job if hasattr(row, "job") else row["job"],
-            item_level=row.item_level if hasattr(row, "item_level") else row["item_level"],
-            combat_power=row.combat_power if hasattr(row, "combat_power") else row["combat_power"],
-            raid_name=row.raid_name if hasattr(row, "raid_name") else row["raid_name"],
-        )
-
     def _to_build_applicant(self, row) -> BuildApplicant:
         return BuildApplicant(
             application_id=row.id if hasattr(row, "id") else row["id"],
