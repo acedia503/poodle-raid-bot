@@ -143,6 +143,8 @@ class SaveRuleButton(Button):
         detail_view = PartyRuleDetailView(
             rule=updated_rule,
             party_rule_service=view.party_rule_service,
+            party_builder_service=view.party_builder_service,
+            party_manage_service=view.party_manage_service,
         )
         detail_embed = build_rule_detail_embed(updated_rule)
 
@@ -168,6 +170,8 @@ class CancelEditButton(Button):
         detail_view = PartyRuleDetailView(
             rule=latest_rule,
             party_rule_service=view.party_rule_service,
+            party_builder_service=view.party_builder_service,
+            party_manage_service=view.party_manage_service,
         )
         detail_embed = build_rule_detail_embed(latest_rule)
 
@@ -178,11 +182,19 @@ class CancelEditButton(Button):
 
 
 class PartyRuleEditView(View):
-    def __init__(self, rule, party_rule_service):
+    def __init__(
+        self,
+        rule,
+        party_rule_service,
+        party_builder_service,
+        party_manage_service,
+    ):
         super().__init__(timeout=300)
 
         self.rule = rule
         self.party_rule_service = party_rule_service
+        self.party_builder_service = party_builder_service
+        self.party_manage_service = party_manage_service
 
         self.party1_priority_jobs = list(rule.party1_priority_jobs)
         self.party1_preferred_jobs = list(rule.party1_preferred_jobs)
@@ -292,11 +304,13 @@ class PartyRuleDetailView(View):
         self.party_builder_service = party_builder_service
         self.party_manage_service = party_manage_service
         
-    @discord.ui.button(label="수정", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="규칙 수정", style=discord.ButtonStyle.primary, row=0)
     async def edit_button(self, interaction: discord.Interaction, button: Button):
         edit_view = PartyRuleEditView(
             rule=self.rule,
             party_rule_service=self.party_rule_service,
+            party_builder_service=self.party_builder_service,
+            party_manage_service=self.party_manage_service,
         )
 
         edit_embed = build_rule_edit_embed(
@@ -311,7 +325,7 @@ class PartyRuleDetailView(View):
             view=edit_view,
         )
 
-    @discord.ui.button(label="초기화", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="규칙 초기화", style=discord.ButtonStyle.danger, row=0)
     async def reset_button(self, interaction: discord.Interaction, button: Button):
         reset_rule = self.party_rule_service.reset_rule(
             guild_id=self.rule.guild_id,
@@ -327,7 +341,76 @@ class PartyRuleDetailView(View):
             view=self,
         )
 
-    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="공대 생성", style=discord.ButtonStyle.success, row=1)
+    async def build_button(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            result = await self.party_builder_service.build_parties(
+                guild_id=self.rule.guild_id,
+                channel_id=self.rule.channel_id,
+                created_by=interaction.user.id,
+            )
+        except ValueError as e:
+            await interaction.followup.edit_message(
+                message_id=interaction.message.id,
+                embed=discord.Embed(
+                    title="공대 생성 실패",
+                    description=str(e),
+                ),
+                view=self,
+            )
+            return
+
+        result_embed = build_party_build_result_embed(result)
+        await interaction.followup.edit_message(
+            message_id=interaction.message.id,
+            embed=result_embed,
+            view=self,
+        )
+
+
+    @discord.ui.button(label="결과 확인", style=discord.ButtonStyle.secondary, row=1)
+    async def view_result_button(self, interaction: discord.Interaction, button: Button):
+        result = self.party_manage_service.get_active_build_result(
+            guild_id=self.rule.guild_id,
+            channel_id=self.rule.channel_id,
+        )
+
+        if result is None:
+            await interaction.response.send_message(
+                "생성된 공대 결과가 없습니다.",
+                ephemeral=True,
+            )
+            return
+
+        result_embed = build_party_build_result_embed(result)
+        await interaction.response.edit_message(
+            embed=result_embed,
+            view=self,
+        )
+
+    @discord.ui.button(label="생성 초기화", style=discord.ButtonStyle.danger, row=1)
+    async def reset_build_button(self, interaction: discord.Interaction, button: Button):
+        reset_ok = self.party_manage_service.reset_active_build_result(
+            guild_id=self.rule.guild_id,
+            channel_id=self.rule.channel_id,
+        )
+
+        if not reset_ok:
+            await interaction.response.send_message(
+                "초기화할 공대 생성 결과가 없습니다.",
+                ephemeral=True,
+            )
+            return
+
+        detail_embed = build_rule_detail_embed(self.rule)
+        await interaction.response.edit_message(
+            embed=detail_embed,
+            view=self,
+        )
+        
+    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary, row=2)
     async def close_button(self, interaction: discord.Interaction, button: Button):
         await interaction.response.edit_message(view=None)
 
