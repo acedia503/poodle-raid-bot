@@ -236,12 +236,13 @@ class PartyBuilderService:
 
         results = await asyncio.gather(*(refresh_one(a) for a in applicants))
 
-        for status, character_name in results:
+        for status, character_name, error in results:
             if status == "ok":
                 summary.updated_count += 1
             else:
                 summary.failed_count += 1
                 summary.failed_characters.append(character_name)
+                print(f"[PARTY BUILD][REFRESH ERROR DETAIL] {character_name}: {error}")
 
         return summary
 
