@@ -213,10 +213,26 @@ class PartyBuilderService:
                         item_level=latest_info.item_level,
                         combat_power=latest_info.combat_power,
                     )
+                    print(
+                        f"[PARTY BUILD][REFRESH OK] "
+                        f"character={applicant.character_name}, "
+                        f"job={latest_info.job}, "
+                        f"item_level={latest_info.item_level}, "
+                        f"combat_power={latest_info.combat_power}"
+                    )
 
                     return ("ok", applicant.character_name)
-                except Exception:
-                    return ("fail", applicant.character_name)
+                # except Exception:
+                    # return ("fail", applicant.character_name)
+                except Exception as e:
+                    print(
+                        f"[PARTY BUILD][REFRESH FAIL] "
+                        f"character={applicant.character_name}, "
+                        f"server={applicant.server}, "
+                        f"race={applicant.race}, "
+                        f"error={e}"
+                    )
+                    return ("fail", applicant.character_name, str(e))
 
         results = await asyncio.gather(*(refresh_one(a) for a in applicants))
 
