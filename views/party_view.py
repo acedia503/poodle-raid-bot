@@ -322,3 +322,65 @@ class PartyRuleDetailView(View):
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
     async def close_button(self, interaction: discord.Interaction, button: Button):
         await interaction.response.edit_message(view=None)
+
+def build_party_build_result_embed(result) -> discord.Embed:
+    embed = discord.Embed(
+        title="공대 생성 결과",
+        description=(
+            f"레이드: {result.raid_name}\n"
+            f"총 신청자: {result.total_applicants}명\n"
+            f"정식 공대: {result.full_group_count}개\n"
+            f"임시 공대: {result.temp_group_count}개\n"
+            f"대기 인원: {result.waiting_count}명"
+        ),
+    )
+
+    for party in result.parties:
+        group_label = f"{party.group_no}공대"
+        if party.is_temp_group:
+            group_label += " (임시)"
+
+        member_lines = []
+        for member in party.members:
+            member_lines.append(
+                f"{member.slot_no}. {member.character_name} / {member.job} / {member.combat_power:,}"
+            )
+
+        if not member_lines:
+            member_lines.append("배치 인원 없음")
+
+        embed.add_field(
+            name=f"{group_label} {party.party_no}파티 (총 전투력: {party.total_combat_power:,})",
+            value="\n".join(member_lines),
+            inline=False,
+        )
+
+    if result.waiting_members:
+        waiting_lines = []
+        for idx, member in enumerate(result.waiting_members, start=1):
+            waiting_lines.append(
+                f"{idx}. {member.character_name} / {member.job} / {member.combat_power:,}"
+            )
+
+        embed.add_field(
+            name="대기 인원",
+            value="\n".join(waiting_lines),
+            inline=False,
+        )
+
+    if hasattr(result, "refresh_summary") and result.refresh_summary is not None:
+        refresh_lines = [
+            f"최신 정보 갱신 성공: {result.refresh_summary.updated_count}명",
+            f"최신 정보 갱신 실패: {result.refresh_summary.failed_count}명",
+        ]
+        if result.refresh_summary.failed_characters:
+            failed_names = ", ".join(result.refresh_summary.failed_characters[:10])
+            refresh_lines.append(f"실패 캐릭터: {failed_names}")
+
+        embed.add_field(
+            name="신청자 정보 갱신 결과",
+            value="\n".join(refresh_lines),
+            inline=False,
+        )
+
+    return embed
