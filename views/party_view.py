@@ -390,7 +390,7 @@ class PartyRuleDetailView(View):
             )
             return
 
-        result_embed = build_party_build_result_embed(result)
+        result_embed = build_party_result_embed(result)
         await interaction.response.edit_message(
             embed=result_embed,
             view=self,
