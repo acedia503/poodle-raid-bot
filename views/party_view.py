@@ -343,31 +343,36 @@ class PartyRuleDetailView(View):
 
     @discord.ui.button(label="공대 생성", style=discord.ButtonStyle.success, row=1)
     async def build_button(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.defer(ephemeral=True)
-
+        loading_embed = discord.Embed(
+            title="공대 생성 중",
+            description="신청자 최신 정보를 조회하고 공대를 생성하고 있습니다.\n잠시만 기다려주세요.",
+        )
+    
+        await interaction.response.edit_message(
+            embed=loading_embed,
+            view=None,
+        )
+    
         try:
             result = await self.party_builder_service.build_parties(
                 guild_id=self.rule.guild_id,
                 channel_id=self.rule.channel_id,
                 created_by=interaction.user.id,
             )
-        except ValueError as e:
-            await interaction.followup.edit_message(
-                message_id=interaction.message.id,
-                embed=discord.Embed(
-                    title="공대 생성 실패",
-                    description=str(e),
-                ),
+            result_embed = build_party_build_result_embed(result)
+            await interaction.edit_original_response(
+                embed=result_embed,
                 view=self,
             )
-            return
-
-        result_embed = build_party_build_result_embed(result)
-        await interaction.followup.edit_message(
-            message_id=interaction.message.id,
-            embed=result_embed,
-            view=self,
-        )
+        except Exception as e:
+            error_embed = discord.Embed(
+                title="공대 생성 실패",
+                description=str(e),
+            )
+            await interaction.edit_original_response(
+                embed=error_embed,
+                view=self,
+            )
 
 
     @discord.ui.button(label="결과 확인", style=discord.ButtonStyle.secondary, row=1)
