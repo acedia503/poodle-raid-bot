@@ -15,6 +15,9 @@ from repositories.channel_raid_repository import ChannelRaidRepository
 from repositories.guild_setting_repository import GuildSettingRepository
 from repositories.raid_application_repository import RaidApplicationRepository
 from repositories.raid_rule_repository import RaidRuleRepository
+from repositories.party_build_session_repository import PartyBuildSessionRepository
+from repositories.party_slot_repository import PartySlotRepository
+from repositories.party_waiting_repository import PartyWaitingRepository
 
 from services.api_service import HttpApiService, MockApiService
 from services.application_service import ApplicationService
@@ -22,7 +25,10 @@ from services.character_info_service import CharacterInfoService
 from services.message_service import MessageService
 from services.raid_service import RaidService
 from services.setting_service import SettingService
-from services.party_rule_service import PartyRuleService
+from repositories.raid_rule_repository import RaidRuleRepository
+from repositories.party_build_session_repository import PartyBuildSessionRepository
+from repositories.party_slot_repository import PartySlotRepository
+from repositories.party_waiting_repository import PartyWaitingRepository
 
 
 def create_bot() -> commands.Bot:
@@ -40,6 +46,9 @@ def create_bot() -> commands.Bot:
     channel_raid_repository = ChannelRaidRepository(database)
     raid_application_repository = RaidApplicationRepository(database)
     raid_rule_repository = RaidRuleRepository(database)
+    party_build_session_repository = PartyBuildSessionRepository(database)
+    party_slot_repository = PartySlotRepository(database)
+    party_waiting_repository = PartyWaitingRepository(database)
 
     # External API
     if config.api_mode == "http":
@@ -56,6 +65,24 @@ def create_bot() -> commands.Bot:
     )
     party_rule_service = PartyRuleService(raid_rule_repository)
 
+    party_builder_service = PartyBuilderService(
+        raid_service=raid_service,
+        raid_application_repository=raid_application_repository,
+        party_rule_service=party_rule_service,
+        character_info_service=character_info_service,
+        party_build_session_repository=party_build_session_repository,
+        party_slot_repository=party_slot_repository,
+        party_waiting_member_repository=party_waiting_member_repository,  # 네가 정리한 이름 기준으로 맞춰도 됨
+        max_refresh_concurrency=5,
+    )
+
+    party_manage_service = PartyManageService(
+        raid_service=raid_service,
+        party_build_session_repository=party_build_session_repository,
+        party_slot_repository=party_slot_repository,
+        party_waiting_repository=party_waiting_repository,
+    )
+
     application_service = ApplicationService(
         character_info_service=character_info_service,
         setting_service=setting_service,
@@ -71,7 +98,15 @@ def create_bot() -> commands.Bot:
     async def setup_hook():
         await bot.add_cog(SettingCommand(bot, setting_service, message_service))
         await bot.add_cog(RaidCommand(bot, raid_service, message_service))
-        await bot.add_cog(PartyCommand(bot, raid_service, party_rule_service))
+        await bot.add_cog(
+            PartyCommand(
+                bot=bot,
+                raid_service=raid_service,
+                party_rule_service=party_rule_service,
+                party_builder_service=party_builder_service,
+                party_manage_service=party_manage_service,
+            )
+        )
         await bot.add_cog(
             ApplicationCommand(
                 bot,
