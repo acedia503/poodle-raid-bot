@@ -17,7 +17,7 @@ from repositories.raid_application_repository import RaidApplicationRepository
 from repositories.raid_rule_repository import RaidRuleRepository
 from repositories.party_build_session_repository import PartyBuildSessionRepository
 from repositories.party_slot_repository import PartySlotRepository
-from repositories.party_waiting_repository import PartyWaitingRepository
+from repositories.party_waiting_repository import PartyWaitingMemberRepository
 
 from services.api_service import HttpApiService, MockApiService
 from services.application_service import ApplicationService
@@ -48,7 +48,7 @@ def create_bot() -> commands.Bot:
     raid_rule_repository = RaidRuleRepository(database)
     party_build_session_repository = PartyBuildSessionRepository(database)
     party_slot_repository = PartySlotRepository(database)
-    party_waiting_repository = PartyWaitingRepository(database)
+    party_waiting_repository = PartyWaitingMemberRepository(database)
 
     # External API
     if config.api_mode == "http":
