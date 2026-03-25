@@ -360,7 +360,7 @@ class PartyRuleDetailView(View):
                 channel_id=self.rule.channel_id,
                 created_by=interaction.user.id,
             )
-            result_embed = build_party_build_result_embed(result)
+            result_embed = build_party_result_embed(result)
             await interaction.edit_original_response(
                 embed=result_embed,
                 view=self,
