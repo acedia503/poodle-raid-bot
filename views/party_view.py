@@ -466,10 +466,11 @@ def build_party_build_result_embed(result) -> discord.Embed:
         )
 
     if hasattr(result, "refresh_summary") and result.refresh_summary is not None:
-        refresh_lines = [
-            f"최신 정보 갱신 성공: {result.refresh_summary.updated_count}명",
-            f"최신 정보 갱신 실패: {result.refresh_summary.failed_count}명",
-        ]
+        refresh_lines = [f"최신 정보 갱신 성공: {result.refresh_summary.updated_count}명"]
+
+        if result.refresh_summary.failed_count > 0:
+            refresh_lines.append(f"최신 정보 갱신 실패: {result.refresh_summary.failed_count}명")
+            
         if result.refresh_summary.failed_characters:
             failed_names = ", ".join(result.refresh_summary.failed_characters[:10])
             refresh_lines.append(f"실패 캐릭터: {failed_names}")
