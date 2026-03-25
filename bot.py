@@ -72,7 +72,7 @@ def create_bot() -> commands.Bot:
         character_info_service=character_info_service,
         party_build_session_repository=party_build_session_repository,
         party_slot_repository=party_slot_repository,
-        party_waiting_member_repository=party_waiting_member_repository,  # 네가 정리한 이름 기준으로 맞춰도 됨
+        party_waiting_repository=party_waiting_repository,
         max_refresh_concurrency=5,
     )
 
