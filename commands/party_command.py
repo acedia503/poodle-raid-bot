@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from services.party_rule_service import PartyRuleService
-from views.party_view import PartyRuleDetailView, build_rule_detail_embed
+from view.party_view import PartyRuleDetailView, build_rule_detail_embed
 
 
 class PartyCommand(commands.Cog):
@@ -12,10 +12,14 @@ class PartyCommand(commands.Cog):
         bot: commands.Bot,
         raid_service,
         party_rule_service: PartyRuleService,
+        party_builder_service,
+        party_manage_service,
     ):
         self.bot = bot
         self.raid_service = raid_service
         self.party_rule_service = party_rule_service
+        self.party_builder_service = party_builder_service
+        self.party_manage_service = party_manage_service
 
     @app_commands.command(name="공대", description="현재 채널의 공대 생성 규칙을 확인합니다.")
     async def party(self, interaction: discord.Interaction):
@@ -47,6 +51,8 @@ class PartyCommand(commands.Cog):
         view = PartyRuleDetailView(
             rule=rule,
             party_rule_service=self.party_rule_service,
+            party_builder_service=self.party_builder_service,
+            party_manage_service=self.party_manage_service,
         )
 
         await interaction.response.send_message(
