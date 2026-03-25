@@ -332,7 +332,7 @@ class RaidApplicationRepository:
               AND raid_name = %s
             ORDER BY created_at ASC
         """
-        with self.db.get_connection() as conn:
+        with self.database.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(query, (guild_id, channel_id, raid_name))
             return cur.fetchall()
@@ -353,6 +353,6 @@ class RaidApplicationRepository:
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """
-        with self.db.get_connection() as conn:
+        with self.database.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(query, (job, item_level, combat_power, application_id))
