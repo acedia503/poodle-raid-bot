@@ -209,9 +209,9 @@ class PartyBuilderService:
                     # latest_info의 반환 필드명도 실제 구현체에 맞게 조정 필요
                     self.raid_application_repository.update_character_snapshot(
                         application_id=applicant.application_id,
-                        job=latest_info.job,
-                        item_level=latest_info.item_level,
-                        combat_power=latest_info.combat_power,
+                        job=latest_info["job"],
+                        item_level=latest_info["item_level"],
+                        combat_power=latest_info["combat_power"],
                     )
                     print(
                         f"[PARTY BUILD][REFRESH OK] "
