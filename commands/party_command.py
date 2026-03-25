@@ -34,10 +34,7 @@ class PartyCommand(commands.Cog):
                 )
                 return
     
-            raid = self.raid_service.get_channel_raid(
-                guild_id=guild.id,
-                channel_id=channel.id,
-            )
+            raid = self.raid_service.get_channel_raid(channel.id)
     
             if raid is None:
                 await interaction.response.send_message(
