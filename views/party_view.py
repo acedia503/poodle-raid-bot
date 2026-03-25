@@ -437,9 +437,10 @@ def build_party_build_result_embed(result) -> discord.Embed:
             group_label += " (임시)"
 
         member_lines = []
-        for member in party.members:
+        for idx, member in enumerate(party.members, start=1):
+            slot_no = getattr(member, "slot_no", idx)
             member_lines.append(
-                f"{member.slot_no}. {member.character_name} / {member.job} / {member.combat_power:,}"
+                f"{slot_no}. {member.character_name} / {member.job} / {member.combat_power:,}"
             )
 
         if not member_lines:
