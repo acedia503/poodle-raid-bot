@@ -25,10 +25,9 @@ from services.character_info_service import CharacterInfoService
 from services.message_service import MessageService
 from services.raid_service import RaidService
 from services.setting_service import SettingService
-from repositories.raid_rule_repository import RaidRuleRepository
-from repositories.party_build_session_repository import PartyBuildSessionRepository
-from repositories.party_slot_repository import PartySlotRepository
-from repositories.party_waiting_repository import PartyWaitingRepository
+from services.party_rule_service import PartyRuleService
+from services.party_builder_service import PartyBuilderService
+from services.party_manage_service import PartyManageService
 
 
 def create_bot() -> commands.Bot:
