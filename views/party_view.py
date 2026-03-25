@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import discord
 from discord.ui import View, Select, Button
+from collections import defaultdict
 
 from utils.constants import JOB_OPTIONS
 
@@ -395,7 +396,7 @@ class PartyRuleDetailView(View):
             view=self,
         )
 
-    @discord.ui.button(label="생성 초기화", style=discord.ButtonStyle.danger, row=1)
+    @discord.ui.button(label="공대 초기화", style=discord.ButtonStyle.danger, row=1)
     async def reset_build_button(self, interaction: discord.Interaction, button: Button):
         reset_ok = self.party_manage_service.reset_active_build_result(
             guild_id=self.rule.guild_id,
@@ -419,65 +420,61 @@ class PartyRuleDetailView(View):
     async def close_button(self, interaction: discord.Interaction, button: Button):
         await interaction.response.edit_message(view=None)
 
-def build_party_build_result_embed(result) -> discord.Embed:
+
+def build_party_result_embed(result) -> discord.Embed:
     embed = discord.Embed(
-        title="공대 생성 결과",
-        description=(
-            f"레이드: {result.raid_name}\n"
-            f"총 신청자: {result.total_applicants}명\n"
-            f"정식 공대: {result.full_group_count}개\n"
-            f"임시 공대: {result.temp_group_count}개\n"
-            f"대기 인원: {result.waiting_count}명"
-        ),
+        title=f"{result.raid_name} 공대 생성 결과",
+        color=discord.Color.green(),
     )
 
+    # 상단 요약
+    embed.description = (
+        f"총 신청자: {result.total_applicants}명\n"
+        f"정식 공대 {result.full_group_count}개 / "
+        f"임시 공대 {result.temp_group_count}개 / "
+        f"대기 인원 {result.waiting_count}명"
+    )
+
+    # 그룹별 정리
+    group_map = defaultdict(list)
     for party in result.parties:
-        group_label = f"{party.group_no}공대"
-        if party.is_temp_group:
-            group_label += " (임시)"
+        group_map[party.group_no].append(party)
 
-        member_lines = []
-        for idx, member in enumerate(party.members, start=1):
-            slot_no = getattr(member, "slot_no", idx)
-            member_lines.append(
-                f"{slot_no}. {member.character_name} / {member.job} / {member.combat_power:,}"
-            )
+    # 공대별 출력
+    for group_no in sorted(group_map.keys()):
+        parties = sorted(group_map[group_no], key=lambda p: p.party_no)
 
-        if not member_lines:
-            member_lines.append("배치 인원 없음")
+        value_lines = []
+
+        for party in parties:
+            value_lines.append(f"**{party.party_no}파티 | 총 전투력: {party.total_combat_power:,}**")
+
+            for idx, member in enumerate(party.members, start=1):
+                value_lines.append(
+                    f"{idx}. {member.character_name} ({member.job}) "
+                    f"[{member.combat_power:,}]"
+                )
+
+            value_lines.append("")  # 줄바꿈
 
         embed.add_field(
-            name=f"{group_label} {party.party_no}파티 (총 전투력: {party.total_combat_power:,})",
-            value="\n".join(member_lines),
+            name=f"✨{group_no}공대",
+            value="\n".join(value_lines),
             inline=False,
         )
 
+    # 대기 인원
     if result.waiting_members:
         waiting_lines = []
         for idx, member in enumerate(result.waiting_members, start=1):
             waiting_lines.append(
-                f"{idx}. {member.character_name} / {member.job} / {member.combat_power:,}"
+                f"{idx}. {member.character_name} ({member.job}) "
+                f"[{member.combat_power:,}]"
             )
 
         embed.add_field(
-            name="대기 인원",
+            name="🕓 대기 인원",
             value="\n".join(waiting_lines),
-            inline=False,
-        )
-
-    if hasattr(result, "refresh_summary") and result.refresh_summary is not None:
-        refresh_lines = [f"최신 정보 갱신 성공: {result.refresh_summary.updated_count}명"]
-
-        if result.refresh_summary.failed_count > 0:
-            refresh_lines.append(f"최신 정보 갱신 실패: {result.refresh_summary.failed_count}명")
-            
-        if result.refresh_summary.failed_characters:
-            failed_names = ", ".join(result.refresh_summary.failed_characters[:10])
-            refresh_lines.append(f"실패 캐릭터: {failed_names}")
-
-        embed.add_field(
-            name="신청자 정보 갱신 결과",
-            value="\n".join(refresh_lines),
             inline=False,
         )
 
