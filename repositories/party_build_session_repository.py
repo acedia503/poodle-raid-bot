@@ -96,3 +96,17 @@ class PartyBuildSessionRepository:
 
         session.id = row["id"]
         return session
+
+    def update_waiting_count(
+        self,
+        session_id: int,
+        waiting_count: int,
+    ) -> None:
+        query = """
+            UPDATE party_build_sessions
+            SET waiting_count = %s
+            WHERE id = %s
+        """
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(query, (waiting_count, session_id))
