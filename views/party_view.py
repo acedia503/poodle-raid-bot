@@ -894,32 +894,52 @@ class PartyBuildHomeView(View):
             description="신청자 최신 정보를 조회하고 공대를 생성하고 있습니다.",
         )
         await interaction.response.edit_message(embed=loading_embed, view=None)
-
+    
         try:
             await self.party_builder_service.build_parties(
                 guild_id=self.rule.guild_id,
                 channel_id=self.rule.channel_id,
                 created_by=interaction.user.id,
             )
+    
             active_result = self.party_manage_service.get_active_build_result(
                 guild_id=self.rule.guild_id,
                 channel_id=self.rule.channel_id,
             )
-            embed = build_build_home_embed(active_result, self.rule, status_message="공대 생성을 완료했습니다.")
+    
+            embed = build_party_result_embed(
+                active_result,
+                status_message="공대 생성을 완료했습니다."
+            )
+    
+            view = PartyResultDetailView(
+                rule=self.rule,
+                party_rule_service=self.party_rule_service,
+                party_builder_service=self.party_builder_service,
+                party_manage_service=self.party_manage_service,
+                party_modify_service=self.party_modify_service,
+            )
+    
         except Exception as e:
             active_result = self.party_manage_service.get_active_build_result(
                 guild_id=self.rule.guild_id,
                 channel_id=self.rule.channel_id,
             )
-            embed = build_build_home_embed(active_result, self.rule, status_message=f"공대 생성 실패: {e}")
-
-        view = PartyBuildHomeView(
-            rule=self.rule,
-            party_rule_service=self.party_rule_service,
-            party_builder_service=self.party_builder_service,
-            party_manage_service=self.party_manage_service,
-            party_modify_service=self.party_modify_service,
-        )
+    
+            embed = build_build_home_embed(
+                active_result,
+                self.rule,
+                status_message=f"공대 생성 실패: {e}"
+            )
+    
+            view = PartyBuildHomeView(
+                rule=self.rule,
+                party_rule_service=self.party_rule_service,
+                party_builder_service=self.party_builder_service,
+                party_manage_service=self.party_manage_service,
+                party_modify_service=self.party_modify_service,
+            )
+    
         await interaction.edit_original_response(embed=embed, view=view)
 
     @discord.ui.button(label="공대 초기화", style=discord.ButtonStyle.danger, row=0)
