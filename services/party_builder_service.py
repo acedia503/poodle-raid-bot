@@ -108,7 +108,6 @@ class PartyBuilderService:
         if raid is None:
             raise ValueError("설정된 레이드가 없습니다.")
 
-        # 1) 현재 채널 레이드 신청자 조회
         raw_applications = self.raid_application_repository.get_by_guild_channel_and_raid(
             guild_id=guild_id,
             channel_id=channel_id,
@@ -116,15 +115,11 @@ class PartyBuilderService:
         )
         applicants = [self._to_build_applicant(row) for row in raw_applications]
 
-        # 신청자가 아예 없을 때도 결과 세션을 만들지 여부는 정책 선택 가능
-        # 지금은 그냥 빈 결과를 생성하지 않고 예외 처리
         if not applicants:
             raise ValueError("신청자가 없습니다.")
 
-        # 2) 최신 정보 병렬 갱신
         refresh_summary = await self.refresh_applications_before_build(applicants)
 
-        # 3) 갱신된 신청자 재조회
         refreshed_raw_applications = self.raid_application_repository.get_by_guild_channel_and_raid(
             guild_id=guild_id,
             channel_id=channel_id,
@@ -132,32 +127,21 @@ class PartyBuilderService:
         )
         applicants = [self._to_build_applicant(row) for row in refreshed_raw_applications]
 
-        # 4) 규칙 조회
         rule = self.party_rule_service.get_or_create_rule(
             guild_id=guild_id,
             channel_id=channel_id,
             raid_name=raid.raid_name,
         )
 
-        # 5) 계획 계산
         plan = self.calculate_build_plan(len(applicants))
-
-        # 6) 파티 생성
         parties = self.create_parties(plan, rule)
-
-        # 7) 신청자 정렬
         applicants = self.sort_applicants(applicants)
 
-        # 8) 우선 직업 배치
         self.assign_priority_jobs(parties, applicants)
-
-        # 9) 일반 배치
         self.assign_remaining_members(parties, applicants)
 
-        # 10) 미배치 인원 = 대기
         waiting_members = [a for a in applicants if not a.is_assigned]
 
-        # 11) 결과 저장
         saved_session = self.save_build_result(
             guild_id=guild_id,
             channel_id=channel_id,
@@ -187,7 +171,7 @@ class PartyBuilderService:
     ) -> RefreshSummary:
         summary = RefreshSummary()
         semaphore = asyncio.Semaphore(self.max_refresh_concurrency)
-    
+
         async def refresh_one(applicant: BuildApplicant):
             async with semaphore:
                 try:
@@ -197,14 +181,14 @@ class PartyBuilderService:
                         applicant.race,
                         applicant.server,
                     )
-    
+
                     self.raid_application_repository.update_character_snapshot(
                         application_id=applicant.application_id,
                         job=latest_info["job"],
                         item_level=latest_info["item_level"],
                         combat_power=latest_info["combat_power"],
                     )
-    
+
                     print(
                         f"[PARTY BUILD][REFRESH OK] "
                         f"character={applicant.character_name}, "
@@ -212,19 +196,21 @@ class PartyBuilderService:
                         f"item_level={latest_info['item_level']}, "
                         f"combat_power={latest_info['combat_power']}"
                     )
-    
+
                     return ("ok", applicant.character_name, None)
-    
+
                 except Exception as e:
                     print(
                         f"[PARTY BUILD][REFRESH FAIL] "
                         f"character={applicant.character_name}, "
+                        f"race={applicant.race}, "
+                        f"server={applicant.server}, "
                         f"error={repr(e)}"
                     )
                     return ("fail", applicant.character_name, str(e))
-    
+
         results = await asyncio.gather(*(refresh_one(a) for a in applicants))
-    
+
         for status, character_name, error in results:
             if status == "ok":
                 summary.updated_count += 1
@@ -232,16 +218,17 @@ class PartyBuilderService:
                 summary.failed_count += 1
                 summary.failed_characters.append(character_name)
                 print(f"[PARTY BUILD][REFRESH ERROR DETAIL] {character_name}: {error}")
-    
+
+        print(
+            f"[PARTY BUILD][REFRESH SUMMARY] "
+            f"updated={summary.updated_count}, "
+            f"failed={summary.failed_count}, "
+            f"failed_characters={summary.failed_characters}"
+        )
+
         return summary
 
     def calculate_build_plan(self, total_count: int) -> BuildPlan:
-        """
-        규칙:
-        - 8명당 정식 1공대
-        - 남은 6~7명 -> 임시 공대 1개
-        - 남은 0~5명 -> 대기
-        """
         full_group_count = total_count // 8
         remain = total_count % 8
 
@@ -268,14 +255,8 @@ class PartyBuilderService:
         )
 
     def create_parties(self, plan: BuildPlan, rule) -> list[BuildParty]:
-        """
-        파티 규칙은 모든 공대에 동일 반복 적용:
-        - 각 공대 1파티 -> party1 규칙
-        - 각 공대 2파티 -> party2 규칙
-        """
         parties: list[BuildParty] = []
 
-        # 정식 공대
         for group_no in range(1, plan.full_group_count + 1):
             parties.append(
                 BuildParty(
@@ -298,12 +279,10 @@ class PartyBuilderService:
                 )
             )
 
-        # 임시 공대
         if plan.temp_group_count == 1:
             temp_group_no = plan.full_group_count + 1
             temp_count = plan.temp_group_member_count
 
-            # 6명 -> 3:3 / 7명 -> 4:3
             party1_size = (temp_count + 1) // 2
             party2_size = temp_count // 2
 
@@ -331,12 +310,6 @@ class PartyBuilderService:
         return parties
 
     def sort_applicants(self, applicants: list[BuildApplicant]) -> list[BuildApplicant]:
-        """
-        기본 정렬:
-        1) 전투력 내림차순
-        2) 아이템레벨 내림차순
-        3) 신청 ID 오름차순
-        """
         return sorted(
             applicants,
             key=lambda a: (-a.combat_power, -a.item_level, a.application_id),
@@ -347,12 +320,6 @@ class PartyBuilderService:
         parties: list[BuildParty],
         applicants: list[BuildApplicant],
     ) -> None:
-        """
-        우선 직업은 해석 B:
-        - 해당 파티에 우선 직업을 먼저 배치 시도
-        - 없으면 미충족으로 남기고 일반 배치 단계에서 채움
-        - 파티 순서대로 먼저 배치
-        """
         for party in parties:
             if not party.priority_jobs:
                 continue
@@ -415,16 +382,13 @@ class PartyBuilderService:
     ) -> int:
         score = 0
 
-        # 같은 파티 동일 직업 최소화
         if target_party.has_job(candidate.job):
             score -= 300
 
-        # 전투력 균형
         projected = target_party.total_combat_power + candidate.combat_power
         avg_power = self.calculate_average_party_power(parties)
         score -= abs(projected - avg_power)
 
-        # 기본적으로 전투력이 너무 낮은 인원만 편향되지 않도록 미세 보정
         score += candidate.combat_power // 100
 
         return score
@@ -434,14 +398,6 @@ class PartyBuilderService:
         parties: list[BuildParty],
         applicants: list[BuildApplicant],
     ) -> None:
-        """
-        일반 배치:
-        - 총 전투력이 가장 낮은 파티부터 채움
-        - 전투력 균형 최우선
-        - 선호 직업은 가산점
-        - 같은 파티 동일 직업 최소화
-        - 같은 공대 동일 user_id 금지
-        """
         while True:
             available_parties = [party for party in parties if not party.is_full()]
             if not available_parties:
@@ -503,7 +459,6 @@ class PartyBuilderService:
     ) -> int:
         score = 0
 
-        # 1) 전투력 균형 최우선
         projected_power = target_party.total_combat_power + candidate.combat_power
         other_powers = [
             party.total_combat_power
@@ -514,19 +469,15 @@ class PartyBuilderService:
             avg_other_power = sum(other_powers) / len(other_powers)
             score -= int(abs(projected_power - avg_other_power) * 10)
 
-        # 2) 선호 직업 보너스
         if candidate.job in target_party.preferred_jobs:
             score += 50
 
-        # 3) 같은 파티 동일 직업 최소화
         if target_party.has_job(candidate.job):
             score -= 400
 
-        # 4) 아직 못 채운 우선 직업 보완이면 약한 보너스
         if candidate.job in self.get_unfilled_priority_jobs(target_party):
             score += 80
 
-        # 5) 기본 전투력 미세 보정
         score += candidate.combat_power // 100
 
         return score
@@ -550,9 +501,6 @@ class PartyBuilderService:
         group_no: int,
         user_id: int,
     ) -> bool:
-        """
-        같은 공대(group_no) 안에 동일 user_id 중복 금지
-        """
         for party in parties:
             if party.group_no != group_no:
                 continue
@@ -581,7 +529,6 @@ class PartyBuilderService:
         from domain.party_slot import PartySlot
         from domain.party_waiting_member import PartyWaitingMember
 
-        # 기존 활성 세션 비활성화
         self.party_build_session_repository.deactivate_existing_sessions(
             guild_id=guild_id,
             channel_id=channel_id,
@@ -650,7 +597,7 @@ class PartyBuilderService:
 
         return session
 
-    def _to_build_applicant(self, row) -> BuildApplicant:
+    def _to_build_applicant(self, row: Any) -> BuildApplicant:
         return BuildApplicant(
             application_id=row.id if hasattr(row, "id") else row["id"],
             guild_id=row.guild_id if hasattr(row, "guild_id") else row["guild_id"],
