@@ -24,6 +24,8 @@ class PartyWaitingMemberRepository:
                 item_level,
                 combat_power
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (session_id, user_id, character_name)
+            DO NOTHING
         """
 
         with self.db.get_connection() as conn:
