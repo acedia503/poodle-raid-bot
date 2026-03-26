@@ -24,6 +24,7 @@ class Database:
         with self.get_connection() as conn:
             cur = conn.cursor()
 
+            # 길드 기본 설정
             cur.execute("""
             CREATE TABLE IF NOT EXISTS guild_settings (
                 id SERIAL PRIMARY KEY,
@@ -35,6 +36,7 @@ class Database:
             )
             """)
 
+            # 채널별 레이드 설정
             cur.execute("""
             CREATE TABLE IF NOT EXISTS channel_raids (
                 id SERIAL PRIMARY KEY,
@@ -49,6 +51,7 @@ class Database:
             )
             """)
 
+            # 레이드 신청
             cur.execute("""
             CREATE TABLE IF NOT EXISTS raid_applications (
                 id SERIAL PRIMARY KEY,
@@ -69,6 +72,86 @@ class Database:
             )
             """)
 
+            # 공대 생성 규칙
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS raid_rules (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                raid_name TEXT NOT NULL,
+                party1_priority_jobs TEXT NOT NULL DEFAULT '[]',
+                party1_preferred_jobs TEXT NOT NULL DEFAULT '[]',
+                party2_priority_jobs TEXT NOT NULL DEFAULT '[]',
+                party2_preferred_jobs TEXT NOT NULL DEFAULT '[]',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(guild_id, channel_id, raid_name)
+            )
+            """)
+
+            # 공대 생성 세션
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS party_build_sessions (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                raid_name TEXT NOT NULL,
+                total_applicants INTEGER NOT NULL,
+                full_group_count INTEGER NOT NULL DEFAULT 0,
+                temp_group_count INTEGER NOT NULL DEFAULT 0,
+                waiting_count INTEGER NOT NULL DEFAULT 0,
+                created_by BIGINT NOT NULL,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """)
+
+            # 공대 배치 결과 슬롯
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS party_slots (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER NOT NULL REFERENCES party_build_sessions(id) ON DELETE CASCADE,
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                raid_name TEXT NOT NULL,
+                group_no INTEGER NOT NULL,
+                party_no INTEGER NOT NULL,
+                slot_no INTEGER NOT NULL,
+                is_temp_group BOOLEAN NOT NULL DEFAULT FALSE,
+                application_id INTEGER NOT NULL,
+                user_id BIGINT NOT NULL,
+                user_name TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                job TEXT NOT NULL,
+                item_level INTEGER NOT NULL,
+                combat_power INTEGER NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(session_id, group_no, party_no, slot_no)
+            )
+            """)
+
+            # 대기 인원
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS party_waiting_members (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER NOT NULL REFERENCES party_build_sessions(id) ON DELETE CASCADE,
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                raid_name TEXT NOT NULL,
+                application_id INTEGER NOT NULL,
+                user_id BIGINT NOT NULL,
+                user_name TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                job TEXT NOT NULL,
+                item_level INTEGER NOT NULL,
+                combat_power INTEGER NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(session_id, user_id, character_name)
+            )
+            """)
+
+            # 인덱스
             cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_guild_settings_guild_id
             ON guild_settings(guild_id)
@@ -100,40 +183,8 @@ class Database:
             """)
 
             cur.execute("""
-            CREATE TABLE IF NOT EXISTS raid_rules (
-                id SERIAL PRIMARY KEY,
-                guild_id BIGINT NOT NULL,
-                channel_id BIGINT NOT NULL,
-                raid_name TEXT NOT NULL,
-                party1_priority_jobs TEXT NOT NULL DEFAULT '[]',
-                party1_preferred_jobs TEXT NOT NULL DEFAULT '[]',
-                party2_priority_jobs TEXT NOT NULL DEFAULT '[]',
-                party2_preferred_jobs TEXT NOT NULL DEFAULT '[]',
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(guild_id, channel_id, raid_name)
-            )
-            """)
-
-            cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_raid_rules_lookup
             ON raid_rules(guild_id, channel_id, raid_name)
-            """)
-
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS party_build_sessions (
-                id SERIAL PRIMARY KEY,
-                guild_id BIGINT NOT NULL,
-                channel_id BIGINT NOT NULL,
-                raid_name TEXT NOT NULL,
-                total_applicants INTEGER NOT NULL,
-                full_group_count INTEGER NOT NULL DEFAULT 0,
-                temp_group_count INTEGER NOT NULL DEFAULT 0,
-                waiting_count INTEGER NOT NULL DEFAULT 0,
-                created_by BIGINT NOT NULL,
-                is_active BOOLEAN NOT NULL DEFAULT TRUE,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
             """)
 
             cur.execute("""
@@ -142,48 +193,13 @@ class Database:
             """)
 
             cur.execute("""
-            CREATE TABLE IF NOT EXISTS party_slots (
-                id SERIAL PRIMARY KEY,
-                session_id INTEGER NOT NULL REFERENCES party_build_sessions(id) ON DELETE CASCADE,
-                guild_id BIGINT NOT NULL,
-                channel_id BIGINT NOT NULL,
-                raid_name TEXT NOT NULL,
-                group_no INTEGER NOT NULL,
-                party_no INTEGER NOT NULL,
-                slot_no INTEGER NOT NULL,
-                is_temp_group BOOLEAN NOT NULL DEFAULT FALSE,
-                application_id INTEGER NOT NULL,
-                user_id BIGINT NOT NULL,
-                user_name TEXT NOT NULL,
-                character_name TEXT NOT NULL,
-                job TEXT NOT NULL,
-                item_level INTEGER NOT NULL,
-                combat_power INTEGER NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-            """)
-
-            cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_party_slots_session
             ON party_slots(session_id, group_no, party_no, slot_no)
             """)
 
             cur.execute("""
-            CREATE TABLE IF NOT EXISTS party_waiting_members (
-                id SERIAL PRIMARY KEY,
-                session_id INTEGER NOT NULL REFERENCES party_build_sessions(id) ON DELETE CASCADE,
-                guild_id BIGINT NOT NULL,
-                channel_id BIGINT NOT NULL,
-                raid_name TEXT NOT NULL,
-                application_id INTEGER NOT NULL,
-                user_id BIGINT NOT NULL,
-                user_name TEXT NOT NULL,
-                character_name TEXT NOT NULL,
-                job TEXT NOT NULL,
-                item_level INTEGER NOT NULL,
-                combat_power INTEGER NOT NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
+            CREATE INDEX IF NOT EXISTS idx_party_slots_user
+            ON party_slots(session_id, user_id)
             """)
 
             cur.execute("""
