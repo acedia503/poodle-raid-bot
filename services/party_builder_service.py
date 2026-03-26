@@ -408,12 +408,12 @@ class PartyBuilderService:
         score = 0
     
         # 전투력 균형 최우선
-        score -= self._power_balance_penalty(parties, target_party, candidate) * 10
+        score -= self._power_balance_penalty(parties, target_party, candidate)
     
         # 같은 파티 동일 직업 최소화
         score -= self._job_duplicate_penalty(target_party, candidate)
     
-        # 임시 공대 인원 분배도 약하게 고려
+        # 임시 공대 인원 균형 약하게 반영
         score -= self._temp_group_size_penalty(parties, target_party)
     
         # 미세 보정
@@ -488,7 +488,7 @@ class PartyBuilderService:
         score = 0
     
         # 1) 전체 전투력 균형 최우선
-        score -= self._power_balance_penalty(parties, target_party, candidate) * 10
+        score -= self._power_balance_penalty(parties, target_party, candidate)
     
         # 2) 우선 직업 미충족 보완
         if candidate.job in self.get_unfilled_priority_jobs(target_party):
@@ -501,7 +501,7 @@ class PartyBuilderService:
         # 4) 같은 파티 동일 직업 최소화
         score -= self._job_duplicate_penalty(target_party, candidate)
     
-        # 5) 임시 공대 파티 인원 편차 최소화
+        # 5) 임시 공대 파티 인원 균형
         score -= self._temp_group_size_penalty(parties, target_party)
     
         # 6) 미세 보정
@@ -556,6 +556,8 @@ class PartyBuilderService:
         from domain.party_slot import PartySlot
         from domain.party_waiting_member import PartyWaitingMember
 
+        self._validate_no_duplicate_users_in_groups(parties)
+        
         self.party_build_session_repository.deactivate_existing_sessions(
             guild_id=guild_id,
             channel_id=channel_id,
@@ -640,72 +642,90 @@ class PartyBuilderService:
             raid_name=row.raid_name,
         )
 
-    def _all_party_powers_after_assignment(
-        self,
-        parties: list[BuildParty],
-        target_party: BuildParty,
-        candidate: BuildApplicant,
-    ) -> list[int]:
-        powers = []
-        for party in parties:
-            if party is target_party:
-                powers.append(party.total_combat_power + candidate.combat_power)
-            else:
-                powers.append(party.total_combat_power)
-        return powers
-    
-    
-    def _power_balance_penalty(
-        self,
-        parties: list[BuildParty],
-        target_party: BuildParty,
-        candidate: BuildApplicant,
-    ) -> int:
-        powers = self._all_party_powers_after_assignment(parties, target_party, candidate)
-        if not powers:
-            return 0
-    
-        avg_power = sum(powers) / len(powers)
-        penalty = sum(abs(power - avg_power) for power in powers)
-        return int(penalty)
-    
-    
-    def _job_duplicate_penalty(
-        self,
-        target_party: BuildParty,
-        candidate: BuildApplicant,
-    ) -> int:
-        duplicate_count = sum(1 for member in target_party.members if member.job == candidate.job)
-    
-        if duplicate_count == 0:
-            return 0
-        if duplicate_count == 1:
-            return 120
-        if duplicate_count == 2:
-            return 300
-        return 600
-    
-    
-    def _temp_group_size_penalty(
-        self,
-        parties: list[BuildParty],
-        target_party: BuildParty,
-    ) -> int:
-        if not target_party.is_temp_group:
-            return 0
-    
-        same_group_parties = [
-            party for party in parties
-            if party.group_no == target_party.group_no
-        ]
-        sizes = []
-        for party in same_group_parties:
-            if party is target_party:
-                sizes.append(len(party.members) + 1)
-            else:
-                sizes.append(len(party.members))
-    
-        if not sizes:
-            return 0
-    
-        return (max(sizes) - min(sizes)) * 80
+def _all_party_powers_after_assignment(
+    self,
+    parties: list[BuildParty],
+    target_party: BuildParty,
+    candidate: BuildApplicant,
+) -> list[int]:
+    powers = []
+    for party in parties:
+        if party is target_party:
+            powers.append(party.total_combat_power + candidate.combat_power)
+        else:
+            powers.append(party.total_combat_power)
+    return powers
+
+
+def _power_balance_penalty(
+    self,
+    parties: list[BuildParty],
+    target_party: BuildParty,
+    candidate: BuildApplicant,
+) -> int:
+    powers = self._all_party_powers_after_assignment(parties, target_party, candidate)
+    if not powers:
+        return 0
+
+    avg_power = sum(powers) / len(powers)
+    penalty = sum(abs(power - avg_power) for power in powers)
+    return int(penalty)
+
+
+def _job_duplicate_penalty(
+    self,
+    target_party: BuildParty,
+    candidate: BuildApplicant,
+) -> int:
+    duplicate_count = sum(1 for member in target_party.members if member.job == candidate.job)
+
+    if duplicate_count == 0:
+        return 0
+    if duplicate_count == 1:
+        return 120
+    if duplicate_count == 2:
+        return 300
+    return 600
+
+
+def _temp_group_size_penalty(
+    self,
+    parties: list[BuildParty],
+    target_party: BuildParty,
+) -> int:
+    if not target_party.is_temp_group:
+        return 0
+
+    same_group_parties = [
+        party for party in parties
+        if party.group_no == target_party.group_no
+    ]
+
+    sizes = []
+    for party in same_group_parties:
+        if party is target_party:
+            sizes.append(len(party.members) + 1)
+        else:
+            sizes.append(len(party.members))
+
+    if not sizes:
+        return 0
+
+    return (max(sizes) - min(sizes)) * 80
+
+
+def _validate_no_duplicate_users_in_groups(
+    self,
+    parties: list[BuildParty],
+) -> None:
+    grouped_users: dict[int, set[int]] = {}
+
+    for party in parties:
+        grouped_users.setdefault(party.group_no, set())
+
+        for member in party.members:
+            if member.user_id in grouped_users[party.group_no]:
+                raise ValueError(
+                    f"{party.group_no}공대에 동일한 유저 ID({member.user_id})가 중복 배치되었습니다."
+                )
+            grouped_users[party.group_no].add(member.user_id)
