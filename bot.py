@@ -28,6 +28,7 @@ from services.setting_service import SettingService
 from services.party_rule_service import PartyRuleService
 from services.party_builder_service import PartyBuilderService
 from services.party_manage_service import PartyManageService
+from services.party_modify_service import PartyModifyService
 
 
 def create_bot() -> commands.Bot:
@@ -81,7 +82,14 @@ def create_bot() -> commands.Bot:
         party_slot_repository=party_slot_repository,
         party_waiting_repository=party_waiting_repository,
     )
-
+    
+    party_modify_service = PartyModifyService(
+        raid_service=raid_service,
+        party_build_session_repository=party_build_session_repository,
+        party_slot_repository=party_slot_repository,
+        party_waiting_repository=party_waiting_repository,
+    )
+    
     application_service = ApplicationService(
         character_info_service=character_info_service,
         setting_service=setting_service,
@@ -104,6 +112,7 @@ def create_bot() -> commands.Bot:
                 party_rule_service=party_rule_service,
                 party_builder_service=party_builder_service,
                 party_manage_service=party_manage_service,
+                party_modify_service=party_modify_service,
             )
         )
         await bot.add_cog(
