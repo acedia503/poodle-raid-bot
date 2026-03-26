@@ -106,7 +106,9 @@ class PartyBuildSessionRepository:
     ) -> None:
         query = """
             UPDATE party_build_sessions
-            SET waiting_count = %s
+            SET
+                waiting_count = %s,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """
         with self.db.get_connection() as conn:
