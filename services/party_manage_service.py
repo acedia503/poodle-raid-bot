@@ -1,8 +1,11 @@
+# services/party_manage_service.py
+
 from dataclasses import dataclass, field
 
 
 @dataclass
 class PartyMemberView:
+    id: int
     slot_no: int
     user_id: int
     user_name: str
@@ -23,6 +26,7 @@ class PartyViewData:
 
 @dataclass
 class WaitingMemberView:
+    id: int
     user_id: int
     user_name: str
     character_name: str
@@ -80,6 +84,7 @@ class PartyManageService:
 
         for row in slot_rows:
             key = (row["group_no"], row["party_no"])
+
             if key not in parties_map:
                 parties_map[key] = PartyViewData(
                     group_no=row["group_no"],
@@ -90,6 +95,7 @@ class PartyManageService:
                 )
 
             member = PartyMemberView(
+                id=row["id"],
                 slot_no=row["slot_no"],
                 user_id=row["user_id"],
                 user_name=row["user_name"],
@@ -98,16 +104,21 @@ class PartyManageService:
                 item_level=row["item_level"],
                 combat_power=row["combat_power"],
             )
+
             parties_map[key].members.append(member)
             parties_map[key].total_combat_power += row["combat_power"]
 
         parties = list(parties_map.values())
         parties.sort(key=lambda p: (p.group_no, p.party_no))
+
         for party in parties:
             party.members.sort(key=lambda m: m.slot_no)
+            # 안전하게 다시 계산
+            party.total_combat_power = sum(member.combat_power for member in party.members)
 
         waiting_members = [
             WaitingMemberView(
+                id=row["id"],
                 user_id=row["user_id"],
                 user_name=row["user_name"],
                 character_name=row["character_name"],
