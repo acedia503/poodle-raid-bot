@@ -862,12 +862,18 @@ class PartyBuildHomeView(View):
             guild_id=self.rule.guild_id,
             channel_id=self.rule.channel_id,
         )
+    
         if active_result is None:
-            embed = build_build_home_embed(None, self.rule, status_message="생성된 공대 결과가 없습니다.")
+            embed = build_build_home_embed(
+                None,
+                self.rule,
+                status_message="생성된 공대 결과가 없습니다.",
+            )
             await interaction.response.edit_message(embed=embed, view=self)
             return
-
+    
         embed = build_party_result_embed(active_result)
+    
         detail_view = PartyResultDetailView(
             rule=self.rule,
             party_rule_service=self.party_rule_service,
@@ -875,7 +881,11 @@ class PartyBuildHomeView(View):
             party_manage_service=self.party_manage_service,
             party_modify_service=self.party_modify_service,
         )
-        await interaction.response.edit_message(embed=embed, view=detail_view)
+    
+        await interaction.response.edit_message(
+            embed=embed,
+            view=detail_view,
+        )
 
     @discord.ui.button(label="공대 생성", style=discord.ButtonStyle.success, row=0)
     async def build_button(self, interaction: discord.Interaction, button: Button):
