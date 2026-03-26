@@ -190,6 +190,52 @@ class RaidApplicationRepository:
             )
             return cur.rowcount
 
+    def bulk_update_character_snapshots(
+        self,
+        updates: list[dict],
+    ) -> int:
+        """
+        updates 예시:
+        [
+            {
+                "application_id": 1,
+                "job": "수호성",
+                "item_level": 3394,
+                "combat_power": 247499,
+            },
+            ...
+        ]
+        """
+        if not updates:
+            return 0
+
+        updated_count = 0
+
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+
+            for item in updates:
+                cur.execute(
+                    """
+                    UPDATE raid_applications
+                    SET
+                        job = %s,
+                        item_level = %s,
+                        combat_power = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                    """,
+                    (
+                        item["job"],
+                        item["item_level"],
+                        item["combat_power"],
+                        item["application_id"],
+                    ),
+                )
+                updated_count += cur.rowcount
+
+        return updated_count
+
     def delete_by_id(self, application_id: int) -> bool:
         with self.database.get_connection() as conn:
             cur = conn.cursor()
@@ -220,8 +266,7 @@ class RaidApplicationRepository:
             )
             row = cur.fetchone()
             return int(row["cnt"]) if row else 0
-    
-    
+
     def delete_by_guild_and_raid_name(
         self,
         guild_id: int,
@@ -323,7 +368,7 @@ class RaidApplicationRepository:
         guild_id: int,
         channel_id: int,
         raid_name: str,
-    ):
+    ) -> list[RaidApplication]:
         query = """
             SELECT *
             FROM raid_applications
@@ -335,8 +380,10 @@ class RaidApplicationRepository:
         with self.database.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(query, (guild_id, channel_id, raid_name))
-            return cur.fetchall()
-    
+            rows = cur.fetchall()
+
+        return [self._to_domain(row) for row in rows]
+
     def update_character_snapshot(
         self,
         application_id: int,
