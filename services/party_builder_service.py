@@ -642,90 +642,90 @@ class PartyBuilderService:
             raid_name=row.raid_name,
         )
 
-def _all_party_powers_after_assignment(
-    self,
-    parties: list[BuildParty],
-    target_party: BuildParty,
-    candidate: BuildApplicant,
-) -> list[int]:
-    powers = []
-    for party in parties:
-        if party is target_party:
-            powers.append(party.total_combat_power + candidate.combat_power)
-        else:
-            powers.append(party.total_combat_power)
-    return powers
-
-
-def _power_balance_penalty(
-    self,
-    parties: list[BuildParty],
-    target_party: BuildParty,
-    candidate: BuildApplicant,
-) -> int:
-    powers = self._all_party_powers_after_assignment(parties, target_party, candidate)
-    if not powers:
-        return 0
-
-    avg_power = sum(powers) / len(powers)
-    penalty = sum(abs(power - avg_power) for power in powers)
-    return int(penalty)
-
-
-def _job_duplicate_penalty(
-    self,
-    target_party: BuildParty,
-    candidate: BuildApplicant,
-) -> int:
-    duplicate_count = sum(1 for member in target_party.members if member.job == candidate.job)
-
-    if duplicate_count == 0:
-        return 0
-    if duplicate_count == 1:
-        return 120
-    if duplicate_count == 2:
-        return 300
-    return 600
-
-
-def _temp_group_size_penalty(
-    self,
-    parties: list[BuildParty],
-    target_party: BuildParty,
-) -> int:
-    if not target_party.is_temp_group:
-        return 0
-
-    same_group_parties = [
-        party for party in parties
-        if party.group_no == target_party.group_no
-    ]
-
-    sizes = []
-    for party in same_group_parties:
-        if party is target_party:
-            sizes.append(len(party.members) + 1)
-        else:
-            sizes.append(len(party.members))
-
-    if not sizes:
-        return 0
-
-    return (max(sizes) - min(sizes)) * 80
-
-
-def _validate_no_duplicate_users_in_groups(
-    self,
-    parties: list[BuildParty],
-) -> None:
-    grouped_users: dict[int, set[int]] = {}
-
-    for party in parties:
-        grouped_users.setdefault(party.group_no, set())
-
-        for member in party.members:
-            if member.user_id in grouped_users[party.group_no]:
-                raise ValueError(
-                    f"{party.group_no}공대에 동일한 유저 ID({member.user_id})가 중복 배치되었습니다."
-                )
-            grouped_users[party.group_no].add(member.user_id)
+    def _all_party_powers_after_assignment(
+        self,
+        parties: list[BuildParty],
+        target_party: BuildParty,
+        candidate: BuildApplicant,
+    ) -> list[int]:
+        powers = []
+        for party in parties:
+            if party is target_party:
+                powers.append(party.total_combat_power + candidate.combat_power)
+            else:
+                powers.append(party.total_combat_power)
+        return powers
+    
+    
+    def _power_balance_penalty(
+        self,
+        parties: list[BuildParty],
+        target_party: BuildParty,
+        candidate: BuildApplicant,
+    ) -> int:
+        powers = self._all_party_powers_after_assignment(parties, target_party, candidate)
+        if not powers:
+            return 0
+    
+        avg_power = sum(powers) / len(powers)
+        penalty = sum(abs(power - avg_power) for power in powers)
+        return int(penalty)
+    
+    
+    def _job_duplicate_penalty(
+        self,
+        target_party: BuildParty,
+        candidate: BuildApplicant,
+    ) -> int:
+        duplicate_count = sum(1 for member in target_party.members if member.job == candidate.job)
+    
+        if duplicate_count == 0:
+            return 0
+        if duplicate_count == 1:
+            return 120
+        if duplicate_count == 2:
+            return 300
+        return 600
+    
+    
+    def _temp_group_size_penalty(
+        self,
+        parties: list[BuildParty],
+        target_party: BuildParty,
+    ) -> int:
+        if not target_party.is_temp_group:
+            return 0
+    
+        same_group_parties = [
+            party for party in parties
+            if party.group_no == target_party.group_no
+        ]
+    
+        sizes = []
+        for party in same_group_parties:
+            if party is target_party:
+                sizes.append(len(party.members) + 1)
+            else:
+                sizes.append(len(party.members))
+    
+        if not sizes:
+            return 0
+    
+        return (max(sizes) - min(sizes)) * 80
+    
+    
+    def _validate_no_duplicate_users_in_groups(
+        self,
+        parties: list[BuildParty],
+    ) -> None:
+        grouped_users: dict[int, set[int]] = {}
+    
+        for party in parties:
+            grouped_users.setdefault(party.group_no, set())
+    
+            for member in party.members:
+                if member.user_id in grouped_users[party.group_no]:
+                    raise ValueError(
+                        f"{party.group_no}공대에 동일한 유저 ID({member.user_id})가 중복 배치되었습니다."
+                    )
+                grouped_users[party.group_no].add(member.user_id)
