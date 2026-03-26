@@ -28,6 +28,8 @@ class PartySlotRepository:
                 item_level,
                 combat_power
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (session_id, group_no, party_no, slot_no)
+            DO NOTHING
         """
 
         with self.db.get_connection() as conn:
@@ -161,7 +163,10 @@ class PartySlotRepository:
                 item_level,
                 combat_power
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (session_id, group_no, party_no, slot_no)
+            DO NOTHING
         """
+        
         with self.db.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(
