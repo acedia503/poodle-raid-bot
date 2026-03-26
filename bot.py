@@ -59,10 +59,12 @@ def create_bot() -> commands.Bot:
     # Services
     character_info_service = CharacterInfoService(api_service)
     setting_service = SettingService(guild_setting_repository)
+
     raid_service = RaidService(
         channel_raid_repository=channel_raid_repository,
         raid_application_repository=raid_application_repository,
     )
+
     party_rule_service = PartyRuleService(raid_rule_repository)
 
     party_builder_service = PartyBuilderService(
@@ -82,39 +84,31 @@ def create_bot() -> commands.Bot:
         party_slot_repository=party_slot_repository,
         party_waiting_repository=party_waiting_repository,
     )
-    
+
     party_modify_service = PartyModifyService(
         raid_service=raid_service,
         party_build_session_repository=party_build_session_repository,
         party_slot_repository=party_slot_repository,
         party_waiting_repository=party_waiting_repository,
     )
-    
+
     application_service = ApplicationService(
         character_info_service=character_info_service,
         setting_service=setting_service,
         raid_service=raid_service,
         repository=raid_application_repository,
     )
+
     message_service = MessageService()
 
     intents = discord.Intents.default()
     intents.members = True
+
     bot = commands.Bot(command_prefix="!", intents=intents)
 
     async def setup_hook():
         await bot.add_cog(SettingCommand(bot, setting_service, message_service))
         await bot.add_cog(RaidCommand(bot, raid_service, message_service))
-        await bot.add_cog(
-            PartyCommand(
-                bot=bot,
-                raid_service=raid_service,
-                party_rule_service=party_rule_service,
-                party_builder_service=party_builder_service,
-                party_manage_service=party_manage_service,
-                party_modify_service=party_modify_service,
-            )
-        )
         await bot.add_cog(
             ApplicationCommand(
                 bot,
@@ -133,6 +127,17 @@ def create_bot() -> commands.Bot:
             )
         )
         await bot.add_cog(InfoCommand(bot, character_info_service, message_service))
+        await bot.add_cog(
+            PartyCommand(
+                bot=bot,
+                raid_service=raid_service,
+                party_rule_service=party_rule_service,
+                party_builder_service=party_builder_service,
+                party_manage_service=party_manage_service,
+                party_modify_service=party_modify_service,
+            )
+        )
+
         await bot.tree.sync()
         print("Slash commands synced.")
 
