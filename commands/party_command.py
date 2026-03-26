@@ -11,15 +11,17 @@ class PartyCommand(commands.Cog):
         self,
         bot: commands.Bot,
         raid_service,
-        party_rule_service: PartyRuleService,
+        party_rule_service,
         party_builder_service,
         party_manage_service,
+        party_modify_service,
     ):
         self.bot = bot
         self.raid_service = raid_service
         self.party_rule_service = party_rule_service
         self.party_builder_service = party_builder_service
         self.party_manage_service = party_manage_service
+        self.party_modify_service = party_modify_service
 
     @app_commands.command(name="공대", description="현재 채널의 공대 생성 규칙을 확인합니다.")
     async def party(self, interaction: discord.Interaction):
@@ -55,6 +57,7 @@ class PartyCommand(commands.Cog):
                 party_rule_service=self.party_rule_service,
                 party_builder_service=self.party_builder_service,
                 party_manage_service=self.party_manage_service,
+                party_modify_service=self.party_modify_service,
             )
     
             await interaction.response.send_message(
