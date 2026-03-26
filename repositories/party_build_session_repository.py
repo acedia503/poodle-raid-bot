@@ -51,7 +51,9 @@ class PartyBuildSessionRepository:
     ) -> None:
         query = """
             UPDATE party_build_sessions
-            SET is_active = FALSE
+            SET
+                is_active = FALSE,
+                updated_at = CURRENT_TIMESTAMP
             WHERE guild_id = %s
               AND channel_id = %s
               AND raid_name = %s
