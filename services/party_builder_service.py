@@ -29,17 +29,36 @@ class PartyBuilderService:
     async def _refresh_applicants(self, applications: list):
         async def fetch(app):
             try:
-                info = self.character_info_service.get_character_info(
-                    character_name=app.character_name,
-                    race=app.race,
-                    server=app.server,
+                info = await asyncio.to_thread(
+                    self.character_info_service.get_character_info,
+                    app.character_name,
+                    app.race,
+                    app.server,
                 )
+    
                 app.job = info["job"]
                 app.item_level = info["item_level"]
                 app.combat_power = info["combat_power"]
-            except Exception:
-                pass  # 실패해도 기존 값 유지
-
+    
+                # DB snapshot 반영
+                self.application_service.repository.update_character_snapshot(
+                    application_id=app.id,
+                    job=app.job,
+                    item_level=app.item_level,
+                    combat_power=app.combat_power,
+                )
+    
+                print(
+                    f"[API 조회 성공] {app.character_name} / "
+                    f"{app.job} / {app.item_level} / {app.combat_power}"
+                )
+    
+            except Exception as e:
+                print(
+                    f"[API 조회 실패] {app.character_name} / "
+                    f"race={app.race} / server={app.server} / error={e}"
+                )
+    
         await asyncio.gather(*(fetch(app) for app in applications))
 
     # =========================
