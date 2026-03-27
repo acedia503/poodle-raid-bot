@@ -58,14 +58,14 @@ def build_party_result_embed(result, status_message: str | None = None):
         desc += "\n"
 
     if getattr(result, "waiting_members", None):
-        desc += "📌상비군\n"
-        for idx, member in enumerate(result.waiting_members, start=1):
-            desc += (
-                f"{idx}. {member.character_name}({member.job[0]}) "
-                f"/ {member.combat_power:,}\n"
-            )
+        desc += "✨상비군\n"
+        if getattr(result, "waiting_members", None):
+        waiting_members = " / ".join(
+            f"{m.character_name}({m.job[0]})" for m in result.waiting_members
+        )
+        desc += f"{waiting_members}\n"
     else:
-        desc += "📌상비군\n없음\n"
+        desc += "없음\n"
 
     embed = discord.Embed(
         title=f"{result.raid_name} 공대 현황",
