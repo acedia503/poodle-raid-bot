@@ -80,32 +80,26 @@ def build_rule_edit_embed(
 
     return embed
 
+# 직업 표시 함수
+def get_job_short(job: str) -> str:
+    if not job:
+        return ""
+    return f"({job[0]})"
 
-def get_job_icon(job: str) -> str:
-    return {
-        "수호성": "🛡️",
-        "검성": "🗡️",
-        "살성": "⚔️",
-        "마도성": "🔥",
-        "궁성": "🏹",
-        "정령성": "🌪️",
-        "호법성": "✨",
-        "치유성": "💚",
-    }.get(job, "")
-
-
+# 파티 한 줄 표시 함
 def build_party_line(party_no: int, members: list) -> str:
     if not members:
         return f"{party_no}-비어있음"
 
     parts = []
     for member in members:
-        icon = get_job_icon(member.job)
-        parts.append(f"{member.character_name}{icon}")
+        short_job = get_job_short(member.job)
+        parts.append(f"{member.character_name}{short_job}")
 
     return f"{party_no}-" + " / ".join(parts)
 
 
+# 공대 생성 결과 요약 embedd 함수
 def build_build_home_embed(active_result, rule, status_message: str | None = None) -> discord.Embed:
     raid_name = getattr(active_result, "raid_name", None) or rule.raid_name
 
@@ -131,6 +125,7 @@ def build_build_home_embed(active_result, rule, status_message: str | None = Non
     return embed
 
 
+# 상세 결과 embedd 함수
 def build_party_result_embed(result, status_message: str | None = None) -> discord.Embed:
     embed = discord.Embed(
         title=f"{result.raid_name} 공대 생성 결과",
@@ -155,13 +150,13 @@ def build_party_result_embed(result, status_message: str | None = None) -> disco
         party2_power = party2.total_combat_power if party2 else 0
 
         lines = [
-            f"총 전투력 [1파티] {party1_power:,} / [2파티] {party2_power:,}",
             build_party_line(1, party1.members if party1 else []),
             build_party_line(2, party2.members if party2 else []),
+            "",  # 공대 사이 줄바꿈용
         ]
 
         embed.add_field(
-            name=f"✨{group_no}공대",
+            name=f"✨{group_no}공대 - 총 전투력 [1파티] {party1_power:,} / [2파티] {party2_power:,}",
             value="\n".join(lines),
             inline=False,
         )
@@ -169,8 +164,8 @@ def build_party_result_embed(result, status_message: str | None = None) -> disco
     if result.waiting_members:
         reserve_parts = []
         for member in result.waiting_members:
-            icon = get_job_icon(member.job)
-            reserve_parts.append(f"{member.character_name}{icon}")
+            short_job = get_job_short(member.job)
+            reserve_parts.append(f"{member.character_name}{short_job}")
 
         embed.add_field(
             name="✨상비군",
@@ -252,7 +247,7 @@ def build_reserve_move_embed(active_result, status_message: str | None = None) -
     reserve_text = "상비군이 없습니다."
     if active_result.waiting_members:
         reserve_text = " / ".join(
-            f"{member.character_name}{get_job_icon(member.job)}"
+            f"{member.character_name}{get_job_short(member.job)}"
             for member in active_result.waiting_members
         )
 
@@ -464,7 +459,7 @@ class PartyModifyGroupSelectView(View):
 # 공대원 선택 버튼
 class MoveGroupMemberButton(Button):
     def __init__(self, member, row: int):
-        label = f"{member.character_name}{get_job_icon(member.job)}"
+        label = f"{member.character_name}{get_job_short(member.job)}"
         super().__init__(label=label[:80], style=discord.ButtonStyle.primary, row=row)
         self.member = member
 
@@ -561,7 +556,7 @@ class ReserveMemberSelect(Select):
         for member in waiting_members[:25]:
             options.append(
                 discord.SelectOption(
-                    label=f"{member.character_name}{get_job_icon(member.job)}",
+                    label=f"{member.character_name}{get_job_short(member.job)}",
                     value=str(member.id),
                     description=f"{member.job} / {member.combat_power:,}",
                 )
@@ -628,7 +623,7 @@ class ReserveMemberSelect(Select):
         for member in waiting_members[:25]:
             options.append(
                 discord.SelectOption(
-                    label=f"{member.character_name}{get_job_icon(member.job)}",
+                    label=f"{member.character_name}{get_job_short(member.job)}",
                     value=str(member.id),
                     description=f"{member.job} / {member.combat_power:,}",
                 )
