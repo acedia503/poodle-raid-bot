@@ -7,12 +7,12 @@ from discord.ui import View, Select, Button
 
 def build_empty_result_embed(raid_name: str, status_message: str | None = None):
     embed = discord.Embed(
-        title=f"{raid_name} 공대 생성 결과",
+        title=f"{raid_name} 공대 현황",
         description="아직 생성된 공대가 없습니다.",
     )
 
     if status_message:
-        embed.add_field(name="안내", value=status_message, inline=False)
+        embed.add_field(name="\n안내", value=status_message, inline=False)
 
     return embed
 
