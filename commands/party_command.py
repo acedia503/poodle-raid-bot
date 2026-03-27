@@ -80,17 +80,3 @@ class PartyCommand(commands.Cog):
             view=view,
             ephemeral=True,
         )
-
-        except Exception as e:
-            traceback.print_exc()
-
-            if interaction.response.is_done():
-                await interaction.followup.send(
-                    f"공대 화면을 여는 중 오류가 발생했습니다: {e}",
-                    ephemeral=True,
-                )
-            else:
-                await interaction.response.send_message(
-                    f"공대 화면을 여는 중 오류가 발생했습니다: {e}",
-                    ephemeral=True,
-                )
