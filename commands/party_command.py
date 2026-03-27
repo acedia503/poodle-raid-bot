@@ -6,7 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from views.party_view import PartyBuildHomeView, build_rule_home_embed
+from views.party_view import PartyBuildHomeView, build_party_result_embed, build_empty_result_embed
 
 
 class PartyCommand(commands.Cog):
