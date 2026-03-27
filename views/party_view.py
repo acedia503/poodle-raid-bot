@@ -81,6 +81,31 @@ def build_rule_edit_embed(
     return embed
 
 
+def get_job_icon(job: str) -> str:
+    return {
+        "수호성": "🛡️",
+        "검성": "🗡️",
+        "살성": "⚔️",
+        "마도성": "🔥",
+        "궁성": "🏹",
+        "정령성": "🌪️",
+        "호법성": "✨",
+        "치유성": "💚",
+    }.get(job, "")
+
+
+def build_party_line(party_no: int, members: list) -> str:
+    if not members:
+        return f"{party_no}-비어있음"
+
+    parts = []
+    for member in members:
+        icon = get_job_icon(member.job)
+        parts.append(f"{member.character_name}{icon}")
+
+    return f"{party_no}-" + " / ".join(parts)
+
+
 def build_build_home_embed(active_result, rule, status_message: str | None = None) -> discord.Embed:
     raid_name = getattr(active_result, "raid_name", None) or rule.raid_name
 
@@ -96,8 +121,7 @@ def build_build_home_embed(active_result, rule, status_message: str | None = Non
                 "현재 공대 생성 결과 요약\n\n"
                 f"총 신청자: {active_result.total_applicants}명\n"
                 f"정식 공대 {active_result.full_group_count}개 / "
-                f"임시 공대 {active_result.temp_group_count}개 / "
-                f"대기 인원 {active_result.waiting_count}명"
+                f"상비군 {active_result.waiting_count}명"
             ),
         )
 
@@ -113,57 +137,44 @@ def build_party_result_embed(result, status_message: str | None = None) -> disco
         description=(
             f"총 신청자: {result.total_applicants}명\n"
             f"정식 공대 {result.full_group_count}개 / "
-            f"임시 공대 {result.temp_group_count}개 / "
-            f"대기 인원 {result.waiting_count}명"
+            f"상비군 {result.waiting_count}명"
         ),
     )
 
-    # group_no 순서대로 출력
     groups: dict[int, list] = {}
     for party in result.parties:
         groups.setdefault(party.group_no, []).append(party)
 
     for group_no in sorted(groups.keys()):
         parties = sorted(groups[group_no], key=lambda p: p.party_no)
-        lines = []
 
-        for party in parties:
-            lines.append(f"**{party.party_no}파티 (총 전투력: {party.total_combat_power:,})**")
+        party1 = next((p for p in parties if p.party_no == 1), None)
+        party2 = next((p for p in parties if p.party_no == 2), None)
 
-            if not party.members:
-                lines.append("배치 인원 없음")
-                lines.append("")
-                continue
+        party1_power = party1.total_combat_power if party1 else 0
+        party2_power = party2.total_combat_power if party2 else 0
 
-            for idx, member in enumerate(party.members, start=1):
-                slot_no = getattr(member, "slot_no", idx)
-                lines.append(
-                    f"{slot_no}. {member.character_name} ({member.job}) "
-                    f"[{member.combat_power:,}]"
-                )
-            lines.append("")
-
-        field_name = f"✨{group_no}공대"
-        if any(getattr(party, "is_temp_group", False) for party in parties):
-            field_name += " (임시)"
+        lines = [
+            f"총 전투력 [1파티] {party1_power:,} / [2파티] {party2_power:,}",
+            build_party_line(1, party1.members if party1 else []),
+            build_party_line(2, party2.members if party2 else []),
+        ]
 
         embed.add_field(
-            name=field_name,
-            value="\n".join(lines).strip(),
+            name=f"✨{group_no}공대",
+            value="\n".join(lines),
             inline=False,
         )
 
     if result.waiting_members:
-        waiting_lines = []
-        for idx, member in enumerate(result.waiting_members, start=1):
-            waiting_lines.append(
-                f"{idx}. {member.character_name} ({member.job}) "
-                f"[{member.combat_power:,}]"
-            )
+        reserve_parts = []
+        for member in result.waiting_members:
+            icon = get_job_icon(member.job)
+            reserve_parts.append(f"{member.character_name}{icon}")
 
         embed.add_field(
-            name="🕓 대기 인원",
-            value="\n".join(waiting_lines),
+            name="✨상비군",
+            value=" / ".join(reserve_parts),
             inline=False,
         )
 
@@ -176,7 +187,11 @@ def build_party_result_embed(result, status_message: str | None = None) -> disco
                 lines.append(
                     "실패 캐릭터: " + ", ".join(refresh_summary.failed_characters[:10])
                 )
-        embed.add_field(name="신청자 정보 갱신 결과", value="\n".join(lines), inline=False)
+        embed.add_field(
+            name="신청자 정보 갱신 결과",
+            value="\n".join(lines),
+            inline=False,
+        )
 
     if status_message:
         embed.add_field(name="안내", value=status_message, inline=False)
