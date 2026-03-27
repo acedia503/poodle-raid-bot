@@ -11,7 +11,7 @@ class PartySlot:
     group_no: int
     party_no: int
     slot_no: int
-    is_temp_group: bool = False
+    is_temp_group: bool
     application_id: int
     user_id: int
     user_name: str
