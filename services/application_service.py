@@ -202,3 +202,20 @@ class ApplicationService:
 
     def admin_delete_applications(self, application_ids: list[int]) -> int:
         return self.repository.delete_by_ids(application_ids)
+
+    def get_applications(
+        self,
+        guild_id: int,
+        channel_id: int,
+    ):
+        """
+        현재 채널(레이드)의 신청 목록 조회
+        """
+        raid = self.raid_service.get_channel_raid(channel_id)
+        if raid is None:
+            return []
+    
+        return self.repository.get_by_guild_and_raid_name(
+            guild_id=guild_id,
+            raid_name=raid.raid_name,
+        )
