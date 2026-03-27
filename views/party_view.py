@@ -475,15 +475,22 @@ class MoveGroupMemberButton(Button):
                 guild_id=view.rule.guild_id,
                 channel_id=view.rule.channel_id,
             )
-            embed = build_party_result_embed(active_result, status_message=result.message)
-            detail_view = PartyResultDetailView(
+            
+            embed = build_build_home_embed(
+                active_result,
+                view.rule,
+                status_message=f"{result.message}\n\n결과 확인 메뉴에서 확인해주세요.",
+            )
+            
+            home_view = PartyBuildHomeView(
                 rule=view.rule,
                 party_rule_service=view.party_rule_service,
                 party_builder_service=view.party_builder_service,
                 party_manage_service=view.party_manage_service,
                 party_modify_service=view.party_modify_service,
             )
-            await interaction.response.edit_message(embed=embed, view=detail_view)
+            
+            await interaction.response.edit_message(embed=embed, view=home_view)
         except Exception as e:
             active_result = view.party_manage_service.get_active_build_result(
                 guild_id=view.rule.guild_id,
@@ -761,15 +768,22 @@ class MoveTargetSelect(Select):
                 guild_id=view.rule.guild_id,
                 channel_id=view.rule.channel_id,
             )
-            embed = build_party_result_embed(active_result, status_message=result.message)
-            detail_view = PartyResultDetailView(
+            
+            embed = build_build_home_embed(
+                active_result,
+                view.rule,
+                status_message=f"{result.message}\n\n결과 확인 메뉴에서 확인해주세요.",
+            )
+            
+            home_view = PartyBuildHomeView(
                 rule=view.rule,
                 party_rule_service=view.party_rule_service,
                 party_builder_service=view.party_builder_service,
                 party_manage_service=view.party_manage_service,
                 party_modify_service=view.party_modify_service,
             )
-            await interaction.response.edit_message(embed=embed, view=detail_view)
+            
+            await interaction.response.edit_message(embed=embed, view=home_view)
 
         except Exception as e:
             active_result = view.party_manage_service.get_active_build_result(
