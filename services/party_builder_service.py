@@ -54,7 +54,6 @@ class BuildPlan:
     total_group_count: int
     assignable_count: int
     expected_waiting_count: int
-    temp_group_member_count: int
 
 
 @dataclass
@@ -255,33 +254,19 @@ class PartyBuilderService:
 
     def calculate_build_plan(self, total_count: int) -> BuildPlan:
         full_group_count = total_count // 8
-        remain = total_count % 8
-
-        temp_group_count = 1 if remain >= 6 else 0
-
-        if temp_group_count == 1:
-            assignable_count = full_group_count * 8 + remain
-            expected_waiting_count = 0
-            temp_group_member_count = remain
-        else:
-            assignable_count = full_group_count * 8
-            expected_waiting_count = remain
-            temp_group_member_count = 0
-
-        total_group_count = full_group_count + temp_group_count
-
+        waiting_count = total_count % 8
+    
         return BuildPlan(
             full_group_count=full_group_count,
-            temp_group_count=temp_group_count,
-            total_group_count=total_group_count,
-            assignable_count=assignable_count,
-            expected_waiting_count=expected_waiting_count,
-            temp_group_member_count=temp_group_member_count,
+            temp_group_count=0,
+            total_group_count=full_group_count,
+            assignable_count=full_group_count * 8,
+            expected_waiting_count=waiting_count,
         )
 
     def create_parties(self, plan: BuildPlan, rule) -> list[BuildParty]:
         parties: list[BuildParty] = []
-
+    
         for group_no in range(1, plan.full_group_count + 1):
             parties.append(
                 BuildParty(
@@ -303,35 +288,7 @@ class PartyBuilderService:
                     preferred_jobs=list(rule.party2_preferred_jobs),
                 )
             )
-
-        if plan.temp_group_count == 1:
-            temp_group_no = plan.full_group_count + 1
-            temp_count = plan.temp_group_member_count
-
-            party1_size = (temp_count + 1) // 2
-            party2_size = temp_count // 2
-
-            parties.append(
-                BuildParty(
-                    group_no=temp_group_no,
-                    party_no=1,
-                    is_temp_group=True,
-                    target_size=party1_size,
-                    priority_jobs=list(rule.party1_priority_jobs),
-                    preferred_jobs=list(rule.party1_preferred_jobs),
-                )
-            )
-            parties.append(
-                BuildParty(
-                    group_no=temp_group_no,
-                    party_no=2,
-                    is_temp_group=True,
-                    target_size=party2_size,
-                    priority_jobs=list(rule.party2_priority_jobs),
-                    preferred_jobs=list(rule.party2_preferred_jobs),
-                )
-            )
-
+    
         return parties
 
     def sort_applicants(self, applicants: list[BuildApplicant]) -> list[BuildApplicant]:
