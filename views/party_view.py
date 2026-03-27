@@ -36,8 +36,36 @@ def build_party_result_embed(result, status_message: str | None = None):
             )
             desc += f"{party.party_no}-{members}\n"
 
+def build_party_result_embed(result, status_message: str | None = None):
+    if result is None:
+        return build_empty_result_embed("레이드")
+
+    desc = (
+        f"총 신청자: {result.total_applicants}명\n"
+        f"정식 공대 {result.full_group_count}개 / "
+        f"상비군 {result.waiting_count}명\n\n"
+    )
+
+    for group in result.groups:
+        desc += f"✨{group.group_no}공대\n"
+
+        for party in group.parties:
+            members = " / ".join(
+                f"{m.character_name}({m.job[0]})" for m in party.members
+            )
+            desc += f"{party.party_no}-{members}\n"
+
         desc += "\n"
 
+    if getattr(result, "waiting_members", None):
+        desc += "📌상비군\n"
+        for idx, member in enumerate(result.waiting_members, start=1):
+            desc += (
+                f"{idx}. {member.character_name}({member.job[0]}) "
+                f"/ {member.combat_power:,}\n"
+            )
+    else:
+        desc += "📌상비군\n없음\n"
 
     embed = discord.Embed(
         title=f"{result.raid_name} 공대 현황",
