@@ -64,6 +64,15 @@ def create_bot() -> commands.Bot:
         channel_raid_repository=channel_raid_repository,
         raid_application_repository=raid_application_repository,
     )
+    
+    message_service = MessageService()
+    
+    application_service = ApplicationService(
+        character_info_service=character_info_service,
+        setting_service=setting_service,
+        raid_service=raid_service,
+        repository=raid_application_repository,
+    )
 
     party_rule_service = PartyRuleService(raid_rule_repository)
 
@@ -89,15 +98,6 @@ def create_bot() -> commands.Bot:
         party_slot_repository=party_slot_repository,
         party_waiting_repository=party_waiting_repository,
     )
-
-    application_service = ApplicationService(
-        character_info_service=character_info_service,
-        setting_service=setting_service,
-        raid_service=raid_service,
-        repository=raid_application_repository,
-    )
-
-    message_service = MessageService()
 
     intents = discord.Intents.default()
     intents.members = True
