@@ -115,12 +115,12 @@ def build_build_home_embed(active_result, rule, status_message: str | None = Non
                 "현재 공대 생성 결과 요약\n\n"
                 f"총 신청자: {active_result.total_applicants}명\n"
                 f"정식 공대 {active_result.full_group_count}개 / "
-                f"상비군 {active_result.waiting_count}명\n\n\u200b\n"
+                f"상비군 {active_result.waiting_count}명"
             ),
         )
 
     if status_message:
-        embed.add_field(name="안내", value=status_message, inline=False)
+        embed.add_field(name="\n\n\u200b\n안내", value=status_message, inline=False)
 
     return embed
 
