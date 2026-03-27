@@ -38,6 +38,18 @@ def build_party_result_embed(result, status_message: str | None = None):
 
         desc += "\n"
 
+    if result.waiting_members:
+        reserve_parts = []
+        for member in result.waiting_members:
+            icon = get_job_icon(member.job)
+            reserve_parts.append(f"{member.character_name}{icon}")
+
+        embed.add_field(
+            name="✨상비군",
+            value=" / ".join(reserve_parts),
+            inline=False,
+        )
+
     embed = discord.Embed(
         title=f"{result.raid_name} 공대 현황",
         description=desc,
