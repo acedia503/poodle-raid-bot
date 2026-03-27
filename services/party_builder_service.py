@@ -138,6 +138,7 @@ class PartyBuilderService:
                             group_no=group_no,
                             party_no=party_no,
                             slot_no=slot_no,
+                            is_temp_group=False,
                             application_id=app.id,
                             user_id=app.user_id,
                             user_name=app.user_name,
