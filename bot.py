@@ -69,13 +69,11 @@ def create_bot() -> commands.Bot:
 
     party_builder_service = PartyBuilderService(
         raid_service=raid_service,
-        raid_application_repository=raid_application_repository,
-        party_rule_service=party_rule_service,
+        application_service=application_service,
         character_info_service=character_info_service,
-        party_build_session_repository=party_build_session_repository,
-        party_slot_repository=party_slot_repository,
-        party_waiting_repository=party_waiting_repository,
-        max_refresh_concurrency=5,
+        session_repository=party_build_session_repository,
+        slot_repository=party_slot_repository,
+        waiting_repository=party_waiting_repository,
     )
 
     party_manage_service = PartyManageService(
