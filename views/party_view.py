@@ -151,13 +151,12 @@ def build_party_result_embed(result, status_message: str | None = None) -> disco
 
         lines = [
             build_party_line(1, party1.members if party1 else []),
-            build_party_line(2, party2.members if party2 else []),
-            "\n\n",  # 공대 사이 줄바꿈용
+            build_party_line(2, party2.members if party2 else [])
         ]
 
         embed.add_field(
             name=f"✨{group_no}공대 - 총 전투력 [1파티] {party1_power:,} / [2파티] {party2_power:,}",
-            value="\n".join(lines),
+            value="\n".join(lines)."\n",
             inline=False,
         )
 
