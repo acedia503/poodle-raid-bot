@@ -1,5 +1,5 @@
 import discord
-from discord.ui import View, Button
+from discord.ui import View, Select, Button
 
 # =========================
 # EMBED BUILDERS (간단 버전)
