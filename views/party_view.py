@@ -12,7 +12,7 @@ def build_empty_result_embed(raid_name: str, status_message: str | None = None):
     )
 
     if status_message:
-        embed.add_field(name="\n\n안내", value=status_message, inline=False)
+        embed.add_field(name="\n\u200b안내", value=status_message, inline=False)
 
     return embed
 
@@ -44,7 +44,7 @@ def build_party_result_embed(result, status_message: str | None = None):
     )
 
     if status_message:
-        embed.add_field(name="\n\n안내", value=status_message, inline=False)
+        embed.add_field(name="\n\u200b안내", value=status_message, inline=False)
 
     return embed
 
