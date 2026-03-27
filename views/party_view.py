@@ -156,7 +156,7 @@ def build_party_result_embed(result, status_message: str | None = None) -> disco
 
         embed.add_field(
             name=f"✨{group_no}공대 - 총 전투력 [1파티] {party1_power:,} / [2파티] {party2_power:,}",
-            value="\n".join(lines),
+            value="\n".join(lines) + "\n\u200b",
             inline=False,
         )
 
