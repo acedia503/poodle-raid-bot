@@ -25,13 +25,10 @@ from database import Database
 
 
 class PartyCommand(commands.Cog):
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot, db):
         self.bot = bot
+        self.db = db
 
-        # =========================
-        # DB & Repository
-        # =========================
-        self.db = Database()
 
         self.channel_raid_repo = ChannelRaidRepository(self.db)
         self.application_repo = RaidApplicationRepository(self.db)
