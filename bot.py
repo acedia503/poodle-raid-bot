@@ -125,16 +125,7 @@ def create_bot() -> commands.Bot:
             )
         )
         await bot.add_cog(InfoCommand(bot, character_info_service, message_service))
-        await bot.add_cog(
-            PartyCommand(
-                bot=bot,
-                raid_service=raid_service,
-                party_rule_service=party_rule_service,
-                party_builder_service=party_builder_service,
-                party_manage_service=party_manage_service,
-                party_modify_service=party_modify_service,
-            )
-        )
+        await bot.add_cog(PartyCommand(bot))
 
         await bot.tree.sync()
         print("Slash commands synced.")
