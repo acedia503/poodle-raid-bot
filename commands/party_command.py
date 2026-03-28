@@ -36,7 +36,7 @@ class PartyCommand(commands.Cog):
         self.session_repo = PartyBuildSessionRepository(self.db)
         self.slot_repo = PartySlotRepository(self.db)
         self.waiting_repo = PartyWaitingMemberRepository(self.db)
-        self.rule_repo = PartyRuleRepository(self.db)
+        self.rule_repo = RaidRuleRepository(self.db)
 
         # =========================
         # Service
