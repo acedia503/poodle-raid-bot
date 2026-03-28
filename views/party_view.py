@@ -419,11 +419,15 @@ class PartyModifyGroupSelectView(View):
     def __init__(
         self,
         rule,
+        party_rule_service,
+        party_builder_service,
         party_manage_service,
         party_modify_service,
     ):
         super().__init__(timeout=300)
         self.rule = rule
+        self.party_rule_service = party_rule_service
+        self.party_builder_service = party_builder_service
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
 
@@ -447,6 +451,7 @@ class PartyModifyGroupSelectView(View):
         )
         view = PartyModifyHomeView(
             self.rule,
+            self.party_rule_service,
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
