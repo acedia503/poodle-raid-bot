@@ -297,6 +297,7 @@ class PartyModifyHomeView(View):
             )
             home = PartyBuildHomeView(
                 self.rule,
+                self.party_rule_service,
                 self.party_builder_service.build_parties,
                 self.party_manage_service,
                 self.party_modify_service,
@@ -330,6 +331,7 @@ class PartyModifyHomeView(View):
             )
             home = PartyBuildHomeView(
                 self.rule,
+                self.party_rule_service,
                 self.party_builder_service.build_parties,
                 self.party_manage_service,
                 self.party_modify_service,
@@ -363,6 +365,7 @@ class PartyModifyHomeView(View):
 
         home = PartyBuildHomeView(
             self.rule,
+            self.party_rule_service,
             self.party_builder_service.build_parties,
             self.party_manage_service,
             self.party_modify_service,
@@ -512,6 +515,7 @@ class GroupMemberSelect(Select):
 
             home = PartyBuildHomeView(
                 view.rule,
+                view.party_rule_service,
                 view.party_manage_service.party_builder_service,
                 view.party_manage_service,
                 view.party_modify_service,
@@ -722,6 +726,7 @@ class MoveTargetSelect(Select):
 
             home = PartyBuildHomeView(
                 view.rule,
+                view.party_rule_service,
                 view.party_manage_service.party_builder_service,
                 view.party_manage_service,
                 view.party_modify_service,
