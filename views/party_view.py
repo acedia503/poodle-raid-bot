@@ -1,9 +1,12 @@
 import discord
 from discord.ui import View, Select, Button
 
-# =========================
-# EMBED BUILDERS (간단 버전)
-# =========================
+
+def get_job_short(job: str) -> str:
+    if not job:
+        return ""
+    return f"({job[0]})"
+
 
 def build_empty_result_embed(raid_name: str, status_message: str | None = None):
     embed = discord.Embed(
@@ -12,7 +15,7 @@ def build_empty_result_embed(raid_name: str, status_message: str | None = None):
     )
 
     if status_message:
-        embed.add_field(name="\n\u200b안내", value=status_message, inline=False)
+        embed.add_field(name="\n\n\u200b안내", value=status_message, inline=False)
 
     return embed
 
@@ -21,59 +24,55 @@ def build_party_result_embed(result, status_message: str | None = None):
     if result is None:
         return build_empty_result_embed("레이드")
 
-    desc = (
-        f"총 신청자: {result.total_applicants}명\n"
-        f"정식 공대 {result.full_group_count}개 / "
-        f"상비군 {result.waiting_count}명\n\n"
-    )
-
-    for group in result.groups:
-        desc += f"✨{group.group_no}공대\n"
-
-        for party in group.parties:
-            members = " / ".join(
-                f"{m.character_name}({m.job[0]})" for m in party.members
-            )
-            desc += f"{party.party_no}-{members}\n"
-
-def build_party_result_embed(result, status_message: str | None = None):
-    if result is None:
-        return build_empty_result_embed("레이드")
-
-    desc = (
-        f"총 신청자: {result.total_applicants}명\n"
-        f"정식 공대 {result.full_group_count}개 / "
-        f"상비군 {result.waiting_count}명\n\n"
-    )
-
-    for group in result.groups:
-        desc += f"✨{group.group_no}공대\n"
-
-        for party in group.parties:
-            members = " / ".join(
-                f"{m.character_name}({m.job[0]})" for m in party.members
-            )
-            desc += f"{party.party_no}-{members}\n"
-
-        desc += "\n"
-
-    if getattr(result, "waiting_members", None):
-        desc += "✨상비군\n"
-        if getattr(result, "waiting_members", None):
-        waiting_members = " / ".join(
-            f"{m.character_name}({m.job[0]})" for m in result.waiting_members
-        )
-        desc += f"{waiting_members}\n"
-    else:
-        desc += "없음\n"
-
     embed = discord.Embed(
         title=f"{result.raid_name} 공대 현황",
-        description=desc,
+        description=(
+            f"총 신청자: {result.total_applicants}명\n"
+            f"정식 공대 {result.full_group_count}개 / "
+            f"상비군 {result.waiting_count}명"
+        ),
+    )
+
+    for group in result.groups:
+        party1 = next((p for p in group.parties if p.party_no == 1), None)
+        party2 = next((p for p in group.parties if p.party_no == 2), None)
+
+        party1_power = party1.total_combat_power if party1 else 0
+        party2_power = party2.total_combat_power if party2 else 0
+
+        party1_members = " / ".join(
+            f"{m.character_name}{get_job_short(m.job)}"
+            for m in (party1.members if party1 else [])
+        )
+        party2_members = " / ".join(
+            f"{m.character_name}{get_job_short(m.job)}"
+            for m in (party2.members if party2 else [])
+        )
+
+        value_lines = [
+            f"1-{party1_members if party1_members else '비어있음'}",
+            f"2-{party2_members if party2_members else '비어있음'}",
+        ]
+
+        embed.add_field(
+            name=f"✨{group.group_no}공대 - 총 전투력 [1파티] {party1_power:,} / [2파티] {party2_power:,}",
+            value="\n".join(value_lines) + "\n\u200b",
+            inline=False,
+        )
+
+    reserve_members = " / ".join(
+        f"{m.character_name}{get_job_short(m.job)}"
+        for m in result.waiting_members
+    )
+
+    embed.add_field(
+        name="✨상비군",
+        value=reserve_members if reserve_members else "없음",
+        inline=False,
     )
 
     if status_message:
-        embed.add_field(name="\n\u200b안내", value=status_message, inline=False)
+        embed.add_field(name="\n\n\u200b안내", value=status_message, inline=False)
 
     return embed
 
@@ -102,48 +101,44 @@ class PartyBuildHomeView(View):
     # =========================
     @discord.ui.button(label="자동", style=discord.ButtonStyle.success, row=0)
     async def auto_build(self, interaction: discord.Interaction, button: Button):
-
+    
         if self.party_manage_service.has_active_build(
             self.rule.guild_id, self.rule.channel_id
         ):
             result = self.party_manage_service.get_active_build_result(
                 self.rule.guild_id, self.rule.channel_id
             )
-
+    
             embed = build_party_result_embed(
                 result,
                 status_message="이미 생성된 공대가 있습니다. 초기화 후 진행해주세요.",
             )
-
+    
             await interaction.response.edit_message(embed=embed, view=self)
             return
-
-        loading = discord.Embed(title="공대 생성 중", description="데이터 조회 중...")
-        await interaction.response.edit_message(embed=loading, view=None)
-
-        try:
-            await self.party_builder_service.build_parties(
-                self.rule.guild_id,
-                self.rule.channel_id,
-                interaction.user.id,
-            )
-
-            result = self.party_manage_service.get_active_build_result(
-                self.rule.guild_id, self.rule.channel_id
-            )
-
-            embed = build_party_result_embed(
-                result,
-                status_message="자동 생성 완료",
-            )
-
-        except Exception as e:
-            embed = build_empty_result_embed(
-                self.rule.raid_name,
-                status_message=f"생성 실패: {e}",
-            )
-
-        await interaction.edit_original_response(embed=embed, view=self)
+    
+        latest_rule = self.party_rule_service.get_or_create_rule(
+            guild_id=self.rule.guild_id,
+            channel_id=self.rule.channel_id,
+            raid_name=self.rule.raid_name,
+        )
+    
+        embed = build_rule_edit_embed(
+            latest_rule,
+            latest_rule.party1_priority_jobs,
+            latest_rule.party1_preferred_jobs,
+            latest_rule.party2_priority_jobs,
+            latest_rule.party2_preferred_jobs,
+        )
+    
+        view = PartyAutoRuleEditView(
+            rule=latest_rule,
+            party_rule_service=self.party_rule_service,
+            party_builder_service=self.party_builder_service,
+            party_manage_service=self.party_manage_service,
+            party_modify_service=self.party_modify_service,
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
 
     # =========================
     # 수동 생성
@@ -773,5 +768,223 @@ class PartyMoveTargetSelectView(View):
             self.rule,
             self.party_manage_service,
             self.party_modify_service,
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+# =========================
+# PARTY RULE VIEWS
+# =========================
+class JobMultiSelect(Select):
+    def __init__(self, placeholder: str, current_values: list[str], on_change_callback):
+        options = []
+        for job in JOB_OPTIONS:
+            options.append(
+                discord.SelectOption(
+                    label=job,
+                    value=job,
+                    default=(job in current_values),
+                )
+            )
+
+        super().__init__(
+            placeholder=placeholder,
+            min_values=1,
+            max_values=len(JOB_OPTIONS),
+            options=options,
+        )
+        self.on_change_callback = on_change_callback
+
+    async def callback(self, interaction: discord.Interaction):
+        selected_values = list(self.values)
+        normalized_values = []
+
+        for value in selected_values:
+            if value not in normalized_values:
+                normalized_values.append(value)
+
+        await self.on_change_callback(interaction, normalized_values)
+        
+ 
+       def build_rule_edit_embed(
+        rule,
+        party1_priority_jobs: list[str],
+        party1_preferred_jobs: list[str],
+        party2_priority_jobs: list[str],
+        party2_preferred_jobs: list[str],
+        status_message: str | None = None,
+    ):
+        embed = discord.Embed(
+            title="자동 생성 규칙 설정",
+            description=(
+                "각 파티의 우선 직업과 선호 직업을 설정한 뒤 생성하세요.\n"
+                "자동 생성 시에만 이 규칙이 반영됩니다."
+            ),
+        )
+    
+        embed.add_field(
+            name="1파티",
+            value=(
+                f"우선 직업: {', '.join(party1_priority_jobs) if party1_priority_jobs else '없음'}\n"
+                f"선호 직업: {', '.join(party1_preferred_jobs) if party1_preferred_jobs else '없음'}"
+            ),
+            inline=False,
+        )
+    
+        embed.add_field(
+            name="2파티",
+            value=(
+                f"우선 직업: {', '.join(party2_priority_jobs) if party2_priority_jobs else '없음'}\n"
+                f"선호 직업: {', '.join(party2_preferred_jobs) if party2_preferred_jobs else '없음'}"
+            ),
+            inline=False,
+        )
+    
+        if status_message:
+            embed.add_field(name="\n\u200b안내", value=status_message, inline=False)
+    
+        return embed
+        
+        
+class PartyAutoRuleEditView(View):
+    def __init__(
+        self,
+        rule,
+        party_rule_service,
+        party_builder_service,
+        party_manage_service,
+        party_modify_service,
+    ):
+        super().__init__(timeout=300)
+
+        self.rule = rule
+        self.party_rule_service = party_rule_service
+        self.party_builder_service = party_builder_service
+        self.party_manage_service = party_manage_service
+        self.party_modify_service = party_modify_service
+
+        self.party1_priority_jobs = list(rule.party1_priority_jobs)
+        self.party1_preferred_jobs = list(rule.party1_preferred_jobs)
+        self.party2_priority_jobs = list(rule.party2_priority_jobs)
+        self.party2_preferred_jobs = list(rule.party2_preferred_jobs)
+
+        self._build_components()
+
+    def _build_components(self):
+        self.clear_items()
+
+        self.add_item(JobMultiSelect(
+            "1파티 우선 직업",
+            self.party1_priority_jobs,
+            self._on_party1_priority_change,
+        ))
+        self.add_item(JobMultiSelect(
+            "1파티 선호 직업",
+            self.party1_preferred_jobs,
+            self._on_party1_preferred_change,
+        ))
+        self.add_item(JobMultiSelect(
+            "2파티 우선 직업",
+            self.party2_priority_jobs,
+            self._on_party2_priority_change,
+        ))
+        self.add_item(JobMultiSelect(
+            "2파티 선호 직업",
+            self.party2_preferred_jobs,
+            self._on_party2_preferred_change,
+        ))
+
+    async def _refresh(self, interaction: discord.Interaction, status_message: str | None = None):
+        self._build_components()
+        embed = build_rule_edit_embed(
+            self.rule,
+            self.party1_priority_jobs,
+            self.party1_preferred_jobs,
+            self.party2_priority_jobs,
+            self.party2_preferred_jobs,
+            status_message=status_message,
+        )
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    async def _on_party1_priority_change(self, interaction, selected_values):
+        self.party1_priority_jobs = selected_values
+        await self._refresh(interaction)
+
+    async def _on_party1_preferred_change(self, interaction, selected_values):
+        self.party1_preferred_jobs = selected_values
+        await self._refresh(interaction)
+
+    async def _on_party2_priority_change(self, interaction, selected_values):
+        self.party2_priority_jobs = selected_values
+        await self._refresh(interaction)
+
+    async def _on_party2_preferred_change(self, interaction, selected_values):
+        self.party2_preferred_jobs = selected_values
+        await self._refresh(interaction)
+
+    @discord.ui.button(label="생성", style=discord.ButtonStyle.success, row=4)
+    async def generate_button(self, interaction: discord.Interaction, button: Button):
+        self.party_rule_service.update_rule(
+            guild_id=self.rule.guild_id,
+            channel_id=self.rule.channel_id,
+            raid_name=self.rule.raid_name,
+            party1_priority_jobs=self.party1_priority_jobs,
+            party1_preferred_jobs=self.party1_preferred_jobs,
+            party2_priority_jobs=self.party2_priority_jobs,
+            party2_preferred_jobs=self.party2_preferred_jobs,
+        )
+
+        loading_embed = discord.Embed(
+            title="공대 생성 중",
+            description="규칙 저장 후 신청자 정보를 조회하고 있습니다.",
+        )
+        await interaction.response.edit_message(embed=loading_embed, view=None)
+
+        try:
+            await self.party_builder_service.build_parties(
+                guild_id=self.rule.guild_id,
+                channel_id=self.rule.channel_id,
+                created_by=interaction.user.id,
+            )
+
+            result = self.party_manage_service.get_active_build_result(
+                self.rule.guild_id,
+                self.rule.channel_id,
+            )
+            embed = build_party_result_embed(result, status_message="자동 생성 완료")
+
+        except Exception as e:
+            result = self.party_manage_service.get_active_build_result(
+                self.rule.guild_id,
+                self.rule.channel_id,
+            )
+            if result:
+                embed = build_party_result_embed(result, status_message=f"생성 실패: {e}")
+            else:
+                embed = build_empty_result_embed(self.rule.raid_name, status_message=f"생성 실패: {e}")
+
+        view = PartyBuildHomeView(
+            rule=self.rule,
+            party_rule_service=self.party_rule_service,
+            party_builder_service=self.party_builder_service,
+            party_manage_service=self.party_manage_service,
+            party_modify_service=self.party_modify_service,
+        )
+        await interaction.edit_original_response(embed=embed, view=view)
+
+    @discord.ui.button(label="취소", style=discord.ButtonStyle.secondary, row=4)
+    async def cancel_button(self, interaction: discord.Interaction, button: Button):
+        result = self.party_manage_service.get_active_build_result(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+        embed = build_party_result_embed(result) if result else build_empty_result_embed(self.rule.raid_name)
+
+        view = PartyBuildHomeView(
+            rule=self.rule,
+            party_rule_service=self.party_rule_service,
+            party_builder_service=self.party_builder_service,
+            party_manage_service=self.party_manage_service,
+            party_modify_service=self.party_modify_service,
         )
         await interaction.response.edit_message(embed=embed, view=view)
