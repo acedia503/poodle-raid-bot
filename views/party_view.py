@@ -117,7 +117,7 @@ class PartyBuildHomeView(View):
             await interaction.response.edit_message(embed=embed, view=self)
             return
     
-        latest_rule = self.party_rule_service.get_or_create_rule(
+        latest_rule = self.party_builder_service.get_or_create_rule(
             guild_id=self.rule.guild_id,
             channel_id=self.rule.channel_id,
             raid_name=self.rule.raid_name,
