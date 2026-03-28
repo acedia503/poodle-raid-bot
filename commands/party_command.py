@@ -19,7 +19,7 @@ from repositories.raid_application_repository import RaidApplicationRepository
 from repositories.party_build_session_repository import PartyBuildSessionRepository
 from repositories.party_slot_repository import PartySlotRepository
 from repositories.party_waiting_repository import PartyWaitingMemberRepository
-from repositories.raid_rule_repository import PartyRuleRepository
+from repositories.raid_rule_repository import RaidRuleRepository
 
 from database import Database
 
