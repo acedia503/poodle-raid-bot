@@ -70,6 +70,7 @@ class PartyCommand(commands.Cog):
     
         view = PartyBuildHomeView(
             rule=rule,
+            party_rule_service=self.party_rule_service,
             party_builder_service=self.party_builder_service,
             party_manage_service=self.party_manage_service,
             party_modify_service=self.party_modify_service,
