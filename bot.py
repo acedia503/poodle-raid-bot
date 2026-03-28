@@ -74,7 +74,7 @@ def create_bot() -> commands.Bot:
         repository=raid_application_repository,
     )
 
-    party_rule_service = RaidRuleService(raid_rule_repository)
+    party_rule_service = PartyRuleService(raid_rule_repository)
 
     party_builder_service = PartyBuilderService(
         raid_service=raid_service,
