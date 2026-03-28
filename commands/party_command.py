@@ -25,7 +25,7 @@ from database import Database
 
 
 class PartyCommand(commands.Cog):
-    def __init__(self, bot: commands.Bot, db: database):
+    def __init__(self, bot: commands.Bot, db: Database):
         self.bot = bot
         self.db = db
 
