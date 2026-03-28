@@ -806,7 +806,7 @@ class JobMultiSelect(Select):
         await self.on_change_callback(interaction, normalized_values)
         
  
-       def build_rule_edit_embed(
+    def build_rule_edit_embed(
         rule,
         party1_priority_jobs: list[str],
         party1_preferred_jobs: list[str],
