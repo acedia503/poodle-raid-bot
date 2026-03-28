@@ -302,7 +302,7 @@ class PartyModifyHomeView(View):
             home = PartyBuildHomeView(
                 self.rule,
                 self.party_rule_service,
-                self.party_builder_service.build_parties,
+                self.party_builder_service,
                 self.party_manage_service,
                 self.party_modify_service,
             )
@@ -336,7 +336,7 @@ class PartyModifyHomeView(View):
             home = PartyBuildHomeView(
                 self.rule,
                 self.party_rule_service,
-                self.party_builder_service.build_parties,
+                self.party_builder_service,
                 self.party_manage_service,
                 self.party_modify_service,
             )
@@ -370,7 +370,7 @@ class PartyModifyHomeView(View):
         home = PartyBuildHomeView(
             self.rule,
             self.party_rule_service,
-            self.party_builder_service.build_parties,
+            self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
         )
