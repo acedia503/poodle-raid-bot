@@ -61,6 +61,45 @@ def build_party_result_embed(result, status_message=None):
     return embed
 
 
+def build_rule_edit_embed(
+    rule,
+    party1_priority_jobs: list[str],
+    party1_preferred_jobs: list[str],
+    party2_priority_jobs: list[str],
+    party2_preferred_jobs: list[str],
+    status_message: str | None = None,
+):
+    embed = discord.Embed(
+        title="자동 생성 규칙 설정",
+        description=(
+            "각 파티의 우선 직업과 선호 직업을 설정한 뒤 생성하세요.\n"
+            "자동 생성 시에만 이 규칙이 반영됩니다."
+        ),
+    )
+
+    embed.add_field(
+        name="1파티",
+        value=(
+            f"우선 직업: {', '.join(party1_priority_jobs) if party1_priority_jobs else '없음'}\n"
+            f"선호 직업: {', '.join(party1_preferred_jobs) if party1_preferred_jobs else '없음'}"
+        ),
+        inline=False,
+    )
+
+    embed.add_field(
+        name="2파티",
+        value=(
+            f"우선 직업: {', '.join(party2_priority_jobs) if party2_priority_jobs else '없음'}\n"
+            f"선호 직업: {', '.join(party2_preferred_jobs) if party2_preferred_jobs else '없음'}"
+        ),
+        inline=False,
+    )
+
+    if status_message:
+        embed.add_field(name="\n\u200b\n안내", value=status_message, inline=False)
+
+    return embed
+
 # =========================
 # 메인 홈
 # =========================
