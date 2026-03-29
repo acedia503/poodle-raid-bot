@@ -75,57 +75,166 @@ class PartyBuildHomeView(View):
         party_modify_service,
     ):
         super().__init__(timeout=300)
+
         self.rule = rule
         self.party_rule_service = party_rule_service
         self.party_builder_service = party_builder_service
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
 
-    @discord.ui.button(label="자동", style=discord.ButtonStyle.success)
-    async def auto(self, interaction: discord.Interaction, _):
-        if self.manage.has_active_build(self.rule.guild_id, self.rule.channel_id):
-            result = self.manage.get_active_build_result(self.rule.guild_id, self.rule.channel_id)
-            embed = build_party_result_embed(result, "이미 생성됨. 초기화 후 진행")
-            return await interaction.response.edit_message(embed=embed, view=self)
+    @discord.ui.button(label="자동", style=discord.ButtonStyle.success, row=0)
+    async def auto_build(self, interaction: discord.Interaction, button: Button):
+        if self.party_manage_service.has_active_build(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        ):
+            result = self.party_manage_service.get_active_build_result(
+                self.rule.guild_id,
+                self.rule.channel_id,
+            )
 
-        rule = self.rule_service.get_or_create_rule(
-            self.rule.guild_id, self.rule.channel_id, self.rule.raid_name
+            embed = build_party_result_embed(
+                result,
+                status_message="이미 생성된 공대가 있습니다. 초기화 후 진행해주세요.",
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+            return
+
+        latest_rule = self.party_rule_service.get_or_create_rule(
+            guild_id=self.rule.guild_id,
+            channel_id=self.rule.channel_id,
+            raid_name=self.rule.raid_name,
         )
 
-        embed = discord.Embed(title="자동 생성 규칙 설정")
-        view = PartyAutoRuleEditView(rule, self.rule_service, self.builder, self.manage, self.modify)
+        embed = build_rule_edit_embed(
+            latest_rule,
+            latest_rule.party1_priority_jobs,
+            latest_rule.party1_preferred_jobs,
+            latest_rule.party2_priority_jobs,
+            latest_rule.party2_preferred_jobs,
+        )
 
+        view = PartyAutoRuleEditView(
+            rule=latest_rule,
+            party_rule_service=self.party_rule_service,
+            party_builder_service=self.party_builder_service,
+            party_manage_service=self.party_manage_service,
+            party_modify_service=self.party_modify_service,
+        )
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="수동", style=discord.ButtonStyle.primary)
-    async def manual(self, interaction: discord.Interaction, _):
-        await interaction.response.edit_message(embed=discord.Embed(title="생성중..."), view=None)
+    @discord.ui.button(label="수동", style=discord.ButtonStyle.primary, row=0)
+    async def manual_build(self, interaction: discord.Interaction, button: Button):
+        if self.party_manage_service.has_active_build(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        ):
+            result = self.party_manage_service.get_active_build_result(
+                self.rule.guild_id,
+                self.rule.channel_id,
+            )
 
-        await self.builder.build_empty_parties(
-            self.rule.guild_id, self.rule.channel_id, interaction.user.id
+            embed = build_party_result_embed(
+                result,
+                status_message="이미 생성된 공대가 있습니다. 초기화 후 진행해주세요.",
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+            return
+
+        loading = discord.Embed(
+            title="수동 생성",
+            description="데이터 조회 중...",
         )
+        await interaction.response.edit_message(embed=loading, view=None)
 
-        result = self.manage.get_active_build_result(self.rule.guild_id, self.rule.channel_id)
-        embed = build_party_result_embed(result, "수동 생성 완료")
+        try:
+            await self.party_builder_service.build_empty_parties(
+                self.rule.guild_id,
+                self.rule.channel_id,
+                interaction.user.id,
+            )
+
+            result = self.party_manage_service.get_active_build_result(
+                self.rule.guild_id,
+                self.rule.channel_id,
+            )
+
+            embed = build_party_result_embed(
+                result,
+                status_message="수동 생성 완료 (수정으로 수동 배치하세요)",
+            )
+
+        except Exception as e:
+            embed = build_empty_result_embed(
+                self.rule.raid_name,
+                status_message=f"생성 실패: {e}",
+            )
 
         await interaction.edit_original_response(embed=embed, view=self)
 
-    @discord.ui.button(label="초기화", style=discord.ButtonStyle.danger)
-    async def reset(self, interaction: discord.Interaction, _):
-        await self.manage.reset_build(self.rule.guild_id, self.rule.channel_id)
-        embed = build_empty_result_embed(self.rule.raid_name, "초기화 완료")
+    @discord.ui.button(label="초기화", style=discord.ButtonStyle.danger, row=0)
+    async def reset(self, interaction: discord.Interaction, button: Button):
+        await self.party_manage_service.reset_build(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+
+        embed = build_empty_result_embed(
+            self.rule.raid_name,
+            status_message="초기화 완료",
+        )
         await interaction.response.edit_message(embed=embed, view=self)
 
     @discord.ui.button(label="수정", style=discord.ButtonStyle.secondary, row=1)
-    async def modify_btn(self, interaction: discord.Interaction, _):
-        view = PartyModifyHomeView(
-            self.rule, self.rule_service, self.builder, self.manage, self.modify
+    async def modify(self, interaction: discord.Interaction, button: Button):
+        result = self.party_manage_service.get_active_build_result(
+            self.rule.guild_id,
+            self.rule.channel_id,
         )
-        embed = discord.Embed(title="공대 수정", description="대상 선택")
+
+        if not result:
+            embed = build_empty_result_embed(
+                self.rule.raid_name,
+                status_message="공대가 없습니다.",
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+            return
+
+        view = PartyModifyHomeView(
+            self.rule,
+            self.party_rule_service,
+            self.party_builder_service,
+            self.party_manage_service,
+            self.party_modify_service,
+        )
+
+        embed = discord.Embed(
+            title="공대 수정",
+            description="수정할 대상을 선택하세요.",
+        )
         await interaction.response.edit_message(embed=embed, view=view)
 
+    @discord.ui.button(label="공유", style=discord.ButtonStyle.primary, row=1)
+    async def share(self, interaction: discord.Interaction, button: Button):
+        result = self.party_manage_service.get_active_build_result(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+
+        if not result:
+            embed = build_empty_result_embed(
+                self.rule.raid_name,
+                status_message="공대가 없습니다.",
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+            return
+
+        embed = build_party_result_embed(result)
+        await interaction.response.defer()
+        await interaction.channel.send(embed=embed)
+
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary, row=1)
-    async def close(self, interaction: discord.Interaction, _):
+    async def close(self, interaction: discord.Interaction, button: Button):
         await interaction.response.edit_message(view=None)
 
 
@@ -134,35 +243,112 @@ class PartyBuildHomeView(View):
 # =========================
 
 class PartyModifyHomeView(View):
-    def __init__(self, rule, rule_service, builder, manage, modify):
+    def __init__(
+        self,
+        rule,
+        party_rule_service,
+        party_builder_service,
+        party_manage_service,
+        party_modify_service,
+    ):
         super().__init__(timeout=300)
+
         self.rule = rule
-        self.rule_service = rule_service
-        self.builder = builder
-        self.manage = manage
-        self.modify = modify
+        self.party_rule_service = party_rule_service
+        self.party_builder_service = party_builder_service
+        self.party_manage_service = party_manage_service
+        self.party_modify_service = party_modify_service
 
-    @discord.ui.button(label="공대 선택")
-    async def group(self, interaction: discord.Interaction, _):
+    @discord.ui.button(label="공대 선택", style=discord.ButtonStyle.primary, row=0)
+    async def select_group(self, interaction: discord.Interaction, button: Button):
+        result = self.party_manage_service.get_active_build_result(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+
+        if not result:
+            embed = build_empty_result_embed(
+                self.rule.raid_name,
+                status_message="공대가 없습니다.",
+            )
+            home = PartyBuildHomeView(
+                self.rule,
+                self.party_rule_service,
+                self.party_builder_service,
+                self.party_manage_service,
+                self.party_modify_service,
+            )
+            await interaction.response.edit_message(embed=embed, view=home)
+            return
+
+        embed = discord.Embed(
+            title="공대 선택",
+            description="상비군으로 이동할 공대원을 고를 공대를 선택하세요.",
+        )
+
         view = PartyModifyGroupSelectView(
-            self.rule, self.rule_service, self.builder, self.manage, self.modify
+            self.rule,
+            self.party_rule_service,
+            self.party_builder_service,
+            self.party_manage_service,
+            self.party_modify_service,
         )
-        await interaction.response.edit_message(embed=discord.Embed(title="공대 선택"), view=view)
+        await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="상비군 선택")
-    async def reserve(self, interaction: discord.Interaction, _):
+    @discord.ui.button(label="상비군 선택", style=discord.ButtonStyle.success, row=0)
+    async def select_reserve(self, interaction: discord.Interaction, button: Button):
+        result = self.party_manage_service.get_active_build_result(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+
+        if not result:
+            embed = build_empty_result_embed(
+                self.rule.raid_name,
+                status_message="공대가 없습니다.",
+            )
+            home = PartyBuildHomeView(
+                self.rule,
+                self.party_rule_service,
+                self.party_builder_service,
+                self.party_manage_service,
+                self.party_modify_service,
+            )
+            await interaction.response.edit_message(embed=embed, view=home)
+            return
+
+        embed = discord.Embed(
+            title="상비군 선택",
+            description="공대로 이동할 상비군 인원을 선택하세요.",
+        )
+
         view = PartyModifyReserveView(
-            self.rule, self.rule_service, self.builder, self.manage, self.modify
+            self.rule,
+            self.party_rule_service,
+            self.party_builder_service,
+            self.party_manage_service,
+            self.party_modify_service,
         )
-        await interaction.response.edit_message(embed=discord.Embed(title="상비군 선택"), view=view)
+        await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label="뒤로가기", row=1)
-    async def back(self, interaction: discord.Interaction, _):
-        result = self.manage.get_active_build_result(self.rule.guild_id, self.rule.channel_id)
-        embed = build_party_result_embed(result) if result else build_empty_result_embed(self.rule.raid_name)
+    @discord.ui.button(label="뒤로가기", style=discord.ButtonStyle.secondary, row=1)
+    async def back(self, interaction: discord.Interaction, button: Button):
+        result = self.party_manage_service.get_active_build_result(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+
+        if result:
+            embed = build_party_result_embed(result)
+        else:
+            embed = build_empty_result_embed(self.rule.raid_name)
 
         home = PartyBuildHomeView(
-            self.rule, self.rule_service, self.builder, self.manage, self.modify
+            self.rule,
+            self.party_rule_service,
+            self.party_builder_service,
+            self.party_manage_service,
+            self.party_modify_service,
         )
         await interaction.response.edit_message(embed=embed, view=home)
 
@@ -172,47 +358,84 @@ class PartyModifyHomeView(View):
 # =========================
 
 class PartyModifyGroupSelectView(View):
-    def __init__(self, rule, rule_service, builder, manage, modify):
+    def __init__(
+        self,
+        rule,
+        party_rule_service,
+        party_builder_service,
+        party_manage_service,
+        party_modify_service,
+    ):
         super().__init__(timeout=300)
-        self.rule = rule
-        self.rule_service = rule_service
-        self.builder = builder
-        self.manage = manage
-        self.modify = modify
 
-        result = manage.get_active_build_result(rule.guild_id, rule.channel_id)
-        groups = sorted({p.group_no for p in result.parties}) if result else []
+        self.rule = rule
+        self.party_rule_service = party_rule_service
+        self.party_builder_service = party_builder_service
+        self.party_manage_service = party_manage_service
+        self.party_modify_service = party_modify_service
+
+        result = self.party_manage_service.get_active_build_result(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+
+        groups = []
+        if result:
+            groups = sorted({party.group_no for party in result.parties})
 
         if groups:
             self.add_item(GroupSelect(groups))
 
-    @discord.ui.button(label="뒤로가기", row=1)
-    async def back(self, interaction, _):
-        await interaction.response.edit_message(
-            embed=discord.Embed(title="공대 수정"),
-            view=PartyModifyHomeView(self.rule, self.rule_service, self.builder, self.manage, self.modify),
+    @discord.ui.button(label="뒤로가기", style=discord.ButtonStyle.secondary, row=1)
+    async def back(self, interaction: discord.Interaction, button: Button):
+        embed = discord.Embed(
+            title="공대 수정",
+            description="수정할 대상을 선택하세요.",
         )
+
+        view = PartyModifyHomeView(
+            self.rule,
+            self.party_rule_service,
+            self.party_builder_service,
+            self.party_manage_service,
+            self.party_modify_service,
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
 
 
 class GroupSelect(Select):
-    def __init__(self, groups):
+    def __init__(self, groups: list[int]):
+        options = [
+            discord.SelectOption(label=f"{group_no}공대", value=str(group_no))
+            for group_no in groups[:25]
+        ]
+
         super().__init__(
-            placeholder="공대 선택",
-            options=[discord.SelectOption(label=f"{g}공대", value=str(g)) for g in groups],
+            placeholder="공대를 선택하세요",
+            min_values=1,
+            max_values=1,
+            options=options,
         )
 
-    async def callback(self, interaction):
+    async def callback(self, interaction: discord.Interaction):
         view = self.view
         group_no = int(self.values[0])
 
-        next_view = PartyModifyGroupMemberView(
-            view.rule, view.rule_service, view.builder, view.manage, view.modify, group_no
+        embed = discord.Embed(
+            title=f"{group_no}공대 인원 선택",
+            description="상비군으로 이동할 공대원을 선택하세요.",
         )
 
-        await interaction.response.edit_message(
-            embed=discord.Embed(title=f"{group_no}공대 인원 선택"),
-            view=next_view,
+        next_view = PartyModifyGroupMemberView(
+            view.rule,
+            view.party_rule_service,
+            view.party_builder_service,
+            view.party_manage_service,
+            view.party_modify_service,
+            group_no,
         )
+
+        await interaction.response.edit_message(embed=embed, view=next_view)
 
 
 # =========================
