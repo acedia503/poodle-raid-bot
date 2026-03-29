@@ -66,13 +66,20 @@ def build_party_result_embed(result, status_message=None):
 # =========================
 
 class PartyBuildHomeView(View):
-    def __init__(self, rule, rule_service, builder, manage, modify):
+    def __init__(
+        self,
+        rule,
+        party_rule_service,
+        party_builder_service,
+        party_manage_service,
+        party_modify_service,
+    ):
         super().__init__(timeout=300)
         self.rule = rule
-        self.rule_service = rule_service
-        self.builder = builder
-        self.manage = manage
-        self.modify = modify
+        self.party_rule_service = party_rule_service
+        self.party_builder_service = party_builder_service
+        self.party_manage_service = party_manage_service
+        self.party_modify_service = party_modify_service
 
     @discord.ui.button(label="자동", style=discord.ButtonStyle.success)
     async def auto(self, interaction: discord.Interaction, _):
