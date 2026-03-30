@@ -632,11 +632,25 @@ class JobMultiSelect(Select):
 
     async def callback(self, interaction: discord.Interaction):
         selected_values = list(self.values)
-        normalized_values = []
 
-        for value in selected_values:
-            if value not in normalized_values:
-                normalized_values.append(value)
+        # 없음 단독 선택 처리
+        if "없음" in selected_values:
+            # 없음과 다른 항목이 같이 선택된 경우:
+            # 마지막 의도를 추정하기 어렵기 때문에
+            # "없음만" 남기도록 강제
+            if len(selected_values) > 1:
+                normalized_values = ["없음"]
+            else:
+                normalized_values = ["없음"]
+        else:
+            # 일반 직업만 선택된 경우 없음 제거
+            normalized_values = []
+            for value in selected_values:
+                if value != "없음" and value not in normalized_values:
+                    normalized_values.append(value)
+
+            if not normalized_values:
+                normalized_values = ["없음"]
 
         await self.on_change_callback(interaction, normalized_values)
 
