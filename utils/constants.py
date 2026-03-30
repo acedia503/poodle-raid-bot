@@ -91,7 +91,6 @@ SAFE_MESSAGE_LIMIT = 1900
 DEFAULT_APPLICATION_STATUSES = {"applied", "waiting", "assigned"}
 
 JOB_OPTIONS = [
-    "없음",
     "수호성",
     "검성",
     "살성",
