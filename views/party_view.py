@@ -633,17 +633,10 @@ class JobMultiSelect(Select):
     async def callback(self, interaction: discord.Interaction):
         selected_values = list(self.values)
 
-        # 없음 단독 선택 처리
+        # 없음은 단독 선택만 허용
         if "없음" in selected_values:
-            # 없음과 다른 항목이 같이 선택된 경우:
-            # 마지막 의도를 추정하기 어렵기 때문에
-            # "없음만" 남기도록 강제
-            if len(selected_values) > 1:
-                normalized_values = ["없음"]
-            else:
-                normalized_values = ["없음"]
+            normalized_values = ["없음"]
         else:
-            # 일반 직업만 선택된 경우 없음 제거
             normalized_values = []
             for value in selected_values:
                 if value != "없음" and value not in normalized_values:
@@ -653,7 +646,7 @@ class JobMultiSelect(Select):
                 normalized_values = ["없음"]
 
         await self.on_change_callback(interaction, normalized_values)
-
+        
 
 class PartyAutoRuleEditView(View):
     def __init__(
@@ -672,34 +665,66 @@ class PartyAutoRuleEditView(View):
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
 
-        self.party1_priority_jobs = list(rule.party1_priority_jobs)
-        self.party1_preferred_jobs = list(rule.party1_preferred_jobs)
-        self.party2_priority_jobs = list(rule.party2_priority_jobs)
-        self.party2_preferred_jobs = list(rule.party2_preferred_jobs)
+        self.party1_priority_jobs = list(rule.party1_priority_jobs) or ["없음"]
+        self.party1_preferred_jobs = list(rule.party1_preferred_jobs) or ["없음"]
+        self.party2_priority_jobs = list(rule.party2_priority_jobs) or ["없음"]
+        self.party2_preferred_jobs = list(rule.party2_preferred_jobs) or ["없음"]
 
-        # Select는 초기 1회만 추가
-        self.add_item(JobMultiSelect(
-            "1파티 우선 직업",
-            self.party1_priority_jobs,
-            self._on_party1_priority_change,
-        ))
-        self.add_item(JobMultiSelect(
-            "1파티 선호 직업",
-            self.party1_preferred_jobs,
-            self._on_party1_preferred_change,
-        ))
-        self.add_item(JobMultiSelect(
-            "2파티 우선 직업",
-            self.party2_priority_jobs,
-            self._on_party2_priority_change,
-        ))
-        self.add_item(JobMultiSelect(
-            "2파티 선호 직업",
-            self.party2_preferred_jobs,
-            self._on_party2_preferred_change,
-        ))
+        self._build_components()
 
-    async def _refresh(self, interaction: discord.Interaction, status_message: str | None = None):
+    def _normalize_jobs(self, values: list[str]) -> list[str]:
+        if not values:
+            return ["없음"]
+
+        if "없음" in values:
+            return ["없음"]
+
+        normalized = []
+        for value in values:
+            if value != "없음" and value not in normalized:
+                normalized.append(value)
+
+        return normalized if normalized else ["없음"]
+
+    def _build_components(self):
+        self.clear_items()
+
+        self.add_item(
+            JobMultiSelect(
+                "1파티 우선 직업",
+                self.party1_priority_jobs,
+                self._on_party1_priority_change,
+            )
+        )
+        self.add_item(
+            JobMultiSelect(
+                "1파티 선호 직업",
+                self.party1_preferred_jobs,
+                self._on_party1_preferred_change,
+            )
+        )
+        self.add_item(
+            JobMultiSelect(
+                "2파티 우선 직업",
+                self.party2_priority_jobs,
+                self._on_party2_priority_change,
+            )
+        )
+        self.add_item(
+            JobMultiSelect(
+                "2파티 선호 직업",
+                self.party2_preferred_jobs,
+                self._on_party2_preferred_change,
+            )
+        )
+
+    async def _refresh(
+        self,
+        interaction: discord.Interaction,
+        status_message: str | None = None,
+    ):
+        self._build_components()
+
         embed = build_rule_edit_embed(
             self.rule,
             self.party1_priority_jobs,
@@ -711,31 +736,36 @@ class PartyAutoRuleEditView(View):
         await interaction.response.edit_message(embed=embed, view=self)
 
     async def _on_party1_priority_change(self, interaction, selected_values):
-        self.party1_priority_jobs = selected_values
+        self.party1_priority_jobs = self._normalize_jobs(selected_values)
         await self._refresh(interaction)
 
     async def _on_party1_preferred_change(self, interaction, selected_values):
-        self.party1_preferred_jobs = selected_values
+        self.party1_preferred_jobs = self._normalize_jobs(selected_values)
         await self._refresh(interaction)
 
     async def _on_party2_priority_change(self, interaction, selected_values):
-        self.party2_priority_jobs = selected_values
+        self.party2_priority_jobs = self._normalize_jobs(selected_values)
         await self._refresh(interaction)
 
     async def _on_party2_preferred_change(self, interaction, selected_values):
-        self.party2_preferred_jobs = selected_values
+        self.party2_preferred_jobs = self._normalize_jobs(selected_values)
         await self._refresh(interaction)
 
     @discord.ui.button(label="생성", style=discord.ButtonStyle.success, row=4)
     async def generate_button(self, interaction: discord.Interaction, button: Button):
+        party1_priority = self._normalize_jobs(self.party1_priority_jobs)
+        party1_preferred = self._normalize_jobs(self.party1_preferred_jobs)
+        party2_priority = self._normalize_jobs(self.party2_priority_jobs)
+        party2_preferred = self._normalize_jobs(self.party2_preferred_jobs)
+
         self.party_rule_service.update_rule(
             guild_id=self.rule.guild_id,
             channel_id=self.rule.channel_id,
             raid_name=self.rule.raid_name,
-            party1_priority_jobs=self.party1_priority_jobs,
-            party1_preferred_jobs=self.party1_preferred_jobs,
-            party2_priority_jobs=self.party2_priority_jobs,
-            party2_preferred_jobs=self.party2_preferred_jobs,
+            party1_priority_jobs=party1_priority,
+            party1_preferred_jobs=party1_preferred,
+            party2_priority_jobs=party2_priority,
+            party2_preferred_jobs=party2_preferred,
         )
 
         loading_embed = discord.Embed(
@@ -755,15 +785,22 @@ class PartyAutoRuleEditView(View):
                 self.rule.guild_id,
                 self.rule.channel_id,
             )
-            embed = build_party_result_embed(result, status_message="자동 생성 완료")
+            embed = build_party_result_embed(
+                result,
+                status_message="자동 생성 완료",
+            )
 
         except Exception as e:
             result = self.party_manage_service.get_active_build_result(
                 self.rule.guild_id,
                 self.rule.channel_id,
             )
+
             if result:
-                embed = build_party_result_embed(result, status_message=f"생성 실패: {e}")
+                embed = build_party_result_embed(
+                    result,
+                    status_message=f"생성 실패: {e}",
+                )
             else:
                 embed = build_empty_result_embed(
                     self.rule.raid_name,
