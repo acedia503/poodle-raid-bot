@@ -85,102 +85,116 @@ class PartyBuilderService:
     # 자동 생성
     # =========================
     async def build_parties(
-        self,
-        guild_id: int,
-        channel_id: int,
-        created_by: int,
-    ):
-        raid = self.raid_service.get_channel_raid(channel_id)
-        if raid is None:
-            raise Exception("레이드 없음")
+    self,
+    guild_id: int,
+    channel_id: int,
+    created_by: int,
+):
+    raid = self.raid_service.get_channel_raid(channel_id)
+    if raid is None:
+        raise Exception("레이드가 없습니다.")
 
-        applications = self.application_service.get_applications(
-            guild_id=guild_id,
-            channel_id=channel_id,
+    applications = self.application_service.get_applications(
+        guild_id=guild_id,
+        channel_id=channel_id,
+    )
+
+    if not applications:
+        raise Exception("신청자가 없습니다.")
+
+    # 최신 정보 갱신
+    await self._refresh_applicants(applications)
+
+    # 기존 세션 비활성화
+    self.session_repository.deactivate_existing_sessions(
+        guild_id,
+        channel_id,
+        raid.raid_name,
+    )
+
+    total = len(applications)
+    full_group_count = total // 8
+
+    session = PartyBuildSession(
+        id=None,
+        guild_id=guild_id,
+        channel_id=channel_id,
+        raid_name=raid.raid_name,
+        total_applicants=total,
+        full_group_count=full_group_count,
+        temp_group_count=0,
+        waiting_count=0,
+        created_by=created_by,
+        is_active=True,
+    )
+    session = self.session_repository.save(session)
+
+    # 규칙 조회
+    rule = self.party_rule_service.get_or_create_rule(
+        guild_id=guild_id,
+        channel_id=channel_id,
+        raid_name=raid.raid_name,
+    )
+
+    # 전체 파티 목록 생성
+    party_buckets: list[PartyBucket] = []
+    for group_no in range(1, full_group_count + 1):
+        party_buckets.append(
+            PartyBucket(
+                group_no=group_no,
+                party_no=1,
+                priority_jobs=list(rule.party1_priority_jobs),
+                preferred_jobs=list(rule.party1_preferred_jobs),
+            )
+        )
+        party_buckets.append(
+            PartyBucket(
+                group_no=group_no,
+                party_no=2,
+                priority_jobs=list(rule.party2_priority_jobs),
+                preferred_jobs=list(rule.party2_preferred_jobs),
+            )
         )
 
-        if not applications:
-            raise Exception("신청자가 없습니다.")
+    # 전투력 높은 순 정렬
+    applications.sort(key=lambda x: x.combat_power, reverse=True)
 
-        # 🔥 최신 정보 갱신
-        await self._refresh_applicants(applications)
+    assignable_count = full_group_count * 8
+    assign_targets = applications[:assignable_count]
+    waiting_targets = applications[assignable_count:]
 
-        # 기존 세션 제거
-        self.session_repository.deactivate_existing_sessions(
-            guild_id,
-            channel_id,
-            raid.raid_name,
+    # 전체 파티 균형 기준 배치
+    for app in assign_targets:
+        candidates = [party for party in party_buckets if party.can_add()]
+        if not candidates:
+            break
+
+        best_party = max(
+            candidates,
+            key=lambda party: (
+                self._calculate_party_score(app, party, party_buckets),
+                -party.total_combat_power,
+                -len(party.members),
+                -party.group_no,
+                -party.party_no,
+            ),
         )
+        best_party.add_member(app)
 
-        total = len(applications)
-        full_group_count = total // 8
-        remainder = total % 8
-
-        # 세션 생성
-        session = PartyBuildSession(
-            id=None,
-            guild_id=guild_id,
-            channel_id=channel_id,
-            raid_name=raid.raid_name,
-            total_applicants=total,
-            full_group_count=full_group_count,
-            temp_group_count=0,
-            waiting_count=0,
-            created_by=created_by,
-            is_active=True,
-        )
-        session = self.session_repository.save(session)
-
-        # 🔥 전투력 기준 정렬
-        applications.sort(key=lambda x: x.combat_power, reverse=True)
-
-        slots = []
-        waiting = []
-
-        index = 0
-
-        # 공대 생성
-        for group_no in range(1, full_group_count + 1):
-            for party_no in [1, 2]:
-                for slot_no in range(1, 5):
-                    if index >= len(applications):
-                        break
-
-                    app = applications[index]
-
-                    slots.append(
-                        PartySlot(
-                            id=None,
-                            session_id=session.id,
-                            guild_id=guild_id,
-                            channel_id=channel_id,
-                            raid_name=raid.raid_name,
-                            group_no=group_no,
-                            party_no=party_no,
-                            slot_no=slot_no,
-                            is_temp_group=False,
-                            application_id=app.id,
-                            user_id=app.user_id,
-                            user_name=app.user_name,
-                            character_name=app.character_name,
-                            job=app.job,
-                            item_level=app.item_level,
-                            combat_power=app.combat_power,
-                        )
-                    )
-                    index += 1
-
-        # 나머지 → 상비군
-        for i in range(index, len(applications)):
-            app = applications[i]
-
-            waiting.append(
-                PartyWaitingMember(
+    slots = []
+    for party in party_buckets:
+        for slot_no, app in enumerate(party.members, start=1):
+            slots.append(
+                PartySlot(
                     id=None,
                     session_id=session.id,
                     guild_id=guild_id,
                     channel_id=channel_id,
                     raid_name=raid.raid_name,
+                    group_no=party.group_no,
+                    party_no=party.party_no,
+                    slot_no=slot_no,
+                    is_temp_group=False,
                     application_id=app.id,
                     user_id=app.user_id,
                     user_name=app.user_name,
@@ -191,10 +205,29 @@ class PartyBuilderService:
                 )
             )
 
-        self.slot_repository.save_all(slots)
-        self.waiting_repository.save_all(waiting)
+    waiting = []
+    for app in waiting_targets:
+        waiting.append(
+            PartyWaitingMember(
+                id=None,
+                session_id=session.id,
+                guild_id=guild_id,
+                channel_id=channel_id,
+                raid_name=raid.raid_name,
+                application_id=app.id,
+                user_id=app.user_id,
+                user_name=app.user_name,
+                character_name=app.character_name,
+                job=app.job,
+                item_level=app.item_level,
+                combat_power=app.combat_power,
+            )
+        )
 
-        return session
+    self.slot_repository.save_all(slots)
+    self.waiting_repository.save_all(waiting)
+
+    return session
 
     # =========================
     # 수동 생성
