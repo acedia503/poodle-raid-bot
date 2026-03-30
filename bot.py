@@ -80,6 +80,7 @@ def create_bot() -> commands.Bot:
         raid_service=raid_service,
         application_service=application_service,
         character_info_service=character_info_service,
+        party_rule_service=party_rule_service,
         session_repository=party_build_session_repository,
         slot_repository=party_slot_repository,
         waiting_repository=party_waiting_repository,
