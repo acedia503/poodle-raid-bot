@@ -663,18 +663,7 @@ class PartyAutoRuleEditView(View):
         self.party2_priority_jobs = list(rule.party2_priority_jobs)
         self.party2_preferred_jobs = list(rule.party2_preferred_jobs)
 
-        self._build_components()
-
-    def _normalize_jobs(self, values: list[str]) -> list[str]:
-        normalized = []
-        for value in values:
-            if value not in normalized:
-                normalized.append(value)
-        return normalized
-
-    def _build_components(self):
-        self.clear_items()
-
+        # Select는 처음 한 번만 추가
         self.add_item(
             JobMultiSelect(
                 "1파티 우선 직업 선택",
@@ -704,13 +693,18 @@ class PartyAutoRuleEditView(View):
             )
         )
 
+    def _normalize_jobs(self, values: list[str]) -> list[str]:
+        normalized = []
+        for value in values:
+            if value not in normalized:
+                normalized.append(value)
+        return normalized
+
     async def _refresh(
         self,
         interaction: discord.Interaction,
         status_message: str | None = None,
     ):
-        self._build_components()
-
         embed = build_rule_edit_embed(
             self.rule,
             self.party1_priority_jobs,
