@@ -624,7 +624,7 @@ class JobMultiSelect(Select):
 
         super().__init__(
             placeholder=placeholder,
-            min_values=1,
+            min_values=0,
             max_values=len(JOB_OPTIONS),
             options=options,
         )
@@ -633,17 +633,10 @@ class JobMultiSelect(Select):
     async def callback(self, interaction: discord.Interaction):
         selected_values = list(self.values)
 
-        # 없음은 단독 선택만 허용
-        if "없음" in selected_values:
-            normalized_values = ["없음"]
-        else:
-            normalized_values = []
-            for value in selected_values:
-                if value != "없음" and value not in normalized_values:
-                    normalized_values.append(value)
-
-            if not normalized_values:
-                normalized_values = ["없음"]
+        normalized_values = []
+        for value in selected_values:
+            if value not in normalized_values:
+                normalized_values.append(value)
 
         await self.on_change_callback(interaction, normalized_values)
         
@@ -665,54 +658,47 @@ class PartyAutoRuleEditView(View):
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
 
-        self.party1_priority_jobs = list(rule.party1_priority_jobs) or ["없음"]
-        self.party1_preferred_jobs = list(rule.party1_preferred_jobs) or ["없음"]
-        self.party2_priority_jobs = list(rule.party2_priority_jobs) or ["없음"]
-        self.party2_preferred_jobs = list(rule.party2_preferred_jobs) or ["없음"]
+        self.party1_priority_jobs = list(rule.party1_priority_jobs)
+        self.party1_preferred_jobs = list(rule.party1_preferred_jobs)
+        self.party2_priority_jobs = list(rule.party2_priority_jobs)
+        self.party2_preferred_jobs = list(rule.party2_preferred_jobs)
 
         self._build_components()
 
     def _normalize_jobs(self, values: list[str]) -> list[str]:
-        if not values:
-            return ["없음"]
-
-        if "없음" in values:
-            return ["없음"]
-
         normalized = []
         for value in values:
-            if value != "없음" and value not in normalized:
+            if value not in normalized:
                 normalized.append(value)
-
-        return normalized if normalized else ["없음"]
+        return normalized
 
     def _build_components(self):
         self.clear_items()
 
         self.add_item(
             JobMultiSelect(
-                "1파티 우선 직업",
+                "1파티 우선 직업 선택",
                 self.party1_priority_jobs,
                 self._on_party1_priority_change,
             )
         )
         self.add_item(
             JobMultiSelect(
-                "1파티 선호 직업",
+                "1파티 선호 직업 선택",
                 self.party1_preferred_jobs,
                 self._on_party1_preferred_change,
             )
         )
         self.add_item(
             JobMultiSelect(
-                "2파티 우선 직업",
+                "2파티 우선 직업 선택",
                 self.party2_priority_jobs,
                 self._on_party2_priority_change,
             )
         )
         self.add_item(
             JobMultiSelect(
-                "2파티 선호 직업",
+                "2파티 선호 직업 선택",
                 self.party2_preferred_jobs,
                 self._on_party2_preferred_change,
             )
@@ -785,6 +771,7 @@ class PartyAutoRuleEditView(View):
                 self.rule.guild_id,
                 self.rule.channel_id,
             )
+
             embed = build_party_result_embed(
                 result,
                 status_message="자동 생성 완료",
