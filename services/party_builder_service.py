@@ -5,6 +5,24 @@ from domain.party_build_session import PartyBuildSession
 from domain.party_waiting_member import PartyWaitingMember
 from domain.party_slot import PartySlot
 
+from dataclasses import dataclass, field
+
+
+@dataclass
+class PartyBucket:
+    group_no: int
+    party_no: int
+    priority_jobs: list[str] = field(default_factory=list)
+    preferred_jobs: list[str] = field(default_factory=list)
+    members: list = field(default_factory=list)
+    total_combat_power: int = 0
+
+    def can_add(self) -> bool:
+        return len(self.members) < 4
+
+    def add_member(self, app) -> None:
+        self.members.append(app)
+        self.total_combat_power += app.combat_power
 
 class PartyBuilderService:
     def __init__(
@@ -12,6 +30,7 @@ class PartyBuilderService:
         raid_service,
         application_service,
         character_info_service,
+        party_rule_service,
         session_repository,
         slot_repository,
         waiting_repository,
@@ -19,6 +38,7 @@ class PartyBuilderService:
         self.raid_service = raid_service
         self.application_service = application_service
         self.character_info_service = character_info_service
+        self.party_rule_service = party_rule_service
         self.session_repository = session_repository
         self.slot_repository = slot_repository
         self.waiting_repository = waiting_repository
@@ -247,3 +267,33 @@ class PartyBuilderService:
         self.waiting_repository.save_all(waiting)
 
         return session
+
+def _calculate_party_score(self, app, target_party: PartyBucket, all_parties: list[PartyBucket]) -> int:
+    simulated_powers = []
+    for party in all_parties:
+        if party is target_party:
+            simulated_powers.append(party.total_combat_power + app.combat_power)
+        else:
+            simulated_powers.append(party.total_combat_power)
+
+    avg_power = sum(simulated_powers) / len(simulated_powers) if simulated_powers else 0
+    balance_penalty = sum(abs(power - avg_power) for power in simulated_powers)
+
+    score = -balance_penalty
+
+    # 우선 직업 가산점
+    if app.job in target_party.priority_jobs:
+        score += 300
+
+    # 선호 직업 가산점
+    if app.job in target_party.preferred_jobs:
+        score += 80
+
+    # 동일 직업 중복 감점
+    duplicate_count = sum(1 for member in target_party.members if member.job == app.job)
+    if duplicate_count == 1:
+        score -= 120
+    elif duplicate_count >= 2:
+        score -= 300
+
+    return score
