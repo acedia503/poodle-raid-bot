@@ -663,11 +663,7 @@ class PartyAutoRuleEditView(View):
         self.party2_priority_jobs = list(rule.party2_priority_jobs)
         self.party2_preferred_jobs = list(rule.party2_preferred_jobs)
 
-        self._build_components()
-
-    def _build_components(self):
-        self.clear_items()
-
+        # Select는 초기 1회만 추가
         self.add_item(JobMultiSelect(
             "1파티 우선 직업",
             self.party1_priority_jobs,
@@ -690,7 +686,6 @@ class PartyAutoRuleEditView(View):
         ))
 
     async def _refresh(self, interaction: discord.Interaction, status_message: str | None = None):
-        self._build_components()
         embed = build_rule_edit_embed(
             self.rule,
             self.party1_priority_jobs,
@@ -756,7 +751,10 @@ class PartyAutoRuleEditView(View):
             if result:
                 embed = build_party_result_embed(result, status_message=f"생성 실패: {e}")
             else:
-                embed = build_empty_result_embed(self.rule.raid_name, status_message=f"생성 실패: {e}")
+                embed = build_empty_result_embed(
+                    self.rule.raid_name,
+                    status_message=f"생성 실패: {e}",
+                )
 
         view = PartyBuildHomeView(
             rule=self.rule,
@@ -773,7 +771,12 @@ class PartyAutoRuleEditView(View):
             self.rule.guild_id,
             self.rule.channel_id,
         )
-        embed = build_party_result_embed(result) if result else build_empty_result_embed(self.rule.raid_name)
+
+        embed = (
+            build_party_result_embed(result)
+            if result
+            else build_empty_result_embed(self.rule.raid_name)
+        )
 
         view = PartyBuildHomeView(
             rule=self.rule,
