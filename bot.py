@@ -94,10 +94,9 @@ def create_bot() -> commands.Bot:
     )
 
     party_modify_service = PartyModifyService(
-        raid_service=raid_service,
-        party_build_session_repository=party_build_session_repository,
-        party_slot_repository=party_slot_repository,
-        party_waiting_repository=party_waiting_repository,
+        session_repository=party_build_session_repository,
+        slot_repository=party_slot_repository,
+        waiting_repository=party_waiting_repository,
     )
 
     intents = discord.Intents.default()
