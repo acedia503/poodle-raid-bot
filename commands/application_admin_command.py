@@ -7,8 +7,8 @@ from discord.ext import commands
 from utils.permissions import ensure_guild_only, is_admin
 from views.application_admin_view import (
     AdminApplicationDeleteCharacterModal,
-    AdminApplicationDeleteManageView,
     ApplicationAdminMainView,
+    ConfirmDeleteView,
 )
 
 
@@ -83,52 +83,48 @@ class ApplicationAdminCommand(commands.Cog):
                 )
 
                 applications = result["applications"]
-                selected_ids = set()
-
-                async def refresh_manage_view(refresh_inter: discord.Interaction, apps, ids):
-                    setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
-                    show_identity = not bool(
-                        setting and setting.default_race and setting.default_server
+                if not applications:
+                    await modal_inter.response.send_message(
+                        "해당 캐릭터 신청 내역이 없습니다.",
+                        ephemeral=True,
                     )
+                    return
 
-                    embed = self.message_service.build_admin_delete_search_embed(
-                        "삭제 대상 선택",
-                        apps,
-                        show_identity=show_identity,
-                    )
-                    view = AdminApplicationDeleteManageView(
-                        applications=apps,
-                        selected_ids=ids,
-                        refresh_callback=refresh_manage_view,
-                        delete_callback=delete_selected,
-                        allow_select_all=False,
-                    )
+                application = applications[0]
 
-                    if refresh_inter.response.is_done():
-                        await refresh_inter.edit_original_response(
-                            content=None,
-                            embed=embed,
-                            view=view,
-                        )
-                    else:
-                        await refresh_inter.response.edit_message(
-                            content=None,
-                            embed=embed,
-                            view=view,
-                        )
+                setting = self.setting_service.get_guild_setting(modal_inter.guild.id)
+                show_identity = not bool(
+                    setting and setting.default_race and setting.default_server
+                )
 
-                async def delete_selected(delete_inter: discord.Interaction, ids: list[int]):
+                embed = self.message_service.build_admin_delete_search_embed(
+                    "삭제 확인",
+                    [application],
+                    show_identity=show_identity,
+                )
+
+                async def confirm_delete(confirm_inter: discord.Interaction, application_id: int):
                     deleted_count = await asyncio.to_thread(
                         self.application_service.admin_delete_applications,
-                        ids,
+                        [application_id],
                     )
-                    await delete_inter.response.edit_message(
+                    await confirm_inter.response.edit_message(
                         content=f"신청 {deleted_count}건을 강제 삭제했습니다.",
                         embed=None,
                         view=None,
                     )
 
-                await refresh_manage_view(modal_inter, applications, selected_ids)
+                view = ConfirmDeleteView(
+                    application=application,
+                    delete_callback=confirm_delete,
+                )
+
+                await modal_inter.response.send_message(
+                    content="삭제할 신청 내역입니다.",
+                    embed=embed,
+                    view=view,
+                    ephemeral=True,
+                )
 
             await inter.response.send_modal(
                 AdminApplicationDeleteCharacterModal(on_character_submit)
