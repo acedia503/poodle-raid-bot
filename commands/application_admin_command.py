@@ -8,6 +8,7 @@ from utils.permissions import ensure_guild_only, is_admin
 from views.application_admin_view import (
     AdminApplicationDeleteCharacterModal,
     AdminApplicationDeleteManageView,
+    AdminApplicationUserPickView,
     AdminApplicationUserSearchModal,
     AdminApplicationUserResultView,
     ApplicationAdminDeleteModeView,
