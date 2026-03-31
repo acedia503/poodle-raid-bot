@@ -580,6 +580,7 @@ class GroupMemberSelect(Select):
             result_msg = view.party_modify_service.remove_party_member_to_waiting(
                 guild_id=view.rule.guild_id,
                 channel_id=view.rule.channel_id,
+                raid_name=view.rule.raid_name,
                 slot_id=slot_id,
             )
 
