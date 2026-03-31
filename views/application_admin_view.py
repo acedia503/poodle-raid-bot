@@ -16,95 +16,6 @@ class AdminApplicationDeleteCharacterModal(discord.ui.Modal, title="캐릭터명
         await self.callback_func(interaction, str(self.character_name.value).strip())
 
 
-class AdminApplicationUserSearchModal(discord.ui.Modal, title="디코 유저 검색"):
-    keyword = discord.ui.TextInput(
-        label="디코 이름 또는 닉네임",
-        required=True,
-        max_length=30,
-    )
-
-    def __init__(self, callback_func):
-        super().__init__()
-        self.callback_func = callback_func
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await self.callback_func(interaction, str(self.keyword.value).strip())
-
-
-class AdminApplicationUserResultSelect(discord.ui.Select):
-    def __init__(self, users, callback_func):
-        options = [
-            discord.SelectOption(
-                label=f"{user['user_name']} | {user['user_id']}",
-                value=str(user["user_id"]),
-            )
-            for user in users[:25]
-        ]
-
-        super().__init__(
-            placeholder="유저를 선택하세요",
-            min_values=1,
-            max_values=1,
-            options=options,
-        )
-        self.users = {str(user["user_id"]): user for user in users[:25]}
-        self.callback_func = callback_func
-
-    async def callback(self, interaction: discord.Interaction):
-        selected_user = self.users[self.values[0]]
-        await self.callback_func(interaction, selected_user)
-        
-
-class AdminApplicationUserResultView(discord.ui.View):
-    def __init__(self, users, callback_func):
-        super().__init__(timeout=180)
-        self.add_item(AdminApplicationUserResultSelect(users, callback_func))
-
-
-class AdminApplicationUserPickSelect(discord.ui.Select):
-    def __init__(self, users, callback_func):
-        options = [
-            discord.SelectOption(
-                label=user["user_name"],
-                value=str(user["user_id"]),
-                description=f"ID {user['user_id']}",
-            )
-            for user in users[:25]
-        ]
-
-        super().__init__(
-            placeholder="삭제할 유저를 선택하세요",
-            min_values=1,
-            max_values=1,
-            options=options,
-        )
-        self.users = {str(user["user_id"]): user for user in users[:25]}
-        self.callback_func = callback_func
-
-    async def callback(self, interaction: discord.Interaction):
-        selected_user = self.users[self.values[0]]
-        await self.callback_func(interaction, selected_user)
-
-
-class AdminApplicationUserPickView(discord.ui.View):
-    def __init__(self, users, callback_func, back_callback):
-        super().__init__(timeout=180)
-        self.add_item(AdminApplicationUserPickSelect(users, callback_func))
-        self.back_callback_func = back_callback
-
-    @discord.ui.button(label="뒤로", style=discord.ButtonStyle.secondary)
-    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.back_callback_func(interaction)
-
-    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
-    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(
-            content="신청 관리 창을 닫았습니다.",
-            embed=None,
-            view=None,
-        )
-        
-
 class AdminApplicationDeleteMultiSelect(discord.ui.Select):
     def __init__(self, applications, selected_ids, refresh_callback):
         self.applications = applications
@@ -241,34 +152,6 @@ class ApplicationAdminMainView(discord.ui.View):
     @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.delete_callback_func(interaction)
-
-    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
-    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(
-            content="신청 관리 창을 닫았습니다.",
-            embed=None,
-            view=None,
-        )
-
-
-class ApplicationAdminDeleteModeView(discord.ui.View):
-    def __init__(self, by_user_callback, by_character_callback, back_callback):
-        super().__init__(timeout=180)
-        self.by_user_callback = by_user_callback
-        self.by_character_callback = by_character_callback
-        self.back_callback = back_callback
-
-    @discord.ui.button(label="유저로 검색", style=discord.ButtonStyle.primary)
-    async def user_search_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.by_user_callback(interaction)
-
-    @discord.ui.button(label="캐릭터명으로 검색", style=discord.ButtonStyle.primary)
-    async def character_search_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.by_character_callback(interaction)
-
-    @discord.ui.button(label="뒤로", style=discord.ButtonStyle.secondary)
-    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.back_callback(interaction)
 
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
