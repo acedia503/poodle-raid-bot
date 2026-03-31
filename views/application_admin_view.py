@@ -32,13 +32,13 @@ class AdminApplicationUserSearchModal(discord.ui.Modal, title="디코 유저 검
 
 
 class AdminApplicationUserResultSelect(discord.ui.Select):
-    def __init__(self, members, callback_func):
+    def __init__(self, users, callback_func):
         options = [
             discord.SelectOption(
-                label=f"{member.display_name} | {member.name}",
-                value=str(member.id),
+                label=f"{user['user_name']} | {user['user_id']}",
+                value=str(user["user_id"]),
             )
-            for member in members[:25]
+            for user in users[:25]
         ]
 
         super().__init__(
@@ -47,18 +47,18 @@ class AdminApplicationUserResultSelect(discord.ui.Select):
             max_values=1,
             options=options,
         )
-        self.members = {str(member.id): member for member in members[:25]}
+        self.users = {str(user["user_id"]): user for user in users[:25]}
         self.callback_func = callback_func
 
     async def callback(self, interaction: discord.Interaction):
-        selected_member = self.members[self.values[0]]
-        await self.callback_func(interaction, selected_member)
+        selected_user = self.users[self.values[0]]
+        await self.callback_func(interaction, selected_user)
 
 
 class AdminApplicationUserResultView(discord.ui.View):
-    def __init__(self, members, callback_func):
+    def __init__(self, users, callback_func):
         super().__init__(timeout=180)
-        self.add_item(AdminApplicationUserResultSelect(members, callback_func))
+        self.add_item(AdminApplicationUserResultSelect(users, callback_func))
 
 
 class AdminApplicationDeleteMultiSelect(discord.ui.Select):
