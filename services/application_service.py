@@ -154,6 +154,31 @@ class ApplicationService:
             "applications": applications,
         }
 
+    
+    def search_current_raid_users(
+        self,
+        channel_id: int,
+        keyword: str,
+    ) -> dict:
+        channel_raid = self.raid_service.get_channel_raid(channel_id)
+        if channel_raid is None:
+            return {
+                "raid_name": None,
+                "users": [],
+            }
+
+        users = self.repository.search_distinct_users_by_guild_raid_and_keyword(
+            guild_id=channel_raid.guild_id,
+            raid_name=channel_raid.raid_name,
+            keyword=keyword,
+        )
+
+        return {
+            "raid_name": channel_raid.raid_name,
+            "users": users,
+        }
+
+    
     def search_current_raid_applications_by_user(
         self,
         channel_id: int,
