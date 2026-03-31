@@ -60,7 +60,7 @@ class PartyWaitingMemberRepository:
             cur.execute(query, (session_id,))
             return cur.fetchall()
 
-    def get_by_id(self, waiting_id: int) -> dict | None:
+    def get_by_id(self, waiting_id: int):
         query = """
             SELECT *
             FROM party_waiting_members
@@ -71,7 +71,7 @@ class PartyWaitingMemberRepository:
             cur.execute(query, (waiting_id,))
             return cur.fetchone()
 
-    def delete_by_id(self, waiting_id: int) -> None:
+    def delete_by_id(self, waiting_id: int):
         query = """
             DELETE FROM party_waiting_members
             WHERE id = %s
