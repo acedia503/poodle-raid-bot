@@ -8,6 +8,18 @@ class PartySlotRepository:
     def __init__(self, db: Database):
         self.db = db
 
+    def get_by_session_id(self, session_id: int):
+        query = """
+            SELECT *
+            FROM party_slots
+            WHERE session_id = %s
+            ORDER BY group_no ASC, party_no ASC, slot_no ASC
+        """
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(query, (session_id,))
+            return cur.fetchall()
+    
     # =========================
     # 단건 조회
     # =========================
