@@ -95,7 +95,7 @@ class ApplicationAdminCommand(commands.Cog):
                         submit_inter.channel.id,
                         keyword,
                     )
-
+            
                     users = result["users"]
                     if not users:
                         await submit_inter.response.send_message(
@@ -103,23 +103,34 @@ class ApplicationAdminCommand(commands.Cog):
                             ephemeral=True,
                         )
                         return
-
+            
+                    async def back_to_delete_mode(back_inter: discord.Interaction):
+                        await back_inter.response.edit_message(
+                            content="삭제 방식을 선택하세요.",
+                            view=ApplicationAdminDeleteModeView(
+                                by_user_callback=by_user_callback,
+                                by_character_callback=by_character_callback,
+                                back_callback=back_callback,
+                            ),
+                            embed=None,
+                        )
+            
                     async def on_user_selected(select_inter: discord.Interaction, selected_user: dict):
                         result = await asyncio.to_thread(
                             self.application_service.search_current_raid_applications_by_user,
                             select_inter.channel.id,
                             selected_user["user_id"],
                         )
-
+            
                         applications = result["applications"]
                         selected_ids = set()
-
+            
                         async def refresh_manage_view(refresh_inter: discord.Interaction, apps, ids):
                             setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
                             show_identity = not bool(
                                 setting and setting.default_race and setting.default_server
                             )
-
+            
                             embed = self.message_service.build_admin_delete_search_embed(
                                 "삭제 대상 선택",
                                 apps,
@@ -132,7 +143,7 @@ class ApplicationAdminCommand(commands.Cog):
                                 delete_callback=delete_selected,
                                 allow_select_all=True,
                             )
-
+            
                             if refresh_inter.response.is_done():
                                 await refresh_inter.edit_original_response(
                                     content=None,
@@ -145,7 +156,7 @@ class ApplicationAdminCommand(commands.Cog):
                                     embed=embed,
                                     view=view,
                                 )
-
+            
                         async def delete_selected(delete_inter: discord.Interaction, ids: list[int]):
                             deleted_count = await asyncio.to_thread(
                                 self.application_service.admin_delete_applications,
@@ -156,18 +167,21 @@ class ApplicationAdminCommand(commands.Cog):
                                 embed=None,
                                 view=None,
                             )
-
-                        # 유저 선택 후에는 기존 흐름처럼 삭제 대상 선택 화면으로 넘어감
+            
                         await refresh_manage_view(select_inter, applications, selected_ids)
-
-                    # 여기서 새 "검색 결과 메시지"를 띄우는 대신,
-                    # 모달 제출 응답으로 결과 선택 화면을 띄움
+            
+                    view = AdminApplicationUserPickView(
+                        users=users,
+                        callback_func=on_user_selected,
+                        back_callback=back_to_delete_mode,
+                    )
+            
                     await submit_inter.response.send_message(
                         content="검색 결과입니다. 삭제할 유저를 선택하세요.",
-                        view=AdminApplicationUserResultView(users, on_user_selected),
+                        view=view,
                         ephemeral=True,
                     )
-
+            
                 await user_inter.response.send_modal(
                     AdminApplicationUserSearchModal(on_user_search)
                 )
