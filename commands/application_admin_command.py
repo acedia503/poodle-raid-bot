@@ -84,9 +84,10 @@ class ApplicationAdminCommand(commands.Cog):
 
                 applications = result["applications"]
                 if not applications:
-                    await modal_inter.response.send_message(
-                        "해당 캐릭터 신청 내역이 없습니다.",
-                        ephemeral=True,
+                    await modal_inter.response.edit_message(
+                        content="해당 캐릭터 신청 내역이 없습니다.",
+                        embed=None,
+                        view=None,
                     )
                     return
 
@@ -119,11 +120,10 @@ class ApplicationAdminCommand(commands.Cog):
                     delete_callback=confirm_delete,
                 )
 
-                await modal_inter.response.send_message(
-                    content="삭제할 신청 내역입니다.",
+                await modal_inter.response.edit_message(
+                    content=None,
                     embed=embed,
                     view=view,
-                    ephemeral=True,
                 )
 
             await inter.response.send_modal(
