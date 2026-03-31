@@ -53,6 +53,13 @@ class AdminApplicationUserResultSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         selected_user = self.users[self.values[0]]
         await self.callback_func(interaction, selected_user)
+        
+
+class AdminApplicationUserResultView(discord.ui.View):
+    def __init__(self, users, callback_func):
+        super().__init__(timeout=180)
+        self.add_item(AdminApplicationUserResultSelect(users, callback_func))
+
 
 class AdminApplicationUserPickSelect(discord.ui.Select):
     def __init__(self, users, callback_func):
@@ -97,12 +104,6 @@ class AdminApplicationUserPickView(discord.ui.View):
             view=None,
         )
         
-
-class AdminApplicationUserResultView(discord.ui.View):
-    def __init__(self, users, callback_func):
-        super().__init__(timeout=180)
-        self.add_item(AdminApplicationUserResultSelect(users, callback_func))
-
 
 class AdminApplicationDeleteMultiSelect(discord.ui.Select):
     def __init__(self, applications, selected_ids, refresh_callback):
