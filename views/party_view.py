@@ -38,8 +38,14 @@ def build_party_result_embed(result, status_message=None):
         p1_power = party1.total_combat_power if party1 else 0
         p2_power = party2.total_combat_power if party2 else 0
 
-        p1 = " / ".join(f"{m.character_name}{get_job_short(m.job)}" for m in (party1.members if party1 else []))
-        p2 = " / ".join(f"{m.character_name}{get_job_short(m.job)}" for m in (party2.members if party2 else []))
+        p1 = " / ".join(
+            f"{m.character_name}{get_job_short(m.job)}"
+            for m in (party1.members if party1 else [])
+        )
+        p2 = " / ".join(
+            f"{m.character_name}{get_job_short(m.job)}"
+            for m in (party2.members if party2 else [])
+        )
 
         embed.add_field(
             name=f"✨{group.group_no}공대 - 총 전투력 [1파티] {p1_power:,} / [2파티] {p2_power:,}",
@@ -47,7 +53,10 @@ def build_party_result_embed(result, status_message=None):
             inline=False,
         )
 
-    reserve = " / ".join(f"{m.character_name}{get_job_short(m.job)}" for m in result.waiting_members)
+    reserve = " / ".join(
+        f"{m.character_name}{get_job_short(m.job)}"
+        for m in result.waiting_members
+    )
 
     embed.add_field(
         name="✨상비군",
@@ -99,6 +108,7 @@ def build_rule_edit_embed(
         embed.add_field(name="\n\u200b\n안내", value=status_message, inline=False)
 
     return embed
+
 
 # =========================
 # 메인 홈
@@ -611,6 +621,260 @@ class GroupMemberSelect(Select):
             await interaction.response.edit_message(embed=embed, view=view)
 
 
+# =========================
+# 상비군 이동
+# =========================
+
+class PartyModifyReserveView(View):
+    def __init__(
+        self,
+        rule,
+        party_rule_service,
+        party_builder_service,
+        party_manage_service,
+        party_modify_service,
+    ):
+        super().__init__(timeout=300)
+
+        self.rule = rule
+        self.party_rule_service = party_rule_service
+        self.party_builder_service = party_builder_service
+        self.party_manage_service = party_manage_service
+        self.party_modify_service = party_modify_service
+
+        result = self.party_manage_service.get_active_build_result(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+
+        waiting_members = result.waiting_members if result else []
+        self.add_item(ReserveMemberSelect(waiting_members))
+
+    @discord.ui.button(label="뒤로가기", style=discord.ButtonStyle.secondary, row=1)
+    async def back(self, interaction: discord.Interaction, button: Button):
+        embed = discord.Embed(
+            title="공대 수정",
+            description="수정할 대상을 선택하세요.",
+        )
+        view = PartyModifyHomeView(
+            self.rule,
+            self.party_rule_service,
+            self.party_builder_service,
+            self.party_manage_service,
+            self.party_modify_service,
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class ReserveMemberSelect(Select):
+    def __init__(self, waiting_members: list):
+        options = []
+
+        for member in waiting_members[:25]:
+            options.append(
+                discord.SelectOption(
+                    label=f"{member.character_name}{get_job_short(member.job)}",
+                    value=str(member.id),
+                    description=f"{member.job} / {member.combat_power:,}",
+                )
+            )
+
+        if not options:
+            options.append(
+                discord.SelectOption(
+                    label="상비군 없음",
+                    value="none",
+                    description="선택 가능한 상비군이 없습니다.",
+                )
+            )
+            disabled = True
+        else:
+            disabled = False
+
+        super().__init__(
+            placeholder="공대로 이동할 상비군 인원을 선택하세요",
+            min_values=1,
+            max_values=1,
+            options=options,
+            disabled=disabled,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view = self.view
+
+        if self.values[0] == "none":
+            embed = discord.Embed(
+                title="상비군 선택",
+                description="선택 가능한 상비군이 없습니다.",
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+            return
+
+        waiting_id = int(self.values[0])
+
+        result = view.party_manage_service.get_active_build_result(
+            view.rule.guild_id,
+            view.rule.channel_id,
+        )
+
+        selected_name = "상비군"
+        if result:
+            target = next((m for m in result.waiting_members if m.id == waiting_id), None)
+            if target:
+                selected_name = target.character_name
+
+        embed = discord.Embed(
+            title="이동 대상 선택",
+            description=f"선택한 인원: {selected_name}\n이동할 공대/파티를 선택하세요.",
+        )
+
+        next_view = PartyMoveTargetSelectView(
+            view.rule,
+            view.party_rule_service,
+            view.party_builder_service,
+            view.party_manage_service,
+            view.party_modify_service,
+            waiting_id,
+            selected_name,
+        )
+
+        await interaction.response.edit_message(embed=embed, view=next_view)
+
+
+class PartyMoveTargetSelectView(View):
+    def __init__(
+        self,
+        rule,
+        party_rule_service,
+        party_builder_service,
+        party_manage_service,
+        party_modify_service,
+        waiting_id: int,
+        selected_member_name: str,
+    ):
+        super().__init__(timeout=300)
+
+        self.rule = rule
+        self.party_rule_service = party_rule_service
+        self.party_builder_service = party_builder_service
+        self.party_manage_service = party_manage_service
+        self.party_modify_service = party_modify_service
+        self.waiting_id = waiting_id
+        self.selected_member_name = selected_member_name
+
+        result = self.party_manage_service.get_active_build_result(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+
+        parties = result.parties if result else []
+        self.add_item(MoveTargetSelect(parties))
+
+    @discord.ui.button(label="뒤로가기", style=discord.ButtonStyle.secondary, row=1)
+    async def back(self, interaction: discord.Interaction, button: Button):
+        embed = discord.Embed(
+            title="상비군 선택",
+            description="공대로 이동할 상비군 인원을 선택하세요.",
+        )
+        view = PartyModifyReserveView(
+            self.rule,
+            self.party_rule_service,
+            self.party_builder_service,
+            self.party_manage_service,
+            self.party_modify_service,
+        )
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class MoveTargetSelect(Select):
+    def __init__(self, parties: list):
+        options = []
+
+        for party in sorted(parties, key=lambda p: (p.group_no, p.party_no))[:25]:
+            options.append(
+                discord.SelectOption(
+                    label=f"{party.group_no}공대 {party.party_no}파티",
+                    value=f"{party.group_no}:{party.party_no}",
+                    description=f"현재 인원 {len(party.members)}명",
+                )
+            )
+
+        if not options:
+            options.append(
+                discord.SelectOption(
+                    label="이동 대상 없음",
+                    value="none",
+                    description="이동 가능한 공대/파티가 없습니다.",
+                )
+            )
+            disabled = True
+        else:
+            disabled = False
+
+        super().__init__(
+            placeholder="이동할 공대/파티를 선택하세요",
+            min_values=1,
+            max_values=1,
+            options=options,
+            disabled=disabled,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view = self.view
+
+        if self.values[0] == "none":
+            embed = discord.Embed(
+                title="이동 대상 선택",
+                description="이동 가능한 공대/파티가 없습니다.",
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+            return
+
+        group_no, party_no = self.values[0].split(":")
+        group_no = int(group_no)
+        party_no = int(party_no)
+
+        try:
+            result_msg = view.party_modify_service.add_waiting_member_to_party(
+                guild_id=view.rule.guild_id,
+                channel_id=view.rule.channel_id,
+                raid_name=view.rule.raid_name,
+                waiting_id=view.waiting_id,
+                group_no=group_no,
+                party_no=party_no,
+            )
+
+            result = view.party_manage_service.get_active_build_result(
+                view.rule.guild_id,
+                view.rule.channel_id,
+            )
+
+            embed = build_party_result_embed(
+                result,
+                status_message=result_msg,
+            )
+
+            home = PartyBuildHomeView(
+                view.rule,
+                view.party_rule_service,
+                view.party_builder_service,
+                view.party_manage_service,
+                view.party_modify_service,
+            )
+            await interaction.response.edit_message(embed=embed, view=home)
+
+        except Exception as e:
+            embed = discord.Embed(
+                title="이동 대상 선택",
+                description=f"이동 실패: {e}",
+            )
+            await interaction.response.edit_message(embed=embed, view=view)
+
+
+# =========================
+# 자동 생성 규칙 설정
+# =========================
+
 class JobMultiSelect(Select):
     def __init__(self, placeholder: str, current_values: list[str], on_change_callback):
         options = []
@@ -640,7 +904,7 @@ class JobMultiSelect(Select):
                 normalized_values.append(value)
 
         await self.on_change_callback(interaction, normalized_values)
-        
+
 
 class PartyAutoRuleEditView(View):
     def __init__(
@@ -664,7 +928,6 @@ class PartyAutoRuleEditView(View):
         self.party2_priority_jobs = list(rule.party2_priority_jobs)
         self.party2_preferred_jobs = list(rule.party2_preferred_jobs)
 
-        # Select는 처음 한 번만 추가
         self.add_item(
             JobMultiSelect(
                 "1파티 우선 직업 선택",
