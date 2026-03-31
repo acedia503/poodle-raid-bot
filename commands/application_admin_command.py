@@ -90,27 +90,25 @@ class ApplicationAdminCommand(commands.Cog):
 
             async def by_user_callback(user_inter: discord.Interaction):
                 async def on_user_search(submit_inter: discord.Interaction, keyword: str):
-                    if submit_inter.guild is None:
-                        await submit_inter.response.send_message(
-                            "서버 채널에서만 사용할 수 있습니다.",
-                            ephemeral=True,
-                        )
-                        return
+                    result = await asyncio.to_thread(
+                        self.application_service.search_current_raid_users,
+                        submit_inter.channel.id,
+                        keyword,
+                    )
 
-                    members = await self._search_guild_members(submit_inter.guild, keyword)
-
-                    if not members:
+                    users = result["users"]
+                    if not users:
                         await submit_inter.response.send_message(
                             "검색 결과가 없습니다.",
                             ephemeral=True,
                         )
                         return
 
-                    async def on_user_selected(select_inter: discord.Interaction, selected_user: discord.Member):
+                    async def on_user_selected(select_inter: discord.Interaction, selected_user):
                         result = await asyncio.to_thread(
                             self.application_service.search_current_raid_applications_by_user,
                             select_inter.channel.id,
-                            selected_user.id,
+                            selected_user["user_id"],
                         )
 
                         applications = result["applications"]
@@ -161,9 +159,11 @@ class ApplicationAdminCommand(commands.Cog):
 
                         await refresh_manage_view(select_inter, applications, selected_ids)
 
+                    # 유저 검색 결과도 기존 흐름과 최대한 맞추기 위해
+                    # 새 메시지 대신 간단 선택 단계로 보여줌
                     await submit_inter.response.send_message(
                         content="검색 결과입니다. 삭제할 유저를 선택하세요.",
-                        view=AdminApplicationUserResultView(members, on_user_selected),
+                        view=AdminApplicationUserResultView(users, on_user_selected),
                         ephemeral=True,
                     )
 
@@ -249,23 +249,3 @@ class ApplicationAdminCommand(commands.Cog):
             ),
             ephemeral=True,
         )
-
-    async def _search_guild_members(
-        self,
-        guild: discord.Guild,
-        keyword: str,
-    ) -> list[discord.Member]:
-        keyword_lower = keyword.lower()
-        members: list[discord.Member] = []
-
-        async for member in guild.fetch_members(limit=None):
-            if member.bot:
-                continue
-
-            display_name = (member.display_name or "").lower()
-            username = (member.name or "").lower()
-
-            if keyword_lower in display_name or keyword_lower in username:
-                members.append(member)
-
-        return members[:25]
