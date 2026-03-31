@@ -61,7 +61,6 @@ class PartyBuilderService:
                 app.item_level = info["item_level"]
                 app.combat_power = info["combat_power"]
 
-                # DB snapshot 반영
                 self.application_service.repository.update_character_snapshot(
                     application_id=app.id,
                     job=app.job,
@@ -81,6 +80,51 @@ class PartyBuilderService:
                 )
 
         await asyncio.gather(*(fetch(app) for app in applications))
+
+    # =========================
+    # 직업 중복 수 계산
+    # =========================
+    def _job_duplicate_count(self, app, target_party: PartyBucket) -> int:
+        return sum(1 for member in target_party.members if member.job == app.job)
+
+    # =========================
+    # 같은 직업 3중복 금지 + 2중복 최소화 후보 필터
+    # =========================
+    def _filter_candidates_by_job_duplication(
+        self,
+        app,
+        candidates: list[PartyBucket],
+    ) -> list[PartyBucket]:
+        if not candidates:
+            return []
+
+        zero_dup = []
+        one_dup = []
+
+        for party in candidates:
+            dup_count = self._job_duplicate_count(app, party)
+
+            # 3중복 금지: 이미 2명 있으면 후보 제외
+            if dup_count >= 2:
+                continue
+
+            # 같은 직업 없는 파티 최우선
+            if dup_count == 0:
+                zero_dup.append(party)
+            else:
+                one_dup.append(party)
+
+        # 0중복 후보가 있으면 무조건 그것만 사용
+        if zero_dup:
+            return zero_dup
+
+        # 0중복이 없을 때만 1중복 후보 허용
+        if one_dup:
+            return one_dup
+
+        # 이론상 여기 오면 모든 후보가 2중복 상태
+        # = 3중복밖에 답이 없다는 뜻이지만, 사용자 요구상 허용하지 않음
+        return []
 
     # =========================
     # 파티 점수 계산
@@ -113,11 +157,18 @@ class PartyBuilderService:
             score += 80
 
         # 동일 직업 중복 감점
-        duplicate_count = sum(1 for member in target_party.members if member.job == app.job)
+        duplicate_count = self._job_duplicate_count(app, target_party)
+
+        # 2번째 배치도 최대한 꺼리게 강한 감점
         if duplicate_count == 1:
-            score -= 120
+            score -= 450
+
+        # 3번째 배치는 후보 필터에서 이미 제외되지만, 안전장치
         elif duplicate_count >= 2:
-            score -= 300
+            score -= 100000
+
+        # 인원 적은 파티 약간 우대
+        score -= len(target_party.members) * 20
 
         return score
 
@@ -142,10 +193,8 @@ class PartyBuilderService:
         if not applications:
             raise Exception("신청자가 없습니다.")
 
-        # 최신 정보 갱신
         await self._refresh_applicants(applications)
 
-        # 기존 세션 종료
         self.session_repository.deactivate_existing_sessions(
             guild_id,
             channel_id,
@@ -169,14 +218,12 @@ class PartyBuilderService:
         )
         session = self.session_repository.save(session)
 
-        # 규칙 조회
         rule = self.party_rule_service.get_or_create_rule(
             guild_id=guild_id,
             channel_id=channel_id,
             raid_name=raid.raid_name,
         )
 
-        # 전체 파티 생성
         party_buckets: list[PartyBucket] = []
         for group_no in range(1, full_group_count + 1):
             party_buckets.append(
@@ -196,26 +243,33 @@ class PartyBuilderService:
                 )
             )
 
-        # 전투력 높은 순 정렬
         applications.sort(key=lambda x: x.combat_power, reverse=True)
 
         assign_count = full_group_count * 8
         assign_targets = applications[:assign_count]
         waiting_targets = applications[assign_count:]
 
-        # 전체 파티 기준 배치
         for app in assign_targets:
             candidates = [p for p in party_buckets if p.can_add()]
             if not candidates:
                 break
 
+            # 같은 직업 3중복 금지 + 2중복 최소화
+            filtered_candidates = self._filter_candidates_by_job_duplication(app, candidates)
+
+            if not filtered_candidates:
+                raise Exception(
+                    f"{app.character_name}({app.job}) 배치 불가: "
+                    "같은 직업 3중복 없이 배치할 수 있는 파티가 없습니다."
+                )
+
             best_party = max(
-                candidates,
+                filtered_candidates,
                 key=lambda p: self._calculate_party_score(app, p, party_buckets),
             )
+
             best_party.add_member(app)
 
-        # 슬롯 저장
         slots = []
         for party in party_buckets:
             for slot_no, app in enumerate(party.members, start=1):
@@ -240,7 +294,6 @@ class PartyBuilderService:
                     )
                 )
 
-        # 상비군 저장
         waiting = []
         for app in waiting_targets:
             waiting.append(
@@ -286,7 +339,6 @@ class PartyBuilderService:
         if not applications:
             raise Exception("신청자가 없습니다.")
 
-        # 최신 정보 갱신
         await self._refresh_applicants(applications)
 
         self.session_repository.deactivate_existing_sessions(
@@ -312,7 +364,6 @@ class PartyBuilderService:
         )
         session = self.session_repository.save(session)
 
-        # 전원 상비군
         waiting = []
         for app in applications:
             waiting.append(
