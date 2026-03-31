@@ -16,147 +16,20 @@ class AdminApplicationDeleteCharacterModal(discord.ui.Modal, title="캐릭터명
         await self.callback_func(interaction, str(self.character_name.value).strip())
 
 
-class AdminApplicationDeleteMultiSelect(discord.ui.Select):
-    def __init__(self, applications, selected_ids, refresh_callback):
-        self.applications = applications
-        self.selected_ids = selected_ids
-        self.refresh_callback = refresh_callback
-
-        options = [
-            discord.SelectOption(
-                label=f"{app.character_name} | {app.job} | {app.item_level} | {app.combat_power:,}",
-                description=f"{app.user_name}",
-                value=str(app.id),
-                default=(app.id in self.selected_ids),
-            )
-            for app in applications[:25]
-        ]
-
-        super().__init__(
-            placeholder="삭제할 캐릭터를 선택하세요",
-            min_values=0,
-            max_values=max(1, len(options)),
-            options=options,
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        self.selected_ids.clear()
-        self.selected_ids.update(int(v) for v in self.values)
-        await self.refresh_callback(interaction, self.applications, self.selected_ids)
-
-
-class SelectAllButton(discord.ui.Button):
-    def __init__(self, parent_view):
-        super().__init__(
-            label="전체 선택",
-            style=discord.ButtonStyle.primary,
-            row=3,
-        )
-        self.parent_view_ref = parent_view
-
-    async def callback(self, interaction: discord.Interaction):
-        self.parent_view_ref.selected_ids.clear()
-        self.parent_view_ref.selected_ids.update(
-            app.id for app in self.parent_view_ref.applications if app.id is not None
-        )
-        await self.parent_view_ref.refresh_callback(
-            interaction,
-            self.parent_view_ref.applications,
-            self.parent_view_ref.selected_ids,
-        )
-
-
-class ForceDeleteButton(discord.ui.Button):
-    def __init__(self, parent_view, disabled: bool):
-        super().__init__(
-            label="강제 삭제",
-            style=discord.ButtonStyle.danger,
-            row=3,
-            disabled=disabled,
-        )
-        self.parent_view_ref = parent_view
-
-    async def callback(self, interaction: discord.Interaction):
-        await self.parent_view_ref.delete_callback(
-            interaction,
-            list(self.parent_view_ref.selected_ids),
-        )
-
-
-class CancelManageButton(discord.ui.Button):
-    def __init__(self):
-        super().__init__(
-            label="취소",
-            style=discord.ButtonStyle.secondary,
-            row=3,
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        await interaction.response.edit_message(
-            content="신청 관리 창을 닫았습니다.",
-            embed=None,
-            view=None,
-        )
-
-
-class AdminApplicationDeleteManageView(discord.ui.View):
-    def __init__(
-        self,
-        applications,
-        selected_ids,
-        refresh_callback,
-        delete_callback,
-        allow_select_all: bool,
-    ):
-        super().__init__(timeout=180)
-        self.applications = applications
-        self.selected_ids = selected_ids
-        self.refresh_callback = refresh_callback
+class ConfirmDeleteView(discord.ui.View):
+    def __init__(self, application, delete_callback):
+        super().__init__(timeout=60)
+        self.application = application
         self.delete_callback = delete_callback
-        self.allow_select_all = allow_select_all
-
-        has_applications = len(applications) > 0
-        has_selected = len(selected_ids) > 0
-
-        if has_applications:
-            self.add_item(
-                AdminApplicationDeleteMultiSelect(
-                    applications=applications,
-                    selected_ids=selected_ids,
-                    refresh_callback=refresh_callback,
-                )
-            )
-
-        if self.allow_select_all and has_applications:
-            self.add_item(SelectAllButton(self))
-
-        self.add_item(
-            ForceDeleteButton(
-                self,
-                disabled=(not has_applications or not has_selected),
-            )
-        )
-        self.add_item(CancelManageButton())
-
-
-class ApplicationAdminMainView(discord.ui.View):
-    def __init__(self, list_callback, delete_callback):
-        super().__init__(timeout=180)
-        self.list_callback_func = list_callback
-        self.delete_callback_func = delete_callback
-
-    @discord.ui.button(label="목록", style=discord.ButtonStyle.primary)
-    async def list_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.list_callback_func(interaction)
 
     @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.delete_callback_func(interaction)
+        await self.delete_callback(interaction, self.application.id)
 
-    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
-    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="취소", style=discord.ButtonStyle.secondary)
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
-            content="신청 관리 창을 닫았습니다.",
+            content="삭제가 취소되었습니다.",
             embed=None,
             view=None,
         )
