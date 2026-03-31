@@ -54,6 +54,49 @@ class AdminApplicationUserResultSelect(discord.ui.Select):
         selected_user = self.users[self.values[0]]
         await self.callback_func(interaction, selected_user)
 
+class AdminApplicationUserPickSelect(discord.ui.Select):
+    def __init__(self, users, callback_func):
+        options = [
+            discord.SelectOption(
+                label=user["user_name"],
+                value=str(user["user_id"]),
+                description=f"ID {user['user_id']}",
+            )
+            for user in users[:25]
+        ]
+
+        super().__init__(
+            placeholder="삭제할 유저를 선택하세요",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+        self.users = {str(user["user_id"]): user for user in users[:25]}
+        self.callback_func = callback_func
+
+    async def callback(self, interaction: discord.Interaction):
+        selected_user = self.users[self.values[0]]
+        await self.callback_func(interaction, selected_user)
+
+
+class AdminApplicationUserPickView(discord.ui.View):
+    def __init__(self, users, callback_func, back_callback):
+        super().__init__(timeout=180)
+        self.add_item(AdminApplicationUserPickSelect(users, callback_func))
+        self.back_callback_func = back_callback
+
+    @discord.ui.button(label="뒤로", style=discord.ButtonStyle.secondary)
+    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.back_callback_func(interaction)
+
+    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="신청 관리 창을 닫았습니다.",
+            embed=None,
+            view=None,
+        )
+        
 
 class AdminApplicationUserResultView(discord.ui.View):
     def __init__(self, users, callback_func):
