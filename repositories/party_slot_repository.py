@@ -8,6 +8,9 @@ class PartySlotRepository:
     def __init__(self, db: Database):
         self.db = db
 
+    # =========================
+    # 전체 조회 (세션 기준)
+    # =========================
     def get_by_session_id(self, session_id: int):
         query = """
             SELECT *
@@ -19,7 +22,7 @@ class PartySlotRepository:
             cur = conn.cursor()
             cur.execute(query, (session_id,))
             return cur.fetchall()
-    
+
     # =========================
     # 단건 조회
     # =========================
@@ -67,7 +70,58 @@ class PartySlotRepository:
             return cur.fetchall()
 
     # =========================
-    # INSERT
+    # 🔥 bulk insert (자동 생성 필수)
+    # =========================
+    def save_all(self, slots: list[PartySlot]) -> None:
+        if not slots:
+            return
+
+        query = """
+            INSERT INTO party_slots (
+                session_id,
+                guild_id,
+                channel_id,
+                raid_name,
+                group_no,
+                party_no,
+                slot_no,
+                is_temp_group,
+                application_id,
+                user_id,
+                user_name,
+                character_name,
+                job,
+                item_level,
+                combat_power
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+
+        with self.db.get_connection() as conn:
+            cur = conn.cursor()
+            for slot in slots:
+                cur.execute(
+                    query,
+                    (
+                        slot.session_id,
+                        slot.guild_id,
+                        slot.channel_id,
+                        slot.raid_name,
+                        slot.group_no,
+                        slot.party_no,
+                        slot.slot_no,
+                        slot.is_temp_group,
+                        slot.application_id,
+                        slot.user_id,
+                        slot.user_name,
+                        slot.character_name,
+                        slot.job,
+                        slot.item_level,
+                        slot.combat_power,
+                    ),
+                )
+
+    # =========================
+    # 단건 insert (수정용)
     # =========================
     def insert(self, slot: PartySlot):
         query = """
