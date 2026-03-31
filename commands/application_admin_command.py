@@ -104,7 +104,7 @@ class ApplicationAdminCommand(commands.Cog):
                         )
                         return
 
-                    async def on_user_selected(select_inter: discord.Interaction, selected_user):
+                    async def on_user_selected(select_inter: discord.Interaction, selected_user: dict):
                         result = await asyncio.to_thread(
                             self.application_service.search_current_raid_applications_by_user,
                             select_inter.channel.id,
@@ -157,10 +157,11 @@ class ApplicationAdminCommand(commands.Cog):
                                 view=None,
                             )
 
+                        # 유저 선택 후에는 기존 흐름처럼 삭제 대상 선택 화면으로 넘어감
                         await refresh_manage_view(select_inter, applications, selected_ids)
 
-                    # 유저 검색 결과도 기존 흐름과 최대한 맞추기 위해
-                    # 새 메시지 대신 간단 선택 단계로 보여줌
+                    # 여기서 새 "검색 결과 메시지"를 띄우는 대신,
+                    # 모달 제출 응답으로 결과 선택 화면을 띄움
                     await submit_inter.response.send_message(
                         content="검색 결과입니다. 삭제할 유저를 선택하세요.",
                         view=AdminApplicationUserResultView(users, on_user_selected),
