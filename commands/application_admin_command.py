@@ -8,10 +8,6 @@ from utils.permissions import ensure_guild_only, is_admin
 from views.application_admin_view import (
     AdminApplicationDeleteCharacterModal,
     AdminApplicationDeleteManageView,
-    AdminApplicationUserPickView,
-    AdminApplicationUserSearchModal,
-    AdminApplicationUserResultView,
-    ApplicationAdminDeleteModeView,
     ApplicationAdminMainView,
 )
 
@@ -79,182 +75,63 @@ class ApplicationAdminCommand(commands.Cog):
             )
 
         async def delete_callback(inter: discord.Interaction):
-            async def back_callback(back_inter: discord.Interaction):
-                await back_inter.response.edit_message(
-                    content="신청 관리 항목을 선택하세요.",
-                    view=ApplicationAdminMainView(
-                        list_callback=list_callback,
-                        delete_callback=delete_callback,
-                    ),
-                    embed=None,
+            async def on_character_submit(modal_inter: discord.Interaction, character_name: str):
+                result = await asyncio.to_thread(
+                    self.application_service.search_current_raid_applications_by_character,
+                    modal_inter.channel.id,
+                    character_name,
                 )
 
-            async def by_user_callback(user_inter: discord.Interaction):
-                async def on_user_search(submit_inter: discord.Interaction, keyword: str):
-                    result = await asyncio.to_thread(
-                        self.application_service.search_current_raid_users,
-                        submit_inter.channel.id,
-                        keyword,
-                    )
-            
-                    users = result["users"]
-                    if not users:
-                        await submit_inter.response.send_message(
-                            "검색 결과가 없습니다.",
-                            ephemeral=True,
-                        )
-                        return
-            
-                    async def back_to_delete_mode(back_inter: discord.Interaction):
-                        await back_inter.response.edit_message(
-                            content="삭제 방식을 선택하세요.",
-                            view=ApplicationAdminDeleteModeView(
-                                by_user_callback=by_user_callback,
-                                by_character_callback=by_character_callback,
-                                back_callback=back_callback,
-                            ),
-                            embed=None,
-                        )
-            
-                    async def on_user_selected(select_inter: discord.Interaction, selected_user: dict):
-                        result = await asyncio.to_thread(
-                            self.application_service.search_current_raid_applications_by_user,
-                            select_inter.channel.id,
-                            selected_user["user_id"],
-                        )
-            
-                        applications = result["applications"]
-                        selected_ids = set()
-            
-                        async def refresh_manage_view(refresh_inter: discord.Interaction, apps, ids):
-                            setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
-                            show_identity = not bool(
-                                setting and setting.default_race and setting.default_server
-                            )
-            
-                            embed = self.message_service.build_admin_delete_search_embed(
-                                "삭제 대상 선택",
-                                apps,
-                                show_identity=show_identity,
-                            )
-                            view = AdminApplicationDeleteManageView(
-                                applications=apps,
-                                selected_ids=ids,
-                                refresh_callback=refresh_manage_view,
-                                delete_callback=delete_selected,
-                                allow_select_all=True,
-                            )
-            
-                            if refresh_inter.response.is_done():
-                                await refresh_inter.edit_original_response(
-                                    content=None,
-                                    embed=embed,
-                                    view=view,
-                                )
-                            else:
-                                await refresh_inter.response.edit_message(
-                                    content=None,
-                                    embed=embed,
-                                    view=view,
-                                )
-            
-                        async def delete_selected(delete_inter: discord.Interaction, ids: list[int]):
-                            deleted_count = await asyncio.to_thread(
-                                self.application_service.admin_delete_applications,
-                                ids,
-                            )
-                            await delete_inter.response.edit_message(
-                                content=f"신청 {deleted_count}건을 강제 삭제했습니다.",
-                                embed=None,
-                                view=None,
-                            )
-            
-                        await refresh_manage_view(select_inter, applications, selected_ids)
-            
-                    view = AdminApplicationUserPickView(
-                        users=users,
-                        callback_func=on_user_selected,
-                        back_callback=back_to_delete_mode,
-                    )
-            
-                    await submit_inter.response.send_message(
-                        content="검색 결과입니다. 삭제할 유저를 선택하세요.",
-                        view=view,
-                        ephemeral=True,
-                    )
-            
-                await user_inter.response.send_modal(
-                    AdminApplicationUserSearchModal(on_user_search)
-                )
+                applications = result["applications"]
+                selected_ids = set()
 
-            async def by_character_callback(char_inter: discord.Interaction):
-                async def on_character_submit(modal_inter: discord.Interaction, character_name: str):
-                    result = await asyncio.to_thread(
-                        self.application_service.search_current_raid_applications_by_character,
-                        modal_inter.channel.id,
-                        character_name,
+                async def refresh_manage_view(refresh_inter: discord.Interaction, apps, ids):
+                    setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
+                    show_identity = not bool(
+                        setting and setting.default_race and setting.default_server
                     )
 
-                    applications = result["applications"]
-                    selected_ids = set()
+                    embed = self.message_service.build_admin_delete_search_embed(
+                        "삭제 대상 선택",
+                        apps,
+                        show_identity=show_identity,
+                    )
+                    view = AdminApplicationDeleteManageView(
+                        applications=apps,
+                        selected_ids=ids,
+                        refresh_callback=refresh_manage_view,
+                        delete_callback=delete_selected,
+                        allow_select_all=False,
+                    )
 
-                    async def refresh_manage_view(refresh_inter: discord.Interaction, apps, ids):
-                        setting = self.setting_service.get_guild_setting(refresh_inter.guild.id)
-                        show_identity = not bool(
-                            setting and setting.default_race and setting.default_server
+                    if refresh_inter.response.is_done():
+                        await refresh_inter.edit_original_response(
+                            content=None,
+                            embed=embed,
+                            view=view,
+                        )
+                    else:
+                        await refresh_inter.response.edit_message(
+                            content=None,
+                            embed=embed,
+                            view=view,
                         )
 
-                        embed = self.message_service.build_admin_delete_search_embed(
-                            "삭제 대상 선택",
-                            apps,
-                            show_identity=show_identity,
-                        )
-                        view = AdminApplicationDeleteManageView(
-                            applications=apps,
-                            selected_ids=ids,
-                            refresh_callback=refresh_manage_view,
-                            delete_callback=delete_selected,
-                            allow_select_all=False,
-                        )
+                async def delete_selected(delete_inter: discord.Interaction, ids: list[int]):
+                    deleted_count = await asyncio.to_thread(
+                        self.application_service.admin_delete_applications,
+                        ids,
+                    )
+                    await delete_inter.response.edit_message(
+                        content=f"신청 {deleted_count}건을 강제 삭제했습니다.",
+                        embed=None,
+                        view=None,
+                    )
 
-                        if refresh_inter.response.is_done():
-                            await refresh_inter.edit_original_response(
-                                content=None,
-                                embed=embed,
-                                view=view,
-                            )
-                        else:
-                            await refresh_inter.response.edit_message(
-                                content=None,
-                                embed=embed,
-                                view=view,
-                            )
+                await refresh_manage_view(modal_inter, applications, selected_ids)
 
-                    async def delete_selected(delete_inter: discord.Interaction, ids: list[int]):
-                        deleted_count = await asyncio.to_thread(
-                            self.application_service.admin_delete_applications,
-                            ids,
-                        )
-                        await delete_inter.response.edit_message(
-                            content=f"신청 {deleted_count}건을 강제 삭제했습니다.",
-                            embed=None,
-                            view=None,
-                        )
-
-                    await refresh_manage_view(modal_inter, applications, selected_ids)
-
-                await char_inter.response.send_modal(
-                    AdminApplicationDeleteCharacterModal(on_character_submit)
-                )
-
-            await inter.response.edit_message(
-                content="삭제 방식을 선택하세요.",
-                view=ApplicationAdminDeleteModeView(
-                    by_user_callback=by_user_callback,
-                    by_character_callback=by_character_callback,
-                    back_callback=back_callback,
-                ),
-                embed=None,
+            await inter.response.send_modal(
+                AdminApplicationDeleteCharacterModal(on_character_submit)
             )
 
         await interaction.response.send_message(
