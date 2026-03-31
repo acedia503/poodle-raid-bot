@@ -403,3 +403,24 @@ class RaidApplicationRepository:
         with self.database.get_connection() as conn:
             cur = conn.cursor()
             cur.execute(query, (job, item_level, combat_power, application_id))
+
+    def search_distinct_users_by_guild_raid_and_keyword(
+        self,
+        guild_id: int,
+        raid_name: str,
+        keyword: str,
+    ) -> list[dict]:
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT DISTINCT user_id, user_name
+                FROM raid_applications
+                WHERE guild_id = %s
+                  AND raid_name = %s
+                  AND LOWER(user_name) LIKE %s
+                ORDER BY user_name ASC
+                """,
+                (guild_id, raid_name, f"%{keyword.lower()}%"),
+            )
+            return cur.fetchall()
