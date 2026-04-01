@@ -100,7 +100,7 @@ class ApplicationAdminCommand(commands.Cog):
                 view=ApplicationAdminListView(back_callback=go_main),
             )
 
-        async def render_user_applications_delete_view(
+        async def render_multi_delete_view(
             inter: discord.Interaction,
             applications,
             back_callback,
@@ -199,9 +199,9 @@ class ApplicationAdminCommand(commands.Cog):
                         select_inter.channel.id,
                         selected_user["user_id"],
                     )
-
                     applications = result["applications"]
-                    await render_user_applications_delete_view(
+
+                    await render_multi_delete_view(
                         select_inter,
                         applications,
                         back_callback=back_to_delete_mode,
@@ -213,18 +213,12 @@ class ApplicationAdminCommand(commands.Cog):
                         modal_inter.channel.id,
                         users[0]["user_id"],
                     )
-
-                    await render_user_applications_delete_view(
+                    await render_multi_delete_view(
                         modal_inter,
                         result["applications"],
                         back_callback=back_to_delete_mode,
                     )
                     return
-
-                setting = self.setting_service.get_guild_setting(modal_inter.guild.id)
-                show_identity = not bool(
-                    setting and setting.default_race and setting.default_server
-                )
 
                 embed = self.message_service.build_admin_user_search_result_embed(
                     "유저 검색 결과",
@@ -308,64 +302,18 @@ class ApplicationAdminCommand(commands.Cog):
                     )
                     return
 
-                selected_ids = set()
-
-                async def refresh_manage_view(refresh_inter: discord.Interaction, apps, ids):
-                    embed = self.message_service.build_admin_delete_search_embed(
-                        "삭제 대상 선택",
-                        apps,
-                        show_identity=show_identity,
-                    )
-                    view = MultiDeleteView(
-                        applications=apps,
-                        selected_ids=ids,
-                        refresh_callback=refresh_manage_view,
-                        delete_selected_callback=delete_selected,
-                        delete_all_callback=delete_all,
-                        back_callback=back_to_delete_mode,
-                    )
-
-                    if refresh_inter.response.is_done():
-                        await refresh_inter.edit_original_response(
-                            content=None,
-                            embed=embed,
-                            view=view,
-                        )
-                    else:
-                        await refresh_inter.response.edit_message(
-                            content=None,
-                            embed=embed,
-                            view=view,
-                        )
-
-                async def delete_selected(delete_inter: discord.Interaction, ids: list[int]):
-                    deleted_count = await asyncio.to_thread(
-                        self.application_service.admin_delete_applications,
-                        ids,
-                    )
-                    await delete_inter.response.edit_message(
-                        content=f"신청 {deleted_count}건을 강제 삭제했습니다.",
-                        embed=None,
-                        view=None,
-                    )
-
-                async def delete_all(delete_inter: discord.Interaction):
-                    ids = [app.id for app in applications if app.id is not None]
-                    deleted_count = await asyncio.to_thread(
-                        self.application_service.admin_delete_applications,
-                        ids,
-                    )
-                    await delete_inter.response.edit_message(
-                        content=f"신청 {deleted_count}건을 강제 삭제했습니다.",
-                        embed=None,
-                        view=None,
-                    )
-
-                await refresh_manage_view(modal_inter, applications, selected_ids)
+                await render_multi_delete_view(
+                    modal_inter,
+                    applications,
+                    back_callback=back_to_delete_mode,
+                )
 
             await inter.response.send_modal(
                 AdminApplicationDeleteCharacterModal(on_character_submit)
             )
+
+        async def delete_callback(inter: discord.Interaction):
+            await go_delete_mode(inter)
 
         await interaction.response.send_message(
             content="신청 관리 항목을 선택하세요.",
