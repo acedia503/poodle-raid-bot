@@ -133,6 +133,7 @@ def create_bot() -> commands.Bot:
                 party_builder_service=party_builder_service,
                 party_manage_service=party_manage_service,
                 party_modify_service=party_modify_service,
+                setting_service=setting_service,
             )
         )
 
