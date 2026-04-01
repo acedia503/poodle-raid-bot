@@ -75,7 +75,7 @@ class PartySlotRepository:
     def save_all(self, slots: list[PartySlot]) -> None:
         if not slots:
             return
-
+    
         query = """
             INSERT INTO party_slots (
                 session_id,
@@ -90,12 +90,14 @@ class PartySlotRepository:
                 user_id,
                 user_name,
                 character_name,
+                race,
+                server,
                 job,
                 item_level,
                 combat_power
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
-
+    
         with self.db.get_connection() as conn:
             cur = conn.cursor()
             for slot in slots:
@@ -114,6 +116,8 @@ class PartySlotRepository:
                         slot.user_id,
                         slot.user_name,
                         slot.character_name,
+                        slot.race,
+                        slot.server,
                         slot.job,
                         slot.item_level,
                         slot.combat_power,
@@ -138,10 +142,12 @@ class PartySlotRepository:
                 user_id,
                 user_name,
                 character_name,
+                race,
+                server,
                 job,
                 item_level,
                 combat_power
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         with self.db.get_connection() as conn:
             cur = conn.cursor()
@@ -160,6 +166,8 @@ class PartySlotRepository:
                     slot.user_id,
                     slot.user_name,
                     slot.character_name,
+                    slot.race,
+                    slot.server,
                     slot.job,
                     slot.item_level,
                     slot.combat_power,
