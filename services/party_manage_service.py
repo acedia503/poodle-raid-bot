@@ -10,17 +10,22 @@ class PartyMemberView:
     user_id: int
     user_name: str
     character_name: str
+    race: str | None
+    server: str | None
     job: str
     item_level: int
     combat_power: int
 
 
 @dataclass
-class WaitingMemberView:
+class PartyMemberView:
     id: int
+    slot_no: int
     user_id: int
     user_name: str
     character_name: str
+    race: str | None
+    server: str | None
     job: str
     item_level: int
     combat_power: int
@@ -124,6 +129,8 @@ class PartyManageService:
                 user_id=row["user_id"],
                 user_name=row["user_name"],
                 character_name=row["character_name"],
+                race=row.get("race"),
+                server=row.get("server"),
                 job=row["job"],
                 item_level=row["item_level"],
                 combat_power=row["combat_power"],
@@ -159,6 +166,8 @@ class PartyManageService:
                 user_id=row["user_id"],
                 user_name=row["user_name"],
                 character_name=row["character_name"],
+                race=row.get("race"),
+                server=row.get("server"),
                 job=row["job"],
                 item_level=row["item_level"],
                 combat_power=row["combat_power"],
