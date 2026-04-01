@@ -483,7 +483,7 @@ class PartyBuildHomeView(View):
             self.rule.guild_id,
             self.rule.channel_id,
         )
-
+    
         if not result:
             embed = build_empty_result_embed(
                 self.rule.raid_name,
@@ -491,15 +491,29 @@ class PartyBuildHomeView(View):
             )
             await interaction.response.edit_message(embed=embed, view=self)
             return
-
-        share_embeds = build_party_share_embeds(
+    
+        text_chunks = build_party_share_text_chunks(
             result,
             show_race_server=self.show_race_server,
         )
-
-        await interaction.response.defer()
-        for embed in share_embeds:
-            await interaction.channel.send(embed=embed)
+    
+        if not text_chunks:
+            await interaction.response.send_message(
+                "복사할 공유 내용이 없습니다.",
+                ephemeral=True,
+            )
+            return
+    
+        await interaction.response.send_message(
+            text_chunks[0],
+            ephemeral=True,
+        )
+    
+        for chunk in text_chunks[1:]:
+            await interaction.followup.send(
+                chunk,
+                ephemeral=True,
+            )
 
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary, row=1)
     async def close(self, interaction: discord.Interaction, button: Button):
