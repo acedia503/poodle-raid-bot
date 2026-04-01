@@ -244,3 +244,55 @@ class ApplicationService:
             guild_id=guild_id,
             raid_name=raid.raid_name,
         )
+        
+    def register_to_waiting_if_party_exists(
+        self,
+        guild_id: int,
+        channel_id: int,
+        application,
+        party_manage_service,
+        party_waiting_repository,
+    ) -> bool:
+        """
+        활성 공대가 있으면 신청자를 상비군에 등록한다.
+        이미 상비군/공대에 있으면 중복 등록하지 않는다.
+        return: 상비군 등록 여부
+        """
+        raid = self.raid_service.get_channel_raid(channel_id)
+        if raid is None:
+            return False
+    
+        session = party_manage_service.party_build_session_repository.get_active_session(
+            guild_id=guild_id,
+            channel_id=channel_id,
+            raid_name=raid.raid_name,
+        )
+        if session is None:
+            return False
+    
+        # 이미 상비군에 있는지 확인
+        waiting_members = party_waiting_repository.get_by_session_id(session.id)
+        for member in waiting_members:
+            if member["user_id"] == application.user_id and member["character_name"] == application.character_name:
+                return False
+    
+        # 이미 공대 슬롯에 있는지 확인
+        slots = party_manage_service.party_slot_repository.get_by_session_id(session.id)
+        for slot in slots:
+            if slot["user_id"] == application.user_id and slot["character_name"] == application.character_name:
+                return False
+    
+        party_waiting_repository.insert_waiting(
+            session_id=session.id,
+            guild_id=guild_id,
+            channel_id=channel_id,
+            raid_name=raid.raid_name,
+            application_id=application.id,
+            user_id=application.user_id,
+            user_name=application.user_name,
+            character_name=application.character_name,
+            job=application.job,
+            item_level=application.item_level,
+            combat_power=application.combat_power,
+        )
+        return True
