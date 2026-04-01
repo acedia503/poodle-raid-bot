@@ -9,11 +9,21 @@ from views.application_result_view import ApplicationResultView
 
 
 class ApplicationCommand(commands.Cog):
-    def __init__(self, bot, service, message_service, setting_service):
+    def __init__(
+        self,
+        bot,
+        service,
+        message_service,
+        setting_service,
+        party_manage_service,
+        party_waiting_repository,
+    ):
         self.bot = bot
         self.service = service
         self.message_service = message_service
         self.setting_service = setting_service
+        self.party_manage_service = party_manage_service
+        self.party_waiting_repository = party_waiting_repository
 
     @app_commands.command(name="신청", description="레이드 신청 또는 신청 내역 확인")
     @app_commands.rename(character_name="캐릭터명")
@@ -101,6 +111,15 @@ class ApplicationCommand(commands.Cog):
                     show_identity=show_identity,
                 )
 
+                added_to_waiting = await asyncio.to_thread(
+                    self.service.register_to_waiting_if_party_exists,
+                    interaction.guild.id,
+                    interaction.channel.id,
+                    result["application"],
+                    self.party_manage_service,
+                    self.party_waiting_repository,
+                )
+
                 sent_to_channel = False
                 if interaction.channel is not None:
                     try:
@@ -109,15 +128,19 @@ class ApplicationCommand(commands.Cog):
                     except discord.Forbidden:
                         sent_to_channel = False
 
+                complete_message = "신청이 완료되었습니다."
+                if added_to_waiting:
+                    complete_message += "\n이미 공대가 생성된 상태라 상비군으로도 등록되었습니다."
+
                 if sent_to_channel:
                     await interaction.edit_original_response(
-                        content="신청이 완료되었습니다.",
+                        content=complete_message,
                         embed=None,
                         view=None,
                     )
                 else:
                     await interaction.edit_original_response(
-                        content="신청이 완료되었습니다. 채널 전송 권한이 없어 여기 표시합니다.",
+                        content=f"{complete_message}\n채널 전송 권한이 없어 여기 표시합니다.",
                         embed=embed,
                         view=None,
                     )
