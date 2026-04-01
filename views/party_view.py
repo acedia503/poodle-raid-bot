@@ -231,6 +231,24 @@ def _build_share_group_text(group, show_race_server: bool) -> str:
     return "\n".join(lines)
 
 
+def _build_share_reserve_block(result, show_race_server: bool) -> str:
+    lines = ["✨상비군"]
+
+    if result.waiting_members:
+        if show_race_server:
+            for idx, member in enumerate(result.waiting_members, start=1):
+                lines.append(f"{idx} - {_member_share_line(member, True)}")
+        else:
+            reserve_text = "/".join(
+                [_member_share_line(member, False) for member in result.waiting_members]
+            ) or "없음"
+            lines.append(reserve_text)
+    else:
+        lines.append("없음")
+
+    return "\n".join(lines)
+    
+
 def _split_text_chunks(blocks: list[str], title: str) -> list[str]:
     chunks = []
     current = title.strip()
@@ -257,6 +275,8 @@ def build_party_share_text_chunks(result, show_race_server: bool) -> list[str]:
         _build_share_group_text(group, show_race_server)
         for group in result.groups
     ]
+
+    blocks.append(_build_share_reserve_block(result, show_race_server))
 
     return _split_text_chunks(blocks, title)
 
