@@ -12,6 +12,8 @@ class PartyWaitingMember:
     user_id: int
     user_name: str
     character_name: str
+    race: str | None
+    server: str | None
     job: str
     item_level: int
     combat_power: int
