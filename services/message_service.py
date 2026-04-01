@@ -171,3 +171,17 @@ class MessageService:
 
         embed.description = "\n".join(lines)
         return embed
+
+    def build_admin_user_search_result_embed(self, title: str, users: list[dict]) -> discord.Embed:
+        embed = discord.Embed(title=title)
+    
+        if not users:
+            embed.description = "검색 결과가 없습니다."
+            return embed
+    
+        lines = []
+        for idx, user in enumerate(users, start=1):
+            lines.append(f"{idx}. {user['user_name']}")
+    
+        embed.description = "\n".join(lines)
+        return embed
