@@ -518,22 +518,30 @@ class PartyBuildHomeView(View):
         )
     
         if not text_chunks:
-            await interaction.response.send_message(
-                "복사할 공유 내용이 없습니다.",
-                ephemeral=True,
+            await interaction.response.edit_message(
+                content="복사할 공유 내용이 없습니다.",
+                embed=None,
+                view=self,
             )
             return
     
-        await interaction.response.send_message(
-            text_chunks[0],
-            ephemeral=True,
+        share_text = "\n\n".join(text_chunks)
+    
+        view = PartyShareView(
+            rule=self.rule,
+            party_rule_service=self.party_rule_service,
+            party_builder_service=self.party_builder_service,
+            party_manage_service=self.party_manage_service,
+            party_modify_service=self.party_modify_service,
+            show_race_server=self.show_race_server,
+            share_text=share_text,
         )
     
-        for chunk in text_chunks[1:]:
-            await interaction.followup.send(
-                chunk,
-                ephemeral=True,
-            )
+        await interaction.response.edit_message(
+            content=share_text,
+            embed=None,
+            view=view,
+        )
 
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary, row=1)
     async def close(self, interaction: discord.Interaction, button: Button):
@@ -1369,3 +1377,54 @@ class PartyAutoRuleEditView(View):
             show_race_server=self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
+
+
+class PartyShareView(View):
+    def __init__(
+        self,
+        rule,
+        party_rule_service,
+        party_builder_service,
+        party_manage_service,
+        party_modify_service,
+        show_race_server: bool,
+        share_text: str,
+    ):
+        super().__init__(timeout=300)
+
+        self.rule = rule
+        self.party_rule_service = party_rule_service
+        self.party_builder_service = party_builder_service
+        self.party_manage_service = party_manage_service
+        self.party_modify_service = party_modify_service
+        self.show_race_server = show_race_server
+        self.share_text = share_text
+
+    @discord.ui.button(label="뒤로가기", style=discord.ButtonStyle.secondary, row=0)
+    async def back(self, interaction: discord.Interaction, button: Button):
+        result = self.party_manage_service.get_active_build_result(
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+
+        if result:
+            embed = build_first_status_embed(
+                result,
+                show_race_server=self.show_race_server,
+            )
+        else:
+            embed = build_empty_result_embed(self.rule.raid_name)
+
+        view = PartyBuildHomeView(
+            rule=self.rule,
+            party_rule_service=self.party_rule_service,
+            party_builder_service=self.party_builder_service,
+            party_manage_service=self.party_manage_service,
+            party_modify_service=self.party_modify_service,
+            show_race_server=self.show_race_server,
+        )
+        await interaction.response.edit_message(embed=embed, content=None, view=view)
+
+    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary, row=0)
+    async def close(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.edit_message(view=None)
