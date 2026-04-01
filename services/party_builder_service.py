@@ -288,6 +288,8 @@ class PartyBuilderService:
                         user_id=app.user_id,
                         user_name=app.user_name,
                         character_name=app.character_name,
+                        race=app.race,
+                        server=app.server,
                         job=app.job,
                         item_level=app.item_level,
                         combat_power=app.combat_power,
@@ -307,12 +309,14 @@ class PartyBuilderService:
                     user_id=app.user_id,
                     user_name=app.user_name,
                     character_name=app.character_name,
+                    race=app.race,
+                    server=app.server,
                     job=app.job,
                     item_level=app.item_level,
                     combat_power=app.combat_power,
                 )
             )
-
+            
         self.slot_repository.save_all(slots)
         self.waiting_repository.save_all(waiting)
 
@@ -377,6 +381,8 @@ class PartyBuilderService:
                     user_id=app.user_id,
                     user_name=app.user_name,
                     character_name=app.character_name,
+                    race=app.race,
+                    server=app.server,
                     job=app.job,
                     item_level=app.item_level,
                     combat_power=app.combat_power,
