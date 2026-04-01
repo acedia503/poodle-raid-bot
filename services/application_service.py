@@ -269,13 +269,23 @@ class ApplicationService:
         # 이미 상비군에 있는지 확인
         waiting_members = party_waiting_repository.get_by_session_id(session.id)
         for member in waiting_members:
-            if member["user_id"] == application.user_id and member["character_name"] == application.character_name:
+            if (
+                member["user_id"] == application.user_id
+                and member["character_name"] == application.character_name
+                and member.get("race") == application.race
+                and member.get("server") == application.server
+            ):
                 return False
     
         # 이미 공대 슬롯에 있는지 확인
         slots = party_manage_service.party_slot_repository.get_by_session_id(session.id)
         for slot in slots:
-            if slot["user_id"] == application.user_id and slot["character_name"] == application.character_name:
+            if (
+                slot["user_id"] == application.user_id
+                and slot["character_name"] == application.character_name
+                and slot.get("race") == application.race
+                and slot.get("server") == application.server
+            ):
                 return False
     
         party_waiting_repository.insert_waiting(
