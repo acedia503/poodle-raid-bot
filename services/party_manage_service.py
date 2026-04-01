@@ -18,9 +18,8 @@ class PartyMemberView:
 
 
 @dataclass
-class PartyMemberView:
+class WaitingMemberView:
     id: int
-    slot_no: int
     user_id: int
     user_name: str
     character_name: str
