@@ -201,3 +201,15 @@ class PartyManageService:
             raid_name=raid.raid_name,
         )
         return True
+        
+        
+    def get_active_session(self, guild_id: int, channel_id: int):
+        raid = self.raid_service.get_channel_raid(channel_id)
+        if raid is None:
+            return None
+    
+        return self.party_build_session_repository.get_active_session(
+            guild_id=guild_id,
+            channel_id=channel_id,
+            raid_name=raid.raid_name,
+        )
