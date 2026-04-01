@@ -111,7 +111,6 @@ class MessageService:
             description="\n".join(lines),
         )
 
-
     def build_admin_application_list_embed(
         self,
         raid_name: str,
@@ -119,15 +118,15 @@ class MessageService:
         show_identity: bool,
     ) -> discord.Embed:
         total_count = len(applications)
-    
+
         embed = discord.Embed(
-            title=f"{raid_name} 신청자 목록 (총 {total_count}명)"
+            title=f"{raid_name} 신청내역 (총 {total_count}명)"
         )
-    
+
         if not applications:
             embed.description = "신청자가 없습니다."
             return embed
-    
+
         lines = []
         for idx, app in enumerate(applications, start=1):
             if show_identity:
@@ -140,10 +139,10 @@ class MessageService:
                     f"{idx}. {app.user_name} | {app.character_name} | "
                     f"{app.job} | {app.item_level} | {app.combat_power:,}"
                 )
-    
+
         embed.description = "\n".join(lines)
         return embed
-    
+
     def build_admin_delete_search_embed(
         self,
         title: str,
@@ -157,31 +156,35 @@ class MessageService:
             return embed
 
         lines = []
-        for app in applications:
+        for idx, app in enumerate(applications, start=1):
             if show_identity:
                 lines.append(
-                    f"{app.user_name} | {app.character_name} | {app.race} | {app.server} | "
+                    f"{idx}. {app.user_name} | {app.character_name} | {app.race} | {app.server} | "
                     f"{app.job} | {app.item_level} | {app.combat_power:,}"
                 )
             else:
                 lines.append(
-                    f"{app.user_name} | {app.character_name} | "
+                    f"{idx}. {app.user_name} | {app.character_name} | "
                     f"{app.job} | {app.item_level} | {app.combat_power:,}"
                 )
 
         embed.description = "\n".join(lines)
         return embed
 
-    def build_admin_user_search_result_embed(self, title: str, users: list[dict]) -> discord.Embed:
+    def build_admin_user_search_result_embed(
+        self,
+        title: str,
+        users: list[dict],
+    ) -> discord.Embed:
         embed = discord.Embed(title=title)
-    
+
         if not users:
             embed.description = "검색 결과가 없습니다."
             return embed
-    
+
         lines = []
         for idx, user in enumerate(users, start=1):
             lines.append(f"{idx}. {user['user_name']}")
-    
+
         embed.description = "\n".join(lines)
         return embed
