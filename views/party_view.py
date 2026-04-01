@@ -1,7 +1,12 @@
+# views/party_view.py
+
 import discord
 from discord.ui import View, Select, Button
 
 from utils.constants import JOB_OPTIONS
+
+
+MAX_EMBED_DESC = 3500
 
 
 # =========================
@@ -12,9 +17,19 @@ def get_job_short(job: str) -> str:
     return f"({job[0]})" if job else ""
 
 
+def _job_short_text(job: str) -> str:
+    return job[0] if job else ""
+
+
+def _safe_get(obj, key, default=""):
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
 def build_empty_result_embed(raid_name: str, status_message=None):
     embed = discord.Embed(
-        title=f"{raid_name} 공대 현황",
+        title=f"🐾{raid_name} 공대 현황🐾",
         description="아직 생성된 공대가 없습니다.",
     )
     if status_message:
@@ -22,52 +37,175 @@ def build_empty_result_embed(raid_name: str, status_message=None):
     return embed
 
 
-def build_party_result_embed(result, status_message=None):
-    embed = discord.Embed(
-        title=f"{result.raid_name} 공대 현황",
-        description=(
-            f"총 신청자: {result.total_applicants}명\n"
-            f"정식 공대 {result.full_group_count}개 / 상비군 {result.waiting_count}명"
-        ),
-    )
+def _member_status_line(member, show_race_server: bool) -> str:
+    user_name = _safe_get(member, "user_name", "")
+    character_name = _safe_get(member, "character_name", "")
+    race = _safe_get(member, "race", "")
+    server = _safe_get(member, "server", "")
+    job = _safe_get(member, "job", "")
+    item_level = _safe_get(member, "item_level", "")
+    combat_power = _safe_get(member, "combat_power", "")
 
-    for group in result.groups:
-        party1 = next((p for p in group.parties if p.party_no == 1), None)
-        party2 = next((p for p in group.parties if p.party_no == 2), None)
+    parts = [user_name, character_name]
 
-        p1_power = party1.total_combat_power if party1 else 0
-        p2_power = party2.total_combat_power if party2 else 0
+    if show_race_server:
+        parts.extend([race, server])
 
-        p1 = " / ".join(
-            f"{m.character_name}{get_job_short(m.job)}"
-            for m in (party1.members if party1 else [])
-        )
-        p2 = " / ".join(
-            f"{m.character_name}{get_job_short(m.job)}"
-            for m in (party2.members if party2 else [])
-        )
+    parts.extend([
+        job,
+        f"{item_level}" if item_level != "" else "",
+        f"{combat_power:,}" if isinstance(combat_power, int) else str(combat_power),
+    ])
 
-        embed.add_field(
-            name=f"✨{group.group_no}공대 - 총 전투력 [1파티] {p1_power:,} / [2파티] {p2_power:,}",
-            value=f"1-{p1 or '비어있음'}\n2-{p2 or '비어있음'}\n\u200b",
-            inline=False,
-        )
+    return "/".join([p for p in parts if p != ""])
 
-    reserve = " / ".join(
-        f"{m.character_name}{get_job_short(m.job)}"
-        for m in result.waiting_members
-    )
 
-    embed.add_field(
-        name="✨상비군",
-        value=reserve or "없음",
-        inline=False,
-    )
+def _member_share_line(member, show_race_server: bool) -> str:
+    user_name = _safe_get(member, "user_name", "")
+    character_name = _safe_get(member, "character_name", "")
+    race = _safe_get(member, "race", "")
+    server = _safe_get(member, "server", "")
+    job = _safe_get(member, "job", "")
 
+    if show_race_server:
+        parts = [user_name, character_name, race, server, job]
+        return "/".join([p for p in parts if p != ""])
+
+    return f"{character_name}({_job_short_text(job)})"
+
+
+def _build_status_group_block(group, show_race_server: bool) -> str:
+    party1 = next((p for p in group.parties if p.party_no == 1), None)
+    party2 = next((p for p in group.parties if p.party_no == 2), None)
+
+    p1_power = party1.total_combat_power if party1 else 0
+    p2_power = party2.total_combat_power if party2 else 0
+
+    lines = [f"✨{group.group_no}공대"]
+
+    lines.append(f"[1파티] 총 전투력: {p1_power:,}")
+    if party1 and party1.members:
+        for idx, member in enumerate(party1.members, start=1):
+            lines.append(f"{idx} - {_member_status_line(member, show_race_server)}")
+    else:
+        lines.append("비어있음")
+
+    lines.append("")
+    lines.append(f"[2파티] 총 전투력: {p2_power:,}")
+    if party2 and party2.members:
+        for idx, member in enumerate(party2.members, start=1):
+            lines.append(f"{idx} - {_member_status_line(member, show_race_server)}")
+    else:
+        lines.append("비어있음")
+
+    return "\n".join(lines)
+
+
+def _build_share_group_block(group, show_race_server: bool) -> str:
+    party1 = next((p for p in group.parties if p.party_no == 1), None)
+    party2 = next((p for p in group.parties if p.party_no == 2), None)
+
+    p1_power = party1.total_combat_power if party1 else 0
+    p2_power = party2.total_combat_power if party2 else 0
+
+    lines = [f"✨{group.group_no}공대"]
+
+    if show_race_server:
+        lines.append(f"[1파티] 총 전투력: {p1_power:,}")
+        if party1 and party1.members:
+            for idx, member in enumerate(party1.members, start=1):
+                lines.append(f"{idx} - {_member_share_line(member, True)}")
+        else:
+            lines.append("비어있음")
+
+        lines.append("")
+        lines.append(f"[2파티] 총 전투력: {p2_power:,}")
+        if party2 and party2.members:
+            for idx, member in enumerate(party2.members, start=1):
+                lines.append(f"{idx} - {_member_share_line(member, True)}")
+        else:
+            lines.append("비어있음")
+    else:
+        p1_text = "/".join(
+            [_member_share_line(m, False) for m in (party1.members if party1 else [])]
+        ) or "비어있음"
+        p2_text = "/".join(
+            [_member_share_line(m, False) for m in (party2.members if party2 else [])]
+        ) or "비어있음"
+
+        lines.append(f"1 - {p1_text}")
+        lines.append(f"2 - {p2_text}")
+
+    return "\n".join(lines)
+
+
+def _split_embeds_by_group(title: str, header_lines: list[str], group_blocks: list[str]) -> list[discord.Embed]:
+    embeds = []
+    current_desc = "\n".join(header_lines).strip()
+
+    for block in group_blocks:
+        candidate = f"{current_desc}\n\n{block}" if current_desc else block
+
+        if len(candidate) > MAX_EMBED_DESC:
+            embeds.append(discord.Embed(title=title, description=current_desc))
+            current_desc = block
+        else:
+            current_desc = candidate
+
+    if current_desc:
+        embeds.append(discord.Embed(title=title, description=current_desc))
+
+    return embeds
+
+
+def build_party_status_embeds(result, show_race_server: bool, status_message: str | None = None):
+    title = f"🐾{result.raid_name} 공대 현황🐾"
+
+    header_lines = []
     if status_message:
-        embed.add_field(name="\n\u200b\n안내", value=status_message, inline=False)
+        header_lines.append(f"안내: {status_message}")
 
-    return embed
+    group_blocks = [
+        _build_status_group_block(group, show_race_server)
+        for group in result.groups
+    ]
+
+    reserve_lines = ["✨상비군"]
+    if result.waiting_members:
+        for idx, member in enumerate(result.waiting_members, start=1):
+            reserve_lines.append(f"{idx} - {_member_status_line(member, show_race_server)}")
+    else:
+        reserve_lines.append("없음")
+
+    group_blocks.append("\n".join(reserve_lines))
+    return _split_embeds_by_group(title, header_lines, group_blocks)
+
+
+def build_party_share_embeds(result, show_race_server: bool):
+    title = f"🐾{result.raid_name} 공대 공유🐾"
+
+    group_blocks = [
+        _build_share_group_block(group, show_race_server)
+        for group in result.groups
+    ]
+
+    return _split_embeds_by_group(title, [], group_blocks)
+
+
+def build_first_status_embed(result, show_race_server: bool, status_message: str | None = None):
+    embeds = build_party_status_embeds(
+        result,
+        show_race_server=show_race_server,
+        status_message=status_message,
+    )
+    return embeds[0] if embeds else build_empty_result_embed(result.raid_name, status_message)
+
+
+# 기존 코드와의 호환용
+def build_party_result_embed(result, status_message=None, show_race_server: bool = True):
+    if result is None:
+        return build_empty_result_embed("레이드", status_message)
+    return build_first_status_embed(result, show_race_server, status_message)
 
 
 def build_rule_edit_embed(
@@ -122,6 +260,7 @@ class PartyBuildHomeView(View):
         party_builder_service,
         party_manage_service,
         party_modify_service,
+        show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
 
@@ -130,6 +269,7 @@ class PartyBuildHomeView(View):
         self.party_builder_service = party_builder_service
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
+        self.show_race_server = show_race_server
 
     @discord.ui.button(label="자동", style=discord.ButtonStyle.success, row=0)
     async def auto_build(self, interaction: discord.Interaction, button: Button):
@@ -142,8 +282,9 @@ class PartyBuildHomeView(View):
                 self.rule.channel_id,
             )
 
-            embed = build_party_result_embed(
+            embed = build_first_status_embed(
                 result,
+                show_race_server=self.show_race_server,
                 status_message="이미 생성된 공대가 있습니다. 초기화 후 진행해주세요.",
             )
             await interaction.response.edit_message(embed=embed, view=self)
@@ -169,6 +310,7 @@ class PartyBuildHomeView(View):
             party_builder_service=self.party_builder_service,
             party_manage_service=self.party_manage_service,
             party_modify_service=self.party_modify_service,
+            show_race_server=self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -183,8 +325,9 @@ class PartyBuildHomeView(View):
                 self.rule.channel_id,
             )
 
-            embed = build_party_result_embed(
+            embed = build_first_status_embed(
                 result,
+                show_race_server=self.show_race_server,
                 status_message="이미 생성된 공대가 있습니다. 초기화 후 진행해주세요.",
             )
             await interaction.response.edit_message(embed=embed, view=self)
@@ -208,8 +351,9 @@ class PartyBuildHomeView(View):
                 self.rule.channel_id,
             )
 
-            embed = build_party_result_embed(
+            embed = build_first_status_embed(
                 result,
+                show_race_server=self.show_race_server,
                 status_message="수동 생성 완료 (수정으로 수동 배치하세요)",
             )
 
@@ -255,6 +399,7 @@ class PartyBuildHomeView(View):
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            self.show_race_server,
         )
 
         embed = discord.Embed(
@@ -278,9 +423,14 @@ class PartyBuildHomeView(View):
             await interaction.response.edit_message(embed=embed, view=self)
             return
 
-        embed = build_party_result_embed(result)
+        share_embeds = build_party_share_embeds(
+            result,
+            show_race_server=self.show_race_server,
+        )
+
         await interaction.response.defer()
-        await interaction.channel.send(embed=embed)
+        for embed in share_embeds:
+            await interaction.channel.send(embed=embed)
 
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary, row=1)
     async def close(self, interaction: discord.Interaction, button: Button):
@@ -299,6 +449,7 @@ class PartyModifyHomeView(View):
         party_builder_service,
         party_manage_service,
         party_modify_service,
+        show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
 
@@ -307,6 +458,7 @@ class PartyModifyHomeView(View):
         self.party_builder_service = party_builder_service
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
+        self.show_race_server = show_race_server
 
     @discord.ui.button(label="공대 선택", style=discord.ButtonStyle.primary, row=0)
     async def select_group(self, interaction: discord.Interaction, button: Button):
@@ -326,6 +478,7 @@ class PartyModifyHomeView(View):
                 self.party_builder_service,
                 self.party_manage_service,
                 self.party_modify_service,
+                self.show_race_server,
             )
             await interaction.response.edit_message(embed=embed, view=home)
             return
@@ -341,6 +494,7 @@ class PartyModifyHomeView(View):
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -362,6 +516,7 @@ class PartyModifyHomeView(View):
                 self.party_builder_service,
                 self.party_manage_service,
                 self.party_modify_service,
+                self.show_race_server,
             )
             await interaction.response.edit_message(embed=embed, view=home)
             return
@@ -377,6 +532,7 @@ class PartyModifyHomeView(View):
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -388,7 +544,10 @@ class PartyModifyHomeView(View):
         )
 
         if result:
-            embed = build_party_result_embed(result)
+            embed = build_first_status_embed(
+                result,
+                show_race_server=self.show_race_server,
+            )
         else:
             embed = build_empty_result_embed(self.rule.raid_name)
 
@@ -398,6 +557,7 @@ class PartyModifyHomeView(View):
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=home)
 
@@ -414,6 +574,7 @@ class PartyModifyGroupSelectView(View):
         party_builder_service,
         party_manage_service,
         party_modify_service,
+        show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
 
@@ -422,6 +583,7 @@ class PartyModifyGroupSelectView(View):
         self.party_builder_service = party_builder_service
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
+        self.show_race_server = show_race_server
 
         result = self.party_manage_service.get_active_build_result(
             self.rule.guild_id,
@@ -448,6 +610,7 @@ class PartyModifyGroupSelectView(View):
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -482,6 +645,7 @@ class GroupSelect(Select):
             view.party_manage_service,
             view.party_modify_service,
             group_no,
+            view.show_race_server,
         )
 
         await interaction.response.edit_message(embed=embed, view=next_view)
@@ -500,6 +664,7 @@ class PartyModifyGroupMemberView(View):
         party_manage_service,
         party_modify_service,
         group_no: int,
+        show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
 
@@ -509,6 +674,7 @@ class PartyModifyGroupMemberView(View):
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
         self.group_no = group_no
+        self.show_race_server = show_race_server
 
         result = self.party_manage_service.get_active_build_result(
             self.rule.guild_id,
@@ -536,6 +702,7 @@ class PartyModifyGroupMemberView(View):
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -599,8 +766,9 @@ class GroupMemberSelect(Select):
                 view.rule.channel_id,
             )
 
-            embed = build_party_result_embed(
+            embed = build_first_status_embed(
                 result,
+                show_race_server=view.show_race_server,
                 status_message=result_msg,
             )
 
@@ -610,6 +778,7 @@ class GroupMemberSelect(Select):
                 view.party_builder_service,
                 view.party_manage_service,
                 view.party_modify_service,
+                view.show_race_server,
             )
             await interaction.response.edit_message(embed=embed, view=home)
 
@@ -633,6 +802,7 @@ class PartyModifyReserveView(View):
         party_builder_service,
         party_manage_service,
         party_modify_service,
+        show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
 
@@ -641,6 +811,7 @@ class PartyModifyReserveView(View):
         self.party_builder_service = party_builder_service
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
+        self.show_race_server = show_race_server
 
         result = self.party_manage_service.get_active_build_result(
             self.rule.guild_id,
@@ -662,6 +833,7 @@ class PartyModifyReserveView(View):
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -736,6 +908,7 @@ class ReserveMemberSelect(Select):
             view.party_modify_service,
             waiting_id,
             selected_name,
+            view.show_race_server,
         )
 
         await interaction.response.edit_message(embed=embed, view=next_view)
@@ -751,6 +924,7 @@ class PartyMoveTargetSelectView(View):
         party_modify_service,
         waiting_id: int,
         selected_member_name: str,
+        show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
 
@@ -761,6 +935,7 @@ class PartyMoveTargetSelectView(View):
         self.party_modify_service = party_modify_service
         self.waiting_id = waiting_id
         self.selected_member_name = selected_member_name
+        self.show_race_server = show_race_server
 
         result = self.party_manage_service.get_active_build_result(
             self.rule.guild_id,
@@ -782,6 +957,7 @@ class PartyMoveTargetSelectView(View):
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -849,8 +1025,9 @@ class MoveTargetSelect(Select):
                 view.rule.channel_id,
             )
 
-            embed = build_party_result_embed(
+            embed = build_first_status_embed(
                 result,
+                show_race_server=view.show_race_server,
                 status_message=result_msg,
             )
 
@@ -860,6 +1037,7 @@ class MoveTargetSelect(Select):
                 view.party_builder_service,
                 view.party_manage_service,
                 view.party_modify_service,
+                view.show_race_server,
             )
             await interaction.response.edit_message(embed=embed, view=home)
 
@@ -914,6 +1092,7 @@ class PartyAutoRuleEditView(View):
         party_builder_service,
         party_manage_service,
         party_modify_service,
+        show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
 
@@ -922,6 +1101,7 @@ class PartyAutoRuleEditView(View):
         self.party_builder_service = party_builder_service
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
+        self.show_race_server = show_race_server
 
         self.party1_priority_jobs = list(rule.party1_priority_jobs)
         self.party1_preferred_jobs = list(rule.party1_preferred_jobs)
@@ -1030,8 +1210,9 @@ class PartyAutoRuleEditView(View):
                 self.rule.channel_id,
             )
 
-            embed = build_party_result_embed(
+            embed = build_first_status_embed(
                 result,
+                show_race_server=self.show_race_server,
                 status_message="자동 생성 완료",
             )
 
@@ -1042,8 +1223,9 @@ class PartyAutoRuleEditView(View):
             )
 
             if result:
-                embed = build_party_result_embed(
+                embed = build_first_status_embed(
                     result,
+                    show_race_server=self.show_race_server,
                     status_message=f"생성 실패: {e}",
                 )
             else:
@@ -1058,6 +1240,7 @@ class PartyAutoRuleEditView(View):
             party_builder_service=self.party_builder_service,
             party_manage_service=self.party_manage_service,
             party_modify_service=self.party_modify_service,
+            show_race_server=self.show_race_server,
         )
         await interaction.edit_original_response(embed=embed, view=view)
 
@@ -1069,7 +1252,7 @@ class PartyAutoRuleEditView(View):
         )
 
         embed = (
-            build_party_result_embed(result)
+            build_first_status_embed(result, self.show_race_server)
             if result
             else build_empty_result_embed(self.rule.raid_name)
         )
@@ -1080,5 +1263,6 @@ class PartyAutoRuleEditView(View):
             party_builder_service=self.party_builder_service,
             party_manage_service=self.party_manage_service,
             party_modify_service=self.party_modify_service,
+            show_race_server=self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
