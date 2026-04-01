@@ -262,11 +262,7 @@ class ApplicationService:
         if raid is None:
             return False
     
-        session = party_manage_service.party_build_session_repository.get_active_session(
-            guild_id=guild_id,
-            channel_id=channel_id,
-            raid_name=raid.raid_name,
-        )
+        session = party_manage_service.get_active_session(guild_id, channel_id)
         if session is None:
             return False
     
