@@ -1427,4 +1427,4 @@ class PartyShareView(View):
 
     @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary, row=0)
     async def close(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.edit_message(view=None)
+        await interaction.delete_original_response()
