@@ -7,6 +7,7 @@ from utils.constants import JOB_OPTIONS
 
 
 MAX_EMBED_DESC = 3500
+MAX_DISCORD_MESSAGE = 1900
 
 
 # =========================
@@ -190,6 +191,74 @@ def build_party_share_embeds(result, show_race_server: bool):
     ]
 
     return _split_embeds_by_group(title, [], group_blocks)
+
+
+def _build_share_group_text(group, show_race_server: bool) -> str:
+    party1 = next((p for p in group.parties if p.party_no == 1), None)
+    party2 = next((p for p in group.parties if p.party_no == 2), None)
+
+    p1_power = party1.total_combat_power if party1 else 0
+    p2_power = party2.total_combat_power if party2 else 0
+
+    lines = [f"✨{group.group_no}공대"]
+
+    if show_race_server:
+        lines.append(f"[1파티] 총 전투력: {p1_power:,}")
+        if party1 and party1.members:
+            for idx, member in enumerate(party1.members, start=1):
+                lines.append(f"{idx} - {_member_share_line(member, True)}")
+        else:
+            lines.append("비어있음")
+
+        lines.append("")
+        lines.append(f"[2파티] 총 전투력: {p2_power:,}")
+        if party2 and party2.members:
+            for idx, member in enumerate(party2.members, start=1):
+                lines.append(f"{idx} - {_member_share_line(member, True)}")
+        else:
+            lines.append("비어있음")
+    else:
+        p1_text = "/".join(
+            [_member_share_line(m, False) for m in (party1.members if party1 else [])]
+        ) or "비어있음"
+        p2_text = "/".join(
+            [_member_share_line(m, False) for m in (party2.members if party2 else [])]
+        ) or "비어있음"
+
+        lines.append(f"1 - {p1_text}")
+        lines.append(f"2 - {p2_text}")
+
+    return "\n".join(lines)
+
+
+def _split_text_chunks(blocks: list[str], title: str) -> list[str]:
+    chunks = []
+    current = title.strip()
+
+    for block in blocks:
+        candidate = f"{current}\n\n{block}" if current else block
+
+        if len(candidate) > MAX_DISCORD_MESSAGE:
+            chunks.append(current)
+            current = block
+        else:
+            current = candidate
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
+
+def build_party_share_text_chunks(result, show_race_server: bool) -> list[str]:
+    title = f"🐾{result.raid_name} 공대 공유🐾"
+
+    blocks = [
+        _build_share_group_text(group, show_race_server)
+        for group in result.groups
+    ]
+
+    return _split_text_chunks(blocks, title)
 
 
 def build_first_status_embed(result, show_race_server: bool, status_message: str | None = None):
