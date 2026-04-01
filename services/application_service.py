@@ -287,6 +287,8 @@ class ApplicationService:
             user_id=application.user_id,
             user_name=application.user_name,
             character_name=application.character_name,
+            race=application.race,
+            server=application.server,
             job=application.job,
             item_level=application.item_level,
             combat_power=application.combat_power,
