@@ -103,6 +103,15 @@ class ApplicationCommand(commands.Cog):
                 server,
             )
 
+            print(
+                "[APPLICATION]",
+                f"guild_id={interaction.guild.id}",
+                f"channel_id={interaction.channel.id}",
+                f"user_id={interaction.user.id}",
+                f"character_name={character_name}",
+                f"action={result.get('action')}",
+            )
+
             if result["action"] == "created":
                 embed = self.message_service.build_application_result_embed(
                     result["raid_name"],
@@ -121,12 +130,45 @@ class ApplicationCommand(commands.Cog):
                 )
 
                 sent_to_channel = False
+                send_fail_reason = None
+
                 if interaction.channel is not None:
                     try:
                         await interaction.channel.send(embed=embed)
                         sent_to_channel = True
-                    except discord.Forbidden:
-                        sent_to_channel = False
+                        print(
+                            "[APPLICATION][PUBLIC_MESSAGE_SENT]",
+                            f"guild_id={interaction.guild.id}",
+                            f"channel_id={interaction.channel.id}",
+                            f"character_name={character_name}",
+                        )
+                    except discord.Forbidden as exc:
+                        send_fail_reason = "채널 전송 권한이 없습니다."
+                        print(
+                            "[APPLICATION][PUBLIC_MESSAGE_FAILED][FORBIDDEN]",
+                            f"guild_id={interaction.guild.id}",
+                            f"channel_id={interaction.channel.id}",
+                            f"character_name={character_name}",
+                            repr(exc),
+                        )
+                    except discord.HTTPException as exc:
+                        send_fail_reason = f"채널 전송 중 HTTP 오류가 발생했습니다. ({exc.status})"
+                        print(
+                            "[APPLICATION][PUBLIC_MESSAGE_FAILED][HTTP]",
+                            f"guild_id={interaction.guild.id}",
+                            f"channel_id={interaction.channel.id}",
+                            f"character_name={character_name}",
+                            repr(exc),
+                        )
+                    except Exception as exc:
+                        send_fail_reason = f"채널 전송 중 알 수 없는 오류가 발생했습니다. ({type(exc).__name__})"
+                        print(
+                            "[APPLICATION][PUBLIC_MESSAGE_FAILED][UNKNOWN]",
+                            f"guild_id={interaction.guild.id}",
+                            f"channel_id={interaction.channel.id}",
+                            f"character_name={character_name}",
+                            repr(exc),
+                        )
 
                 complete_message = "신청이 완료되었습니다."
                 if added_to_waiting:
@@ -139,8 +181,9 @@ class ApplicationCommand(commands.Cog):
                         view=None,
                     )
                 else:
+                    extra_reason = send_fail_reason or "채널에 공개 메시지를 전송하지 못했습니다."
                     await interaction.edit_original_response(
-                        content=f"{complete_message}\n채널 전송 권한이 없어 여기 표시합니다.",
+                        content=f"{complete_message}\n공개 메시지 전송 실패: {extra_reason}",
                         embed=embed,
                         view=None,
                     )
@@ -183,6 +226,13 @@ class ApplicationCommand(commands.Cog):
                 )
 
         except Exception as exc:
+            print(
+                "[APPLICATION][PROCESS_ERROR]",
+                f"guild_id={getattr(interaction.guild, 'id', None)}",
+                f"channel_id={getattr(interaction.channel, 'id', None)}",
+                f"character_name={character_name}",
+                repr(exc),
+            )
             await interaction.edit_original_response(
                 content=f"오류가 발생했습니다: {exc}",
                 embed=None,
