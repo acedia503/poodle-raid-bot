@@ -80,6 +80,41 @@ class PartyBuilderService:
                 )
 
         await asyncio.gather(*(fetch(app) for app in applications))
+        
+    # =========================
+    # 같은 공대(group_no) 안에 동일 Discord 유저(user_id) 금지
+    # =========================
+    def _filter_candidates_by_user_duplication(
+        self,
+        app,
+        candidates: list[PartyBucket],
+        all_parties: list[PartyBucket],
+    ) -> list[PartyBucket]:
+        """
+        같은 공대(group_no) 안에 동일 user_id가 이미 있으면
+        그 공대의 모든 파티를 후보에서 제외한다.
+        """
+        filtered = []
+    
+        for target_party in candidates:
+            same_group_parties = [
+                party for party in all_parties
+                if party.group_no == target_party.group_no
+            ]
+    
+            duplicated_user = False
+            for party in same_group_parties:
+                for member in party.members:
+                    if member.user_id == app.user_id:
+                        duplicated_user = True
+                        break
+                if duplicated_user:
+                    break
+    
+            if not duplicated_user:
+                filtered.append(target_party)
+    
+        return filtered
 
     # =========================
     # 직업 중복 수 계산
@@ -254,8 +289,23 @@ class PartyBuilderService:
             if not candidates:
                 break
 
-            # 같은 직업 3중복 금지 + 2중복 최소화
-            filtered_candidates = self._filter_candidates_by_job_duplication(app, candidates)
+            # 1) 같은 공대 안 동일 유저 금지
+            candidates = self._filter_candidates_by_user_duplication(
+                app,
+                candidates,
+                party_buckets,
+            )
+
+            if not candidates:
+                raise Exception(
+                    f"{app.character_name} 배치 불가: 같은 공대에 동일 유저가 이미 존재합니다."
+                )
+
+            # 2) 같은 직업 3중복 금지 + 2중복 최소화
+            filtered_candidates = self._filter_candidates_by_job_duplication(
+                app,
+                candidates,
+            )
 
             if not filtered_candidates:
                 raise Exception(
