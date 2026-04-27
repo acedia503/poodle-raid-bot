@@ -74,6 +74,7 @@ def create_bot() -> commands.Bot:
         setting_service=setting_service,
         raid_service=raid_service,
         repository=raid_application_repository,
+        character_repository=character_repository,
     )
 
     party_rule_service = PartyRuleService(raid_rule_repository)
@@ -116,7 +117,7 @@ def create_bot() -> commands.Bot:
                 message_service,
                 setting_service,
                 party_manage_service,
-                party_waiting_repository,
+                party_waiting_,
             )
         )
         await bot.add_cog(
