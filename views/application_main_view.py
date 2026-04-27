@@ -58,14 +58,14 @@ class ApplicationMainView(discord.ui.View):
     ):
         await self.status_callback(interaction)
 
-    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
-    async def close_button(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
-    ):
-        await interaction.response.edit_message(
-            content=self.close_message,
-            embed=None,
-            view=None,
-        )
+    ##@discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary)
+    ##async def close_button(
+    ##    self,
+    ##    interaction: discord.Interaction,
+    ##    button: discord.ui.Button,
+    ##):
+    ##    await interaction.response.edit_message(
+    ##        content=self.close_message,
+    ##        embed=None,
+    ##        view=None,
+    ##    )
