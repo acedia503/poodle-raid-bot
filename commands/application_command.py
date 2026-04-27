@@ -7,6 +7,7 @@ from discord.ext import commands
 from views.application_view import RaceView, ServerView
 from views.application_result_view import ApplicationResultView
 from views.application_main_view import ApplicationMainView, ApplicationCharacterModal
+from views.application_cancel_view import ApplicationCancelSelectView
 
 class ApplicationCommand(commands.Cog):
     
@@ -148,11 +149,88 @@ class ApplicationCommand(commands.Cog):
                         )
                     return
             
-                await inter.response.edit_message(
-                    content="취소할 신청 내역이 여러 건입니다.\n선택 취소 UI는 다음 단계에서 연결합니다.",
-                    embed=None,
-                    view=None,
-                )
+                selected_ids = set()
+            
+                async def refresh_cancel_view(refresh_inter, apps, ids):
+                    lines = []
+                    for idx, app in enumerate(apps, start=1):
+                        checked = "✅" if app.id in ids else "⬜"
+                        lines.append(
+                            f"{checked} {idx}. **{app.raid_name}** | "
+                            f"{app.character_name} | {app.job} | "
+                            f"{app.item_level} | {app.combat_power:,}"
+                        )
+            
+                    embed = discord.Embed(
+                        title="신청 취소 대상 선택",
+                        description="\n".join(lines),
+                    )
+            
+                    view = ApplicationCancelSelectView(
+                        applications=apps,
+                        selected_ids=ids,
+                        refresh_callback=refresh_cancel_view,
+                        cancel_selected_callback=cancel_selected,
+                        cancel_all_callback=cancel_all,
+                    )
+            
+                    if refresh_inter.response.is_done():
+                        await refresh_inter.edit_original_response(
+                            content=None,
+                            embed=embed,
+                            view=view,
+                        )
+                    else:
+                        await refresh_inter.response.edit_message(
+                            content=None,
+                            embed=embed,
+                            view=view,
+                        )
+            
+                async def cancel_selected(cancel_inter, ids: list[int]):
+                    if not ids:
+                        await cancel_inter.response.send_message(
+                            "취소할 신청을 선택하세요.",
+                            ephemeral=True,
+                        )
+                        return
+            
+                    cancelled_count = 0
+                    for application_id in ids:
+                        ok = await asyncio.to_thread(
+                            self.service.cancel_application,
+                            application_id,
+                            cancel_inter.user.id,
+                            False,
+                        )
+                        if ok:
+                            cancelled_count += 1
+            
+                    await cancel_inter.response.edit_message(
+                        content=f"신청 {cancelled_count}건을 취소했습니다.",
+                        embed=None,
+                        view=None,
+                    )
+            
+                async def cancel_all(cancel_inter):
+                    cancelled_count = 0
+                    for app in applications:
+                        ok = await asyncio.to_thread(
+                            self.service.cancel_application,
+                            app.id,
+                            cancel_inter.user.id,
+                            False,
+                        )
+                        if ok:
+                            cancelled_count += 1
+            
+                    await cancel_inter.response.edit_message(
+                        content=f"신청 {cancelled_count}건을 취소했습니다.",
+                        embed=None,
+                        view=None,
+                    )
+            
+                await refresh_cancel_view(inter, applications, selected_ids)
             
             async def status_callback(inter: discord.Interaction):
                 result = await asyncio.to_thread(
