@@ -126,8 +126,15 @@ class HttpApiService(BaseApiService):
             params["serverId"] = server_id
 
         response = self._request_json(self.search_url, params=params)
+        payload = response["data"]
 
-        return response["data"]
+        print("[API][SEARCH_URL]", response["url"])
+        print("[API][SEARCH_PAYLOAD]", payload)
+
+        if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+            return payload["data"]
+
+        return payload
 
     def _get_character_detail(self, character_id: str, server_id: int) -> dict[str, Any]:
         params = {
