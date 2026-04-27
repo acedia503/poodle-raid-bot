@@ -36,6 +36,8 @@ class ApplicationService:
             race=race,
             server=server,
         )
+        
+        print("[DEBUG][CHARACTER_INFO]", info)
 
         existing_character = self.character_repository.get_by_identity(
             guild_id=guild_id,
