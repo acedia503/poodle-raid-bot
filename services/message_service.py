@@ -55,25 +55,36 @@ class MessageService:
         result_type: str,
         show_identity: bool,
     ) -> discord.Embed:
-        if result_type == "updated":
-            title = f"{raid_name} 신청 정보가 조회되었습니다."
-        else:
+        if result_type == "created":
             title = f"✅ {raid_name} 신청 완료"
-
-        lines = [
-            f"**캐릭터명** : {info['character_name']}",
-        ]
-
+        elif result_type in ("show_current", "updated"):
+            title = f"🔄 {raid_name} 신청 정보가 업데이트되었습니다."
+        elif result_type == "already_exists_other_user":
+            title = f"⚠️ {raid_name} 이미 신청된 캐릭터입니다."
+        elif result_type == "cancelled":
+            title = f"❌ {raid_name} 신청 취소 완료"
+        else:
+            title = f"{raid_name} 신청 정보"
+    
+        lines = []
+    
+        if result_type == "already_exists_other_user":
+            lines.append("이미 다른 유저가 신청한 캐릭터입니다.")
+            lines.append("신청 정보를 조회합니다.")
+            lines.append("")
+    
+        lines.append(f"**캐릭터명** : {info['character_name']}")
+    
         if show_identity:
             lines.append(f"**종족** : {info['race']}")
             lines.append(f"**서버** : {info['server']}")
-
+    
         lines.extend([
             f"**직업** : {info['job']}",
             f"**아이템레벨** : {info['item_level']}",
             f"**전투력** : {info['combat_power']:,}",
         ])
-
+    
         return discord.Embed(
             description=title + "\n\n" + "\n".join(lines)
         )
