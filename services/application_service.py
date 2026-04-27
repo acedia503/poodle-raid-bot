@@ -31,54 +31,36 @@ class ApplicationService:
         race: str,
         server: str,
     ) -> dict:
+        channel_raid = self.raid_service.get_channel_raid(channel_id)
+
         info = self.character_info_service.get_character_info(
             character_name=character_name,
             race=race,
             server=server,
         )
-        
-        print("[DEBUG][CHARACTER_INFO]", info)
 
-        existing_character = self.character_repository.get_by_identity(
+        info_character_name = info.get("character_name") or character_name
+        info_race = info.get("race") or race
+        info_server = info.get("server") or server
+
+        existing_apps = self.repository.get_user_applications_by_character_identity(
             guild_id=guild_id,
-            character_name=character_name,
-            race=race,
-            server=server,
+            user_id=user_id,
+            character_name=info_character_name,
+            race=info_race,
+            server=info_server,
         )
-
-        if existing_character is not None and existing_character.user_id != user_id:
-            return {
-                "action": "already_exists_other_user",
-                "message": "이미 신청된 캐릭터입니다. 신청 정보를 조회합니다.",
-                "info": {
-                    "character_name": existing_character.character_name,
-                    "race": existing_character.race,
-                    "server": existing_character.server,
-                    "job": existing_character.job,
-                    "item_level": existing_character.item_level,
-                    "combat_power": existing_character.combat_power,
-                },
-                "character": existing_character,
-            }
 
         character = self.character_repository.upsert(
             guild_id=guild_id,
             user_id=user_id,
             user_name=user_name,
-            character_name=info.get("character_name") or character_name,
-            race=info.get("race") or race,
-            server=info.get("server") or server,
+            character_name=info_character_name,
+            race=info_race,
+            server=info_server,
             job=info["job"],
             item_level=info["item_level"],
             combat_power=info["combat_power"],
-        )
-
-        existing_apps = self.repository.get_user_applications_by_character_identity(
-            guild_id=guild_id,
-            user_id=user_id,
-            character_name=character.character_name,
-            race=character.race,
-            server=character.server,
         )
 
         self.repository.bulk_update_character_snapshot(
@@ -88,19 +70,36 @@ class ApplicationService:
             combat_power=character.combat_power,
         )
 
-        channel_raid = self.raid_service.get_channel_raid(channel_id)
+        if channel_raid is None:
+            if not existing_apps:
+                return {
+                    "action": "not_allowed",
+                    "message": "현재 채널에는 레이드가 설정되어 있지 않아 신청할 수 없습니다.",
+                }
 
-        if channel_raid is not None:
-            existing_in_current_raid = self.repository.get_user_application_in_raid(
-                guild_id=guild_id,
-                user_id=user_id,
-                character_name=character.character_name,
-                race=character.race,
-                server=character.server,
-                raid_name=channel_raid.raid_name,
-            )
+            return {
+                "action": "show_all",
+                "info": {
+                    "character_name": character.character_name,
+                    "race": character.race,
+                    "server": character.server,
+                    "job": character.job,
+                    "item_level": character.item_level,
+                    "combat_power": character.combat_power,
+                },
+                "applications": existing_apps,
+            }
 
-            if existing_in_current_raid is not None:
+        existing_in_current_raid = self.repository.get_by_guild_raid_character_identity(
+            guild_id=guild_id,
+            raid_name=channel_raid.raid_name,
+            character_name=character.character_name,
+            race=character.race,
+            server=character.server,
+        )
+
+        if existing_in_current_raid is not None:
+            if existing_in_current_raid.user_id == user_id:
                 return {
                     "action": "show_current",
                     "message": "이미 신청된 캐릭터입니다. 신청 정보를 업데이트합니다.",
@@ -116,49 +115,65 @@ class ApplicationService:
                     "application": existing_in_current_raid,
                 }
 
-            if (
-                channel_raid.min_item_level is not None
-                and character.item_level < channel_raid.min_item_level
-            ):
-                return {
-                    "action": "rejected",
-                    "message": (
-                        f"{channel_raid.raid_name} 신청이 불가능합니다.\n\n"
-                        f"현재 아이템레벨 {character.item_level}\n"
-                        f"필요 아이템레벨 {channel_raid.min_item_level}"
-                    ),
-                }
-
-            application = RaidApplication(
-                id=None,
-                guild_id=guild_id,
-                channel_id=channel_id,
-                user_id=user_id,
-                user_name=user_name,
-                character_name=character.character_name,
-                race=character.race,
-                server=character.server,
-                job=character.job,
-                item_level=character.item_level,
-                combat_power=character.combat_power,
-                raid_name=channel_raid.raid_name,
-                character_id=character.id,
-            )
-            created = self.repository.create(application)
-
             return {
-                "action": "created",
+                "action": "already_exists_other_user",
+                "message": "이미 신청된 캐릭터입니다. 신청 정보를 조회합니다.",
                 "info": {
-                    "character_name": character.character_name,
-                    "race": character.race,
-                    "server": character.server,
-                    "job": character.job,
-                    "item_level": character.item_level,
-                    "combat_power": character.combat_power,
+                    "character_name": existing_in_current_raid.character_name,
+                    "race": existing_in_current_raid.race,
+                    "server": existing_in_current_raid.server,
+                    "job": existing_in_current_raid.job,
+                    "item_level": existing_in_current_raid.item_level,
+                    "combat_power": existing_in_current_raid.combat_power,
                 },
                 "raid_name": channel_raid.raid_name,
-                "application": created,
+                "application": existing_in_current_raid,
             }
+
+        if (
+            channel_raid.min_item_level is not None
+            and character.item_level < channel_raid.min_item_level
+        ):
+            return {
+                "action": "rejected",
+                "message": (
+                    f"{channel_raid.raid_name} 신청이 불가능합니다.\n\n"
+                    f"현재 아이템레벨 {character.item_level}\n"
+                    f"필요 아이템레벨 {channel_raid.min_item_level}"
+                ),
+            }
+
+        application = RaidApplication(
+            id=None,
+            guild_id=guild_id,
+            channel_id=channel_id,
+            user_id=user_id,
+            user_name=user_name,
+            character_name=character.character_name,
+            race=character.race,
+            server=character.server,
+            job=character.job,
+            item_level=character.item_level,
+            combat_power=character.combat_power,
+            raid_name=channel_raid.raid_name,
+            character_id=character.id,
+        )
+
+        created = self.repository.create(application)
+
+        return {
+            "action": "created",
+            "info": {
+                "character_name": character.character_name,
+                "race": character.race,
+                "server": character.server,
+                "job": character.job,
+                "item_level": character.item_level,
+                "combat_power": character.combat_power,
+            },
+            "raid_name": channel_raid.raid_name,
+            "application": created,
+        }
 
         if not existing_apps:
             return {
