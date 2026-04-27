@@ -192,7 +192,7 @@ class ApplicationCommand(commands.Cog):
                 embed = self.message_service.build_application_result_embed(
                     result["raid_name"],
                     result["info"],
-                    "updated",
+                    result["action"],
                     show_identity=show_identity,
                 )
                 view = ApplicationResultView(
@@ -204,6 +204,20 @@ class ApplicationCommand(commands.Cog):
                     content=None,
                     embed=embed,
                     view=view,
+                )
+
+            elif result["action"] == "already_exists_other_user":
+                embed = self.message_service.build_application_result_embed(
+                    result["raid_name"],
+                    result["info"],
+                    result["action"],
+                    show_identity=show_identity,
+                )
+            
+                await interaction.edit_original_response(
+                    content=result.get("message"),
+                    embed=embed,
+                    view=None,
                 )
 
             elif result["action"] == "show_all":
