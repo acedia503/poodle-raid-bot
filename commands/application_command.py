@@ -96,7 +96,64 @@ class ApplicationCommand(commands.Cog):
                     embed=embed,
                     view=None,
                 )
-    
+
+            async def cancel_callback(inter: discord.Interaction):
+                applications = await asyncio.to_thread(
+                    self.service.repository.get_by_guild_and_user_id,
+                    inter.guild.id,
+                    inter.user.id,
+                )
+            
+                if not applications:
+                    await inter.response.edit_message(
+                        content="취소할 신청 내역이 없습니다.",
+                        embed=None,
+                        view=None,
+                    )
+                    return
+            
+                if len(applications) == 1:
+                    app = applications[0]
+                    ok = await asyncio.to_thread(
+                        self.service.cancel_application,
+                        app.id,
+                        inter.user.id,
+                        False,
+                    )
+            
+                    if ok:
+                        embed = self.message_service.build_application_result_embed(
+                            app.raid_name,
+                            {
+                                "character_name": app.character_name,
+                                "race": app.race,
+                                "server": app.server,
+                                "job": app.job,
+                                "item_level": app.item_level,
+                                "combat_power": app.combat_power,
+                            },
+                            "cancelled",
+                            show_identity=True,
+                        )
+                        await inter.response.edit_message(
+                            content=None,
+                            embed=embed,
+                            view=None,
+                        )
+                    else:
+                        await inter.response.edit_message(
+                            content="이미 취소되었거나 존재하지 않는 신청입니다.",
+                            embed=None,
+                            view=None,
+                        )
+                    return
+            
+                await inter.response.edit_message(
+                    content="취소할 신청 내역이 여러 건입니다.\n선택 취소 UI는 다음 단계에서 연결합니다.",
+                    embed=None,
+                    view=None,
+                )
+            
             async def status_callback(inter: discord.Interaction):
                 result = await asyncio.to_thread(
                     self.service.get_current_raid_application_list,
@@ -133,6 +190,7 @@ class ApplicationCommand(commands.Cog):
                 view=ApplicationMainView(
                     apply_callback=apply_callback,
                     my_applications_callback=my_applications_callback,
+                    cancel_callback=cancel_callback,
                     status_callback=status_callback,
                 ),
                 ephemeral=True,
