@@ -117,7 +117,7 @@ def create_bot() -> commands.Bot:
                 message_service,
                 setting_service,
                 party_manage_service,
-                party_waiting_,
+                party_waiting_repository,
             )
         )
         await bot.add_cog(
