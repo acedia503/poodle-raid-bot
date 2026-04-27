@@ -22,6 +22,7 @@ class RaidApplicationRepository:
             item_level=row["item_level"],
             combat_power=row["combat_power"],
             raid_name=row["raid_name"],
+            character_id=row.get("character_id"),
             created_at=row.get("created_at"),
             updated_at=row.get("updated_at"),
         )
@@ -34,9 +35,10 @@ class RaidApplicationRepository:
                 INSERT INTO raid_applications (
                     guild_id, channel_id, user_id, user_name,
                     character_name, race, server,
-                    job, item_level, combat_power, raid_name
+                    job, item_level, combat_power, raid_name,
+                    character_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -51,6 +53,7 @@ class RaidApplicationRepository:
                     application.item_level,
                     application.combat_power,
                     application.raid_name,
+                    application.character_id,
                 ),
             )
             application_id = cur.fetchone()["id"]
