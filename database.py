@@ -50,7 +50,26 @@ class Database:
                 UNIQUE(guild_id, raid_name)
             )
             """)
-
+            
+            # 캐릭터 정보
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS characters (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                user_name TEXT NOT NULL,
+                character_name TEXT NOT NULL,
+                race TEXT NOT NULL,
+                server TEXT NOT NULL,
+                job TEXT NOT NULL,
+                item_level INTEGER NOT NULL,
+                combat_power INTEGER NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(guild_id, character_name, race, server)
+            )
+            """)
+            
             # 레이드 신청
             cur.execute("""
             CREATE TABLE IF NOT EXISTS raid_applications (
@@ -70,6 +89,11 @@ class Database:
                 updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(guild_id, raid_name, character_name, race, server)
             )
+            """)
+
+            cur.execute("""
+            ALTER TABLE raid_applications
+            ADD COLUMN IF NOT EXISTS character_id INTEGER
             """)
 
             # 공대 생성 규칙
@@ -202,6 +226,20 @@ class Database:
             ON party_slots(session_id, user_id)
             """)
 
+            cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_characters_guild_identity
+            ON characters(guild_id, character_name, race, server)
+            """)
+
+            cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_characters_guild_user
+            ON characters(guild_id, user_id)
+            """)
+
+            cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_raid_applications_character_id
+            ON raid_applications(character_id)
+            """)
             cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_party_waiting_members_session
             ON party_waiting_members(session_id)
