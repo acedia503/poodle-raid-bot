@@ -13,6 +13,7 @@ from database import Database
 
 from repositories.channel_raid_repository import ChannelRaidRepository
 from repositories.guild_setting_repository import GuildSettingRepository
+from repositories.character_repository import CharacterRepository
 from repositories.raid_application_repository import RaidApplicationRepository
 from repositories.raid_rule_repository import RaidRuleRepository
 from repositories.party_build_session_repository import PartyBuildSessionRepository
@@ -45,6 +46,7 @@ def create_bot() -> commands.Bot:
     guild_setting_repository = GuildSettingRepository(database)
     channel_raid_repository = ChannelRaidRepository(database)
     raid_application_repository = RaidApplicationRepository(database)
+    character_repository = CharacterRepository(database)
     raid_rule_repository = RaidRuleRepository(database)
     party_build_session_repository = PartyBuildSessionRepository(database)
     party_slot_repository = PartySlotRepository(database)
