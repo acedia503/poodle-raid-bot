@@ -73,7 +73,7 @@ class MockApiService(BaseApiService):
 class HttpApiService(BaseApiService):
     def __init__(self, timeout: int = 5):
         self.search_url = "https://aion2.plaync.com/ko-kr/api/search/aion2/search/v2/character"
-        self.detail_url = "https://aion2.plaync.com/api/character/info"
+        self.detail_url = "https://aion2.plaync.com/ko-kr/api/character/info"
         self.timeout = timeout
 
     def get_character_info(
@@ -92,10 +92,14 @@ class HttpApiService(BaseApiService):
         )
 
         basic = self._extract_basic_character(search_data, character_name.strip())
-        detail_data = self._get_character_detail(
-            character_id=basic["character_id"],
-            server_id=basic["server_id"],
-        )
+        try:
+            detail_data = self._get_character_detail(
+                character_id=basic["character_id"],
+                server_id=basic["server_id"],
+            )
+        except ApiServiceError as exc:
+            print("[API][DETAIL_FALLBACK]", repr(exc))
+            detail_data = {}
         merged = self._merge_basic_and_detail(basic, detail_data)
 
         normalized = self.normalize_character_response(merged)
@@ -162,7 +166,8 @@ class HttpApiService(BaseApiService):
                 "Chrome/136.0.0.0 Safari/537.36"
             ),
             "Accept": "application/json, text/plain, */*",
-            "Referer": "https://aion2.plaync.com/",
+            "Referer": "https://aion2.plaync.com/ko-kr/",
+            "Origin": "https://aion2.plaync.com",
         }
 
         try:
@@ -219,16 +224,31 @@ class HttpApiService(BaseApiService):
             ),
             "server": str(matched.get("serverName") or "-"),
             "race": self._extract_race_name(matched),
+            "item_level": int(matched.get("level") or 0),
+            "job": "-",
+            "combat_power": 0,
         }
-
+        
     def _merge_basic_and_detail(self, basic: dict[str, Any], detail: dict[str, Any]) -> dict[str, Any]:
         profile = detail.get("profile", {}) if isinstance(detail, dict) else {}
         stat = detail.get("stat", {}) if isinstance(detail, dict) else {}
-
-        job = profile.get("className") or detail.get("className") or "-"
-        combat_power = profile.get("combatPower") or detail.get("combatPower") or 0
+    
+        job = (
+            profile.get("className")
+            or detail.get("className")
+            or basic.get("job")
+            or "-"
+        )
+        combat_power = (
+            profile.get("combatPower")
+            or detail.get("combatPower")
+            or basic.get("combat_power")
+            or 0
+        )
         item_level = self._extract_item_level_from_detail(stat, detail)
-
+        if not item_level:
+            item_level = basic.get("item_level") or 0
+    
         return {
             "character_name": basic.get("character_name", "-"),
             "job": str(job or "-"),
