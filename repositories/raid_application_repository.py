@@ -22,7 +22,7 @@ class RaidApplicationRepository:
             item_level=row["item_level"],
             combat_power=row["combat_power"],
             raid_name=row["raid_name"],
-            character_id=row.get("character_id"),
+            character_id=row.get("character_id"),  # 추가
             created_at=row.get("created_at"),
             updated_at=row.get("updated_at"),
         )
@@ -57,9 +57,29 @@ class RaidApplicationRepository:
                 ),
             )
             application_id = cur.fetchone()["id"]
-
+    
         return self.get_by_id(application_id)
 
+    def get_by_guild_and_user_id(
+        self,
+        guild_id: int,
+        user_id: int,
+    ) -> list[RaidApplication]:
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT *
+                FROM raid_applications
+                WHERE guild_id = %s
+                  AND user_id = %s
+                ORDER BY created_at DESC
+                """,
+                (guild_id, user_id),
+            )
+            rows = cur.fetchall()
+            return [self._to_domain(row) for row in rows]
+    
     def get_by_id(self, application_id: int) -> Optional[RaidApplication]:
         with self.database.get_connection() as conn:
             cur = conn.cursor()
