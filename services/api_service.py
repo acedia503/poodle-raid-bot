@@ -144,8 +144,15 @@ class HttpApiService(BaseApiService):
         }
 
         response = self._request_json(self.detail_url, params=params)
+        payload = response["data"]
 
-        return response["data"]
+        print("[API][DETAIL_URL]", response["url"])
+        print("[API][DETAIL_PAYLOAD]", payload)
+
+        if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+            return payload["data"]
+
+        return payload
 
     def _request_json(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
         headers = {
