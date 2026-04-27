@@ -4,7 +4,7 @@ from typing import Optional
 
 @dataclass
 class RaidApplication:
-    id: Optional[int]
+    id: int | None
     guild_id: int
     channel_id: int
     user_id: int
@@ -16,5 +16,6 @@ class RaidApplication:
     item_level: int
     combat_power: int
     raid_name: str
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    character_id: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
