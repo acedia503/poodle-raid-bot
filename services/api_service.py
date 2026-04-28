@@ -6,6 +6,7 @@ import re
 
 import requests
 
+from urllib.parse import unquote
 from utils.constants import RACE_TO_ID, SERVER_NAME_TO_ID
 
 
@@ -198,10 +199,12 @@ class HttpApiService(BaseApiService):
             server_id=server_id,
             race_id=race_id,
         )
-
+        
+        decoded_character_id = unquote(character_id)
+        
         params = {
             "lang": "ko",
-            "characterId": character_id,
+            "characterId": decoded_character_id,
             "serverId": server_id,
         }
 
