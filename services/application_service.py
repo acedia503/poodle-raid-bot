@@ -119,6 +119,7 @@ class ApplicationService:
                 "action": "already_exists_other_user",
                 "message": "이미 신청된 캐릭터입니다. 신청 정보를 조회합니다.",
                 "info": {
+                    "user_name": existing_in_current_raid.user_name,
                     "character_name": existing_in_current_raid.character_name,
                     "race": existing_in_current_raid.race,
                     "server": existing_in_current_raid.server,
@@ -136,11 +137,17 @@ class ApplicationService:
         ):
             return {
                 "action": "rejected",
-                "message": (
-                    f"{channel_raid.raid_name} 신청이 불가능합니다.\n\n"
-                    f"현재 아이템레벨 {character.item_level}\n"
-                    f"필요 아이템레벨 {channel_raid.min_item_level}"
-                ),
+                "raid_name": channel_raid.raid_name,
+                "info": {
+                    "character_name": character.character_name,
+                    "race": character.race,
+                    "server": character.server,
+                    "job": character.job,
+                    "item_level": character.item_level,
+                    "combat_power": character.combat_power,
+                    "min_item_level": channel_raid.min_item_level,
+                },
+                "message": "입장 조건인 아이템 레벨이 충족하지 않습니다.",
             }
 
         application = RaidApplication(
