@@ -29,12 +29,81 @@ class ApplicationCommand(commands.Cog):
         self.party_manage_service = party_manage_service
         self.party_waiting_repository = party_waiting_repository
 
+    def _notice_embed(
+        self,
+        title: str,
+        description: str,
+        color: discord.Color | None = None,
+    ) -> discord.Embed:
+        return discord.Embed(
+            title=title,
+            description=description,
+            color=color or discord.Color.blurple(),
+        )
+
+    def _error_embed(self, title: str, description: str) -> discord.Embed:
+        return discord.Embed(
+            title=title,
+            description=description,
+            color=discord.Color.red(),
+        )
+
+    def _friendly_error_message(self, exc: Exception) -> str:
+        text = str(exc)
+
+        if "캐릭터를 찾을 수 없습니다" in text:
+            return (
+                "캐릭터 정보를 찾을 수 없습니다.\n\n"
+                "입력한 캐릭터명, 종족, 서버가 맞는지 확인해주세요."
+            )
+
+        if "외부 API" in text or "API" in text:
+            return (
+                "캐릭터 정보 조회 중 문제가 발생했습니다.\n\n"
+                "잠시 후 다시 시도해주세요.\n"
+                "계속 실패하면 관리자에게 문의해주세요."
+            )
+
+        if "알 수 없는 종족" in text or "알 수 없는 서버" in text:
+            return (
+                "종족 또는 서버 정보가 올바르지 않습니다.\n\n"
+                "다시 선택 후 신청해주세요."
+            )
+
+        return (
+            "처리 중 예상하지 못한 오류가 발생했습니다.\n\n"
+            f"오류 내용: {text}"
+        )
+
+    async def _respond_error(self, interaction: discord.Interaction, exc: Exception):
+        embed = self._error_embed(
+            "오류가 발생했습니다.",
+            self._friendly_error_message(exc),
+        )
+
+        if interaction.response.is_done():
+            await interaction.edit_original_response(
+                content=None,
+                embed=embed,
+                view=None,
+            )
+        else:
+            await interaction.response.send_message(
+                content=None,
+                embed=embed,
+                ephemeral=True,
+            )
+
     @app_commands.command(name="신청", description="레이드 신청 메뉴")
     async def apply(self, interaction: discord.Interaction):
         try:
             if interaction.guild is None or interaction.channel is None:
                 await interaction.response.send_message(
-                    "서버 채널에서만 사용할 수 있습니다.",
+                    content=None,
+                    embed=self._error_embed(
+                        "사용할 수 없는 위치입니다.",
+                        "서버 채널에서만 사용할 수 있습니다.",
+                    ),
                     ephemeral=True,
                 )
                 return
@@ -51,7 +120,6 @@ class ApplicationCommand(commands.Cog):
                     interaction.user.id,
                 )
                 title = f"내 {channel_raid.raid_name} 신청 현황"
-                #content = f"{channel_raid.raid_name} 신청 메뉴입니다."
             else:
                 applications = await asyncio.to_thread(
                     self.service.repository.get_by_guild_and_user_id,
@@ -59,7 +127,6 @@ class ApplicationCommand(commands.Cog):
                     interaction.user.id,
                 )
                 title = "내 전체 신청 현황"
-                #content = "현재 채널에 매칭된 레이드가 없습니다."
 
             if applications:
                 lines = []
@@ -73,14 +140,21 @@ class ApplicationCommand(commands.Cog):
                 embed = discord.Embed(
                     title=title,
                     description="\n".join(lines),
+                    color=discord.Color.blurple(),
                 )
             else:
                 embed = discord.Embed(
                     title=title,
                     description="신청 내역이 없습니다.",
+                    color=discord.Color.blurple(),
                 )
 
             if channel_raid is None:
+                embed.add_field(
+                    name="안내",
+                    value="현재 채널에 매칭된 레이드가 없어 전체 신청 현황만 표시합니다.",
+                    inline=False,
+                )
                 await interaction.response.send_message(
                     content=None,
                     embed=embed,
@@ -99,18 +173,19 @@ class ApplicationCommand(commands.Cog):
 
                     if not setting:
                         async def race_callback(race_inter, race):
-                            embed = discord.Embed(
+                            race_embed = discord.Embed(
                                 title="신규 신청",
                                 description=(
                                     f"**캐릭터명** : {character_name}\n"
                                     f"**종족** : {race}\n\n"
                                     "서버를 선택하세요."
                                 ),
+                                color=discord.Color.blurple(),
                             )
-                    
+
                             await race_inter.response.edit_message(
                                 content=None,
-                                embed=embed,
+                                embed=race_embed,
                                 view=ServerView(
                                     race,
                                     lambda i, r, s: self._process(
@@ -122,18 +197,19 @@ class ApplicationCommand(commands.Cog):
                                     ),
                                 ),
                             )
-                    
-                        embed = discord.Embed(
+
+                        race_embed = discord.Embed(
                             title="신규 신청",
                             description=(
                                 f"**캐릭터명** : {character_name}\n\n"
                                 "종족을 선택하세요."
                             ),
+                            color=discord.Color.blurple(),
                         )
-                    
+
                         await modal_inter.response.edit_message(
                             content=None,
-                            embed=embed,
+                            embed=race_embed,
                             view=RaceView(race_callback),
                         )
                         return
@@ -160,8 +236,12 @@ class ApplicationCommand(commands.Cog):
 
                 if not applications:
                     await inter.response.edit_message(
-                        content="취소할 신청 내역이 없습니다.",
-                        embed=None,
+                        content=None,
+                        embed=self._notice_embed(
+                            "취소할 신청 내역이 없습니다.",
+                            f"{channel_raid.raid_name}에 신청한 캐릭터가 없습니다.",
+                            discord.Color.orange(),
+                        ),
                         view=None,
                     )
                     return
@@ -196,8 +276,12 @@ class ApplicationCommand(commands.Cog):
                         )
                     else:
                         await inter.response.edit_message(
-                            content="이미 취소되었거나 존재하지 않는 신청입니다.",
-                            embed=None,
+                            content=None,
+                            embed=self._notice_embed(
+                                "신청 취소 실패",
+                                "이미 취소되었거나 존재하지 않는 신청입니다.",
+                                discord.Color.orange(),
+                            ),
                             view=None,
                         )
                     return
@@ -217,6 +301,7 @@ class ApplicationCommand(commands.Cog):
                     cancel_list_embed = discord.Embed(
                         title="신청 취소 대상 선택",
                         description="\n".join(lines),
+                        color=discord.Color.orange(),
                     )
 
                     view = ApplicationCancelSelectView(
@@ -243,7 +328,12 @@ class ApplicationCommand(commands.Cog):
                 async def cancel_selected(cancel_inter, ids: list[int]):
                     if not ids:
                         await cancel_inter.response.send_message(
-                            "취소할 신청을 선택하세요.",
+                            content=None,
+                            embed=self._notice_embed(
+                                "선택된 신청이 없습니다.",
+                                "취소할 신청을 먼저 선택해주세요.",
+                                discord.Color.orange(),
+                            ),
                             ephemeral=True,
                         )
                         return
@@ -260,8 +350,12 @@ class ApplicationCommand(commands.Cog):
                             cancelled_count += 1
 
                     await cancel_inter.response.edit_message(
-                        content=f"신청 {cancelled_count}건을 취소했습니다.",
-                        embed=None,
+                        content=None,
+                        embed=self._notice_embed(
+                            "신청 취소 완료",
+                            f"신청 {cancelled_count}건을 취소했습니다.",
+                            discord.Color.green(),
+                        ),
                         view=None,
                     )
 
@@ -278,8 +372,12 @@ class ApplicationCommand(commands.Cog):
                             cancelled_count += 1
 
                     await cancel_inter.response.edit_message(
-                        content=f"신청 {cancelled_count}건을 취소했습니다.",
-                        embed=None,
+                        content=None,
+                        embed=self._notice_embed(
+                            "신청 취소 완료",
+                            f"신청 {cancelled_count}건을 취소했습니다.",
+                            discord.Color.green(),
+                        ),
                         view=None,
                     )
 
@@ -293,8 +391,12 @@ class ApplicationCommand(commands.Cog):
 
                 if result["raid_name"] is None:
                     await inter.response.edit_message(
-                        content="현재 채널에 매칭된 레이드가 없습니다.",
-                        embed=None,
+                        content=None,
+                        embed=self._notice_embed(
+                            "레이드 신청 현황을 볼 수 없습니다.",
+                            "현재 채널에 매칭된 레이드가 없습니다.",
+                            discord.Color.orange(),
+                        ),
                         view=None,
                     )
                     return
@@ -311,7 +413,7 @@ class ApplicationCommand(commands.Cog):
                 )
 
                 await inter.response.edit_message(
-                    content=f"{result['raid_name']} 신청자 목록",
+                    content=None,
                     embed=status_embed,
                     view=None,
                 )
@@ -320,8 +422,12 @@ class ApplicationCommand(commands.Cog):
             if is_admin(interaction):
                 async def admin_delete_callback(inter: discord.Interaction):
                     await inter.response.edit_message(
-                        content="관리자 삭제 기능은 다음 단계에서 연결됩니다.",
-                        embed=None,
+                        content=None,
+                        embed=self._notice_embed(
+                            "관리자용 신청 삭제",
+                            "관리자 삭제 기능은 다음 단계에서 연결됩니다.",
+                            discord.Color.orange(),
+                        ),
                         view=None,
                     )
 
@@ -338,17 +444,7 @@ class ApplicationCommand(commands.Cog):
             )
 
         except Exception as exc:
-            if interaction.response.is_done():
-                await interaction.edit_original_response(
-                    content=f"오류가 발생했습니다: {exc}",
-                    embed=None,
-                    view=None,
-                )
-            else:
-                await interaction.response.send_message(
-                    f"오류가 발생했습니다: {exc}",
-                    ephemeral=True,
-                )
+            await self._respond_error(interaction, exc)
 
     async def _process(self, interaction, character_name, race, server, show_identity: bool):
         await interaction.response.defer(ephemeral=True)
@@ -356,8 +452,11 @@ class ApplicationCommand(commands.Cog):
         try:
             if interaction.guild is None or interaction.channel is None:
                 await interaction.edit_original_response(
-                    content="서버 채널에서만 사용할 수 있습니다.",
-                    embed=None,
+                    content=None,
+                    embed=self._error_embed(
+                        "사용할 수 없는 위치입니다.",
+                        "서버 채널에서만 사용할 수 있습니다.",
+                    ),
                     view=None,
                 )
                 return
@@ -409,29 +508,37 @@ class ApplicationCommand(commands.Cog):
                         await interaction.channel.send(embed=embed)
                         sent_to_channel = True
                     except discord.Forbidden:
-                        send_fail_reason = "채널 전송 권한이 없습니다."
+                        send_fail_reason = "봇에게 현재 채널 메시지 전송 권한이 없습니다."
                     except discord.HTTPException as exc:
-                        send_fail_reason = f"채널 전송 중 HTTP 오류가 발생했습니다. ({exc.status})"
+                        send_fail_reason = f"디스코드 전송 오류가 발생했습니다. 상태 코드: {exc.status}"
                     except Exception as exc:
-                        send_fail_reason = f"채널 전송 중 알 수 없는 오류가 발생했습니다. ({type(exc).__name__})"
+                        send_fail_reason = f"알 수 없는 전송 오류가 발생했습니다. ({type(exc).__name__})"
 
-                complete_message = "신청이 완료되었습니다."
                 if added_to_waiting:
-                    complete_message += "\n이미 공대가 생성된 상태라 상비군으로도 등록되었습니다."
+                    embed.add_field(
+                        name="추가 안내",
+                        value="이미 공대가 생성된 상태라 상비군으로도 등록되었습니다.",
+                        inline=False,
+                    )
 
                 if sent_to_channel:
-                    await interaction.edit_original_response(
-                        content=complete_message,
-                        embed=None,
-                        view=None,
+                    embed.add_field(
+                        name="처리 결과",
+                        value="공개 채널에 신청 완료 메시지를 전송했습니다.",
+                        inline=False,
                     )
                 else:
-                    extra_reason = send_fail_reason or "채널에 공개 메시지를 전송하지 못했습니다."
-                    await interaction.edit_original_response(
-                        content=f"{complete_message}\n공개 메시지 전송 실패: {extra_reason}",
-                        embed=embed,
-                        view=None,
+                    embed.add_field(
+                        name="공개 메시지 전송 실패",
+                        value=send_fail_reason or "채널에 공개 메시지를 전송하지 못했습니다.",
+                        inline=False,
                     )
+
+                await interaction.edit_original_response(
+                    content=None,
+                    embed=embed,
+                    view=None,
+                )
 
             elif result["action"] == "show_current":
                 embed = self.message_service.build_application_result_embed(
@@ -446,7 +553,7 @@ class ApplicationCommand(commands.Cog):
                     owner_user_id=interaction.user.id,
                 )
                 await interaction.edit_original_response(
-                    content=result.get("message"),
+                    content=None,
                     embed=embed,
                     view=view,
                 )
@@ -460,7 +567,7 @@ class ApplicationCommand(commands.Cog):
                 )
 
                 await interaction.edit_original_response(
-                    content=result.get("message"),
+                    content=None,
                     embed=embed,
                     view=None,
                 )
@@ -477,10 +584,35 @@ class ApplicationCommand(commands.Cog):
                     view=None,
                 )
 
+            elif result["action"] == "rejected":
+                await interaction.edit_original_response(
+                    content=None,
+                    embed=self._error_embed(
+                        "신청 불가",
+                        result.get("message", "신청 조건을 만족하지 않아 신청할 수 없습니다."),
+                    ),
+                    view=None,
+                )
+
+            elif result["action"] == "not_allowed":
+                await interaction.edit_original_response(
+                    content=None,
+                    embed=self._notice_embed(
+                        "신청할 수 없습니다.",
+                        result.get("message", "현재 채널에서는 신청할 수 없습니다."),
+                        discord.Color.orange(),
+                    ),
+                    view=None,
+                )
+
             else:
                 await interaction.edit_original_response(
-                    content=result["message"],
-                    embed=None,
+                    content=None,
+                    embed=self._notice_embed(
+                        "처리 결과",
+                        result.get("message", "요청 처리가 완료되었습니다."),
+                        discord.Color.orange(),
+                    ),
                     view=None,
                 )
 
@@ -493,7 +625,10 @@ class ApplicationCommand(commands.Cog):
                 repr(exc),
             )
             await interaction.edit_original_response(
-                content=f"오류가 발생했습니다: {exc}",
-                embed=None,
+                content=None,
+                embed=self._error_embed(
+                    "신청 처리 중 오류가 발생했습니다.",
+                    self._friendly_error_message(exc),
+                ),
                 view=None,
             )
