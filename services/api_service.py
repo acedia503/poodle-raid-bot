@@ -6,7 +6,7 @@ import re
 
 import requests
 
-from urllib.parse import unquote
+from urllib.parse import unquote, quote
 from utils.constants import RACE_TO_ID, SERVER_NAME_TO_ID
 
 
@@ -194,20 +194,27 @@ class HttpApiService(BaseApiService):
         server_id: int,
         race_id: int | None = None,
     ) -> dict[str, Any]:
-        referer = self._warmup_character_page(
+        # 상세 페이지를 먼저 호출해서 세션/쿠키를 준비
+        self._warmup_character_page(
             character_id=character_id,
             server_id=server_id,
             race_id=race_id,
         )
-        
+    
         decoded_character_id = unquote(character_id)
-        
+        encoded_character_id = quote(decoded_character_id, safe="")
+    
+        referer = (
+            f"https://aion2.plaync.com/ko-kr/characters/"
+            f"{server_id}/{encoded_character_id}"
+        )
+    
         params = {
             "lang": "ko",
             "characterId": decoded_character_id,
             "serverId": server_id,
         }
-
+    
         try:
             res = self.session.get(
                 self.detail_url,
@@ -218,35 +225,36 @@ class HttpApiService(BaseApiService):
             )
         except requests.RequestException as exc:
             raise ExternalApiRequestError(f"캐릭터 상세 API 요청 실패: {exc}") from exc
-
+    
+        print("[API][DETAIL_REFERER]", referer)
         print("[API][DETAIL_URL]", res.url)
         print("[API][DETAIL_STATUS]", res.status_code)
         print("[API][DETAIL_LOCATION]", res.headers.get("Location"))
-
+    
         if res.status_code in (301, 302, 303, 307, 308):
             raise ExternalApiRequestError(
                 f"상세 API가 리다이렉트되었습니다: {res.headers.get('Location')}"
             )
-
+    
         if res.status_code == 404:
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
-
+    
         if res.status_code >= 400:
             print("[API][DETAIL_BODY]", res.text[:500])
             raise ExternalApiRequestError(f"외부 API 오류: {res.status_code}")
-
+    
         try:
             payload = res.json()
         except ValueError as exc:
             raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
-
+    
         print("[API][DETAIL_PAYLOAD]", payload)
-
+    
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
             return payload["data"]
-
+    
         return payload
-
+    
     def _request_json(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
         try:
             res = self.session.get(
