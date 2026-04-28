@@ -299,8 +299,7 @@ class ApplicationCommand(commands.Cog):
                     for idx, app in enumerate(apps, start=1):
                         checked = "✅" if app.id in ids else "⬜"
                         lines.append(
-                            f"{checked} {idx}. **{app.raid_name}** | "
-                            f"{app.character_name} | {app.job} | "
+                            f"{checked} {idx}. {app.character_name} | {app.job} | "
                             f"{app.item_level} | {app.combat_power:,}"
                         )
 
