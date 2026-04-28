@@ -246,9 +246,6 @@ class HttpApiService(BaseApiService):
         headers["Cookie"] = self._build_cookie_header(race_id, server_id)
         headers.pop("Origin", None)
 
-        print("[API][DETAIL_REQUEST_REFERER]", res.request.headers.get("Referer"))
-        print("[API][DETAIL_REQUEST_HEADERS]", dict(res.request.headers))
-
         try:
             res = self.session.get(
                 self.detail_url,
@@ -259,7 +256,9 @@ class HttpApiService(BaseApiService):
             )
         except requests.RequestException as exc:
             raise ExternalApiRequestError(f"캐릭터 상세 API 요청 실패: {exc}") from exc
-
+            
+        print("[API][DETAIL_REQUEST_REFERER]", res.request.headers.get("Referer"))
+        print("[API][DETAIL_REQUEST_HEADERS]", dict(res.request.headers))
         print("[API][DETAIL_REFERER]", referer)
         print("[API][DETAIL_URL]", res.url)
         print("[API][DETAIL_STATUS]", res.status_code)
