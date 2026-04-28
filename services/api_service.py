@@ -135,14 +135,14 @@ class HttpApiService(BaseApiService):
 
     
     def _get_character_detail(self, character_id: str, server_id: int) -> dict[str, Any]:
-        # character_id는 검색 API에서 받은 raw 값 그대로 사용
-        # requests params를 쓰면 %가 다시 인코딩될 수 있어서 URL을 직접 조립
         url = (
             f"{self.detail_url}"
             f"?lang=ko"
             f"&characterId={character_id}"
             f"&serverId={server_id}"
         )
+    
+        print("[API][DETAIL_RAW_URL]", url)
     
         response = self._request_json_raw(url)
         payload = response["data"]
@@ -215,19 +215,26 @@ class HttpApiService(BaseApiService):
                 url,
                 headers=headers,
                 timeout=self.timeout,
+                allow_redirects=False,  # 중요
             )
         except requests.RequestException as exc:
             raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
     
-        if res.status_code >= 400:
-            print("[API][ERROR_URL]", res.url)
-            print("[API][ERROR_STATUS]", res.status_code)
-            print("[API][ERROR_BODY]", res.text[:500])
+        print("[API][RAW_STATUS]", res.status_code)
+        print("[API][RAW_LOCATION]", res.headers.get("Location"))
+    
+        if res.status_code in (301, 302, 303, 307, 308):
+            raise ExternalApiRequestError(
+                f"상세 API가 리다이렉트되었습니다: {res.headers.get('Location')}"
+            )
     
         if res.status_code == 404:
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
     
         if res.status_code >= 400:
+            print("[API][ERROR_URL]", res.url)
+            print("[API][ERROR_STATUS]", res.status_code)
+            print("[API][ERROR_BODY]", res.text[:500])
             raise ExternalApiRequestError(f"외부 API 오류: {res.status_code}")
     
         try:
