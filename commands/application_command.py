@@ -131,11 +131,17 @@ class ApplicationCommand(commands.Cog):
             if applications:
                 lines = []
                 for idx, app in enumerate(applications, start=1):
-                    lines.append(
-                        f"{idx}. **{app.raid_name}** | "
-                        f"{app.character_name} | {app.job} | "
-                        f"{app.item_level} | {app.combat_power:,}"
-                    )
+                    if channel_raid is not None:
+                        lines.append(
+                            f"{idx}. {app.character_name} | {app.job} | "
+                            f"{app.item_level} | {app.combat_power:,}"
+                        )
+                    else:
+                        lines.append(
+                            f"{idx}. **{app.raid_name}** | "
+                            f"{app.character_name} | {app.job} | "
+                            f"{app.item_level} | {app.combat_power:,}"
+                        )
 
                 embed = discord.Embed(
                     title=title,
