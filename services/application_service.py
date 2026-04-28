@@ -344,7 +344,26 @@ class ApplicationService:
         }
 
     def admin_delete_applications(self, application_ids: list[int]) -> int:
-        return self.repository.delete_by_ids(application_ids)
+        applications = [
+            app
+            for app in (self.repository.get_by_id(app_id) for app_id in application_ids)
+            if app is not None
+        ]
+    
+        deleted_count = self.repository.delete_by_ids(application_ids)
+    
+        character_ids = {
+            app.character_id
+            for app in applications
+            if app.character_id is not None
+        }
+    
+        for character_id in character_ids:
+            remaining_count = self.repository.count_by_character_id(character_id)
+            if remaining_count == 0:
+                self.character_repository.delete_by_id(character_id)
+    
+        return deleted_count
 
     def get_applications(
         self,
