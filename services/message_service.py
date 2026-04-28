@@ -57,23 +57,89 @@ class MessageService:
     ) -> discord.Embed:
         if result_type == "created":
             title = f"✅ {raid_name} 신청 완료"
-        elif result_type in ("show_current", "updated"):
+    
+            lines = [
+                f"**캐릭터명** : {info['character_name']}",
+            ]
+    
+            if show_identity:
+                lines.append(f"**종족** : {info['race']}")
+                lines.append(f"**서버** : {info['server']}")
+    
+            lines.extend([
+                f"**직업** : {info['job']}",
+                f"**아이템레벨** : {info['item_level']}",
+                f"**전투력** : {info['combat_power']:,}",
+            ])
+    
+            return discord.Embed(
+                description=title + "\n\n" + "\n".join(lines),
+                color=discord.Color.green(),
+            )
+    
+        if result_type == "rejected":
+            title = f"⛔ {raid_name} 신청 불가"
+    
+            lines = [
+                f"**캐릭터명** : {info['character_name']}",
+            ]
+    
+            if show_identity:
+                lines.append(f"**종족** : {info['race']}")
+                lines.append(f"**서버** : {info['server']}")
+    
+            lines.extend([
+                f"**직업** : {info['job']}",
+                f"**아이템레벨** : {info['item_level']}",
+                f"**전투력** : {info['combat_power']:,}",
+                "",
+                "**사유** : 입장 조건인 아이템 레벨이 충족하지 않습니다.",
+            ])
+    
+            min_item_level = info.get("min_item_level")
+            if min_item_level is not None:
+                lines.append(f"**입장조건** : [아이템레벨] {min_item_level}")
+    
+            return discord.Embed(
+                description=title + "\n\n" + "\n".join(lines),
+                color=discord.Color.red(),
+            )
+    
+        if result_type == "already_exists_other_user":
+            title = f"⚠️ {raid_name} 신청 중복"
+    
+            lines = [
+                f"**디코유저** : {info.get('user_name', '-')}",
+                f"**캐릭터명** : {info['character_name']}",
+            ]
+    
+            if show_identity:
+                lines.append(f"**종족** : {info['race']}")
+                lines.append(f"**서버** : {info['server']}")
+    
+            lines.extend([
+                f"**직업** : {info['job']}",
+                f"**아이템레벨** : {info['item_level']}",
+                f"**전투력** : {info['combat_power']:,}",
+                "",
+                "**사유** : 해당 캐릭터는 다른 유저의 캐릭터로 등록되어 있습니다. 관리자에게 문의해주세요.",
+            ])
+    
+            return discord.Embed(
+                description=title + "\n\n" + "\n".join(lines),
+                color=discord.Color.orange(),
+            )
+    
+        if result_type in ("show_current", "updated"):
             title = f"🔄 {raid_name} 신청 정보가 업데이트되었습니다."
-        elif result_type == "already_exists_other_user":
-            title = f"⚠️ {raid_name} 이미 신청된 캐릭터입니다."
         elif result_type == "cancelled":
             title = f"❌ {raid_name} 신청 취소 완료"
         else:
             title = f"{raid_name} 신청 정보"
     
-        lines = []
-    
-        if result_type == "already_exists_other_user":
-            lines.append("이미 다른 유저가 신청한 캐릭터입니다.")
-            lines.append("신청 정보를 조회합니다.")
-            lines.append("")
-    
-        lines.append(f"**캐릭터명** : {info['character_name']}")
+        lines = [
+            f"**캐릭터명** : {info['character_name']}",
+        ]
     
         if show_identity:
             lines.append(f"**종족** : {info['race']}")
@@ -86,7 +152,8 @@ class MessageService:
         ])
     
         return discord.Embed(
-            description=title + "\n\n" + "\n".join(lines)
+            description=title + "\n\n" + "\n".join(lines),
+            color=discord.Color.blurple(),
         )
 
     def build_application_all_embed(
