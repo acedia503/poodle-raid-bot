@@ -50,7 +50,30 @@ class ApplicationService:
             race=info_race,
             server=info_server,
         )
-
+        
+        existing_character = self.character_repository.get_by_identity(
+            guild_id=guild_id,
+            character_name=info_character_name,
+            race=info_race,
+            server=info_server,
+        )
+        
+        if existing_character is not None and existing_character.user_id != user_id:
+            return {
+                "action": "already_exists_other_user",
+                "raid_name": channel_raid.raid_name if channel_raid else "-",
+                "message": "해당 캐릭터는 다른 유저의 캐릭터로 등록되어 있습니다. 관리자에게 문의해주세요.",
+                "info": {
+                    "user_name": existing_character.user_name,
+                    "character_name": existing_character.character_name,
+                    "race": existing_character.race,
+                    "server": existing_character.server,
+                    "job": existing_character.job,
+                    "item_level": existing_character.item_level,
+                    "combat_power": existing_character.combat_power,
+                },
+            }
+    
         character = self.character_repository.upsert(
             guild_id=guild_id,
             user_id=user_id,
