@@ -258,7 +258,7 @@ class HttpApiService(BaseApiService):
         if matched is None:
             matched = char_list[0]
 
-        character_id = unquote(str(matched.get("characterId") or ""))
+        character_id = str(matched.get("characterId") or "")
         server_id = int(matched.get("serverId") or 0)
 
         if not character_id or server_id <= 0:
