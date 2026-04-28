@@ -97,6 +97,7 @@ class HttpApiService(BaseApiService):
         detail_data = self._get_character_detail(
             character_id=basic["character_id"],
             server_id=basic["server_id"],
+            race_id=basic.get("race_id"),
         )
 
         merged = self._merge_basic_and_detail(basic, detail_data)
@@ -116,6 +117,7 @@ class HttpApiService(BaseApiService):
             "Sec-Fetch-Site": "same-origin",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Dest": "empty",
+            "Connection": "keep-alive",
         }
 
     def _search_character(
@@ -150,16 +152,22 @@ class HttpApiService(BaseApiService):
 
         return payload
 
-    def _warmup_character_page(self, character_id: str, server_id: int) -> str:
+    def _warmup_character_page(
+        self,
+        character_id: str,
+        server_id: int,
+        race_id: int | None = None,
+    ) -> str:
         page_url = f"{self.character_page_url}/{server_id}/{character_id}"
 
-        # 브라우저 요청에서 확인된 기본 쿠키 값
+        selected_server_id = f"{race_id}-{server_id}" if race_id else str(server_id)
+
         self.session.cookies.set("gw_locale", "ko-KR", domain="aion2.plaync.com")
         self.session.cookies.set("aion2_gw_locale", "ko-KR", domain="aion2.plaync.com")
         self.session.cookies.set("visitedGame", "AION2", domain="aion2.plaync.com")
         self.session.cookies.set(
             "charactersSelectedServerId",
-            str(server_id),
+            selected_server_id,
             domain="aion2.plaync.com",
         )
 
@@ -175,11 +183,21 @@ class HttpApiService(BaseApiService):
 
         print("[API][WARMUP_URL]", res.url)
         print("[API][WARMUP_STATUS]", res.status_code)
+        print("[API][COOKIE]", self.session.cookies.get_dict())
 
         return page_url
 
-    def _get_character_detail(self, character_id: str, server_id: int) -> dict[str, Any]:
-        referer = self._warmup_character_page(character_id, server_id)
+    def _get_character_detail(
+        self,
+        character_id: str,
+        server_id: int,
+        race_id: int | None = None,
+    ) -> dict[str, Any]:
+        referer = self._warmup_character_page(
+            character_id=character_id,
+            server_id=server_id,
+            race_id=race_id,
+        )
 
         params = {
             "lang": "ko",
@@ -275,6 +293,12 @@ class HttpApiService(BaseApiService):
 
         character_id = str(matched.get("characterId") or "")
         server_id = int(matched.get("serverId") or 0)
+        race_id_raw = matched.get("race")
+
+        try:
+            race_id = int(race_id_raw) if race_id_raw is not None else None
+        except (TypeError, ValueError):
+            race_id = None
 
         if not character_id or server_id <= 0:
             raise InvalidApiResponseError("캐릭터 상세 조회에 필요한 ID 정보가 없습니다.")
@@ -282,6 +306,7 @@ class HttpApiService(BaseApiService):
         return {
             "character_id": character_id,
             "server_id": server_id,
+            "race_id": race_id,
             "character_name": self._clean_html(
                 str(matched.get("characterName") or matched.get("name") or "-")
             ),
@@ -338,20 +363,19 @@ class HttpApiService(BaseApiService):
         }
 
     def _extract_item_level(self, detail: dict[str, Any]) -> int:
-        stat_list = detail.get("stat", [])
-
-        if isinstance(stat_list, list):
-            for entry in stat_list:
-                if entry.get("type") == "ItemLevel":
-                    return int(entry.get("value") or 0)
-
         stat_obj = detail.get("stat", {})
+
         if isinstance(stat_obj, dict):
-            nested_stat_list = stat_obj.get("statList", [])
-            if isinstance(nested_stat_list, list):
-                for entry in nested_stat_list:
+            stat_list = stat_obj.get("statList", [])
+            if isinstance(stat_list, list):
+                for entry in stat_list:
                     if entry.get("type") == "ItemLevel":
                         return int(entry.get("value") or 0)
+
+        if isinstance(stat_obj, list):
+            for entry in stat_obj:
+                if entry.get("type") == "ItemLevel":
+                    return int(entry.get("value") or 0)
 
         return int(detail.get("itemLevel") or 0)
 
