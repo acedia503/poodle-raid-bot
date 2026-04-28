@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any
-from urllib.parse import quote
 import re
 
 import requests
@@ -74,7 +73,9 @@ class HttpApiService(BaseApiService):
     def __init__(self, timeout: int = 5):
         self.search_url = "https://aion2.plaync.com/ko-kr/api/search/aion2/search/v2/character"
         self.detail_url = "https://aion2.plaync.com/api/character/info"
+        self.character_page_url = "https://aion2.plaync.com/ko-kr/characters"
         self.timeout = timeout
+        self.session = requests.Session()
 
     def get_character_info(
         self,
@@ -100,6 +101,22 @@ class HttpApiService(BaseApiService):
 
         merged = self._merge_basic_and_detail(basic, detail_data)
         return self.normalize_character_response(merged)
+
+    def _get_headers(self, referer: str | None = None) -> dict[str, str]:
+        return {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/147.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Referer": referer or "https://aion2.plaync.com/ko-kr/",
+            "Origin": "https://aion2.plaync.com",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Dest": "empty",
+        }
 
     def _search_character(
         self,
@@ -133,123 +150,112 @@ class HttpApiService(BaseApiService):
 
         return payload
 
-    
-    def _get_character_detail(self, character_id: str, server_id: int) -> dict[str, Any]:
-        encoded_character_id = quote(character_id, safe="")
-    
-        url = (
-            f"{self.detail_url}"
-            f"?lang=ko"
-            f"&characterId={encoded_character_id}"
-            f"&serverId={server_id}"
+    def _warmup_character_page(self, character_id: str, server_id: int) -> str:
+        page_url = f"{self.character_page_url}/{server_id}/{character_id}"
+
+        # 브라우저 요청에서 확인된 기본 쿠키 값
+        self.session.cookies.set("gw_locale", "ko-KR", domain="aion2.plaync.com")
+        self.session.cookies.set("aion2_gw_locale", "ko-KR", domain="aion2.plaync.com")
+        self.session.cookies.set("visitedGame", "AION2", domain="aion2.plaync.com")
+        self.session.cookies.set(
+            "charactersSelectedServerId",
+            str(server_id),
+            domain="aion2.plaync.com",
         )
-    
-        print("[API][DETAIL_RAW_URL]", url)
-    
-        response = self._request_json_raw(url)
-        payload = response["data"]
-    
-        print("[API][DETAIL_URL]", response["url"])
-        print("[API][DETAIL_DATA]", payload)
-    
-        if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
-            return payload["data"]
-    
-        return payload
 
+        try:
+            res = self.session.get(
+                page_url,
+                headers=self._get_headers("https://aion2.plaync.com/ko-kr/"),
+                timeout=self.timeout,
+                allow_redirects=True,
+            )
+        except requests.RequestException as exc:
+            raise ExternalApiRequestError(f"캐릭터 상세 페이지 요청 실패: {exc}") from exc
 
-    def _request_json(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/136.0.0.0 Safari/537.36"
-            ),
-            "Accept": "application/json, text/plain, */*",
-            "Referer": "https://aion2.plaync.com/ko-kr/",
-            "Origin": "https://aion2.plaync.com",
+        print("[API][WARMUP_URL]", res.url)
+        print("[API][WARMUP_STATUS]", res.status_code)
+
+        return page_url
+
+    def _get_character_detail(self, character_id: str, server_id: int) -> dict[str, Any]:
+        referer = self._warmup_character_page(character_id, server_id)
+
+        params = {
+            "lang": "ko",
+            "characterId": character_id,
+            "serverId": server_id,
         }
 
         try:
-            res = requests.get(
-                url,
+            res = self.session.get(
+                self.detail_url,
                 params=params,
-                headers=headers,
+                headers=self._get_headers(referer),
                 timeout=self.timeout,
+                allow_redirects=False,
             )
         except requests.RequestException as exc:
-            raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
+            raise ExternalApiRequestError(f"캐릭터 상세 API 요청 실패: {exc}") from exc
 
-        if res.status_code == 404:
-            raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
+        print("[API][DETAIL_URL]", res.url)
+        print("[API][DETAIL_STATUS]", res.status_code)
+        print("[API][DETAIL_LOCATION]", res.headers.get("Location"))
 
-        if res.status_code >= 400:
-            print("[API][ERROR_URL]", res.url)
-            print("[API][ERROR_STATUS]", res.status_code)
-            print("[API][ERROR_BODY]", res.text[:500])
-            raise ExternalApiRequestError(f"외부 API 오류: {res.status_code}")
-
-        try:
-            data = res.json()
-        except ValueError as exc:
-            raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
-
-        return {
-            "url": res.url,
-            "data": data,
-        }
-
-    
-    def _request_json_raw(self, url: str) -> dict[str, Any]:
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/136.0.0.0 Safari/537.36"
-            ),
-            "Accept": "application/json, text/plain, */*",
-            "Referer": "https://aion2.plaync.com/ko-kr/",
-            "Origin": "https://aion2.plaync.com",
-        }
-    
-        try:
-            res = requests.get(
-                url,
-                headers=headers,
-                timeout=self.timeout,
-                allow_redirects=False,  # 중요
-            )
-        except requests.RequestException as exc:
-            raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
-    
-        print("[API][RAW_STATUS]", res.status_code)
-        print("[API][RAW_LOCATION]", res.headers.get("Location"))
-    
         if res.status_code in (301, 302, 303, 307, 308):
             raise ExternalApiRequestError(
                 f"상세 API가 리다이렉트되었습니다: {res.headers.get('Location')}"
             )
-    
+
         if res.status_code == 404:
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
-    
+
+        if res.status_code >= 400:
+            print("[API][DETAIL_BODY]", res.text[:500])
+            raise ExternalApiRequestError(f"외부 API 오류: {res.status_code}")
+
+        try:
+            payload = res.json()
+        except ValueError as exc:
+            raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
+
+        print("[API][DETAIL_PAYLOAD]", payload)
+
+        if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+            return payload["data"]
+
+        return payload
+
+    def _request_json(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
+        try:
+            res = self.session.get(
+                url,
+                params=params,
+                headers=self._get_headers(),
+                timeout=self.timeout,
+            )
+        except requests.RequestException as exc:
+            raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
+
+        if res.status_code == 404:
+            raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
+
         if res.status_code >= 400:
             print("[API][ERROR_URL]", res.url)
             print("[API][ERROR_STATUS]", res.status_code)
             print("[API][ERROR_BODY]", res.text[:500])
             raise ExternalApiRequestError(f"외부 API 오류: {res.status_code}")
-    
+
         try:
             data = res.json()
         except ValueError as exc:
             raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
-    
+
         return {
             "url": res.url,
             "data": data,
         }
 
-    
     def _extract_basic_character(self, data: dict[str, Any], keyword: str) -> dict[str, Any]:
         char_list = data.get("list", [])
         if not char_list:
@@ -321,10 +327,7 @@ class HttpApiService(BaseApiService):
             or basic.get("race")
             or "-"
         )
-        
-        print("[API][MERGE_DETAIL_KEYS]", detail.keys() if isinstance(detail, dict) else type(detail))
-        print("[API][MERGE_DETAIL]", detail)
-        
+
         return {
             "character_name": character_name,
             "job": job,
@@ -334,16 +337,14 @@ class HttpApiService(BaseApiService):
             "race": race,
         }
 
-
     def _extract_item_level(self, detail: dict[str, Any]) -> int:
-        # 실제 응답 구조: detail["stat"] == list[dict]
         stat_list = detail.get("stat", [])
+
         if isinstance(stat_list, list):
             for entry in stat_list:
                 if entry.get("type") == "ItemLevel":
                     return int(entry.get("value") or 0)
 
-        # 혹시 구조가 바뀌었을 때 fallback
         stat_obj = detail.get("stat", {})
         if isinstance(stat_obj, dict):
             nested_stat_list = stat_obj.get("statList", [])
