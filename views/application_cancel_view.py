@@ -1,48 +1,14 @@
 import discord
 
 
-class ApplicationCancelSelect(discord.ui.Select):
-    def __init__(self, applications, selected_ids, refresh_callback):
-        options = [
-            discord.SelectOption(
-                label=f"{idx}. {app.raid_name} | {app.character_name}",
-                description=f"{app.job} | {app.item_level} | {app.combat_power:,}",
-                value=str(app.id),
-                default=(app.id in selected_ids),
-            )
-            for idx, app in enumerate(applications[:25], start=1)
-        ]
-
-        super().__init__(
-            placeholder="취소할 신청 내역을 선택하세요",
-            min_values=0,
-            max_values=max(1, len(options)),
-            options=options,
-        )
-
-        self.applications = applications
-        self.selected_ids = selected_ids
-        self.refresh_callback = refresh_callback
-
-    async def callback(self, interaction: discord.Interaction):
-        self.selected_ids.clear()
-        self.selected_ids.update(int(value) for value in self.values)
-
-        await self.refresh_callback(
-            interaction,
-            self.applications,
-            self.selected_ids,
-        )
-
-
-class ApplicationCancelSelectView(discord.ui.View):
+class ApplicationCancelButtonSelectView(discord.ui.View):
     def __init__(
         self,
         applications,
         selected_ids,
         refresh_callback,
         cancel_selected_callback,
-        cancel_all_callback,
+        back_callback,
     ):
         super().__init__(timeout=180)
 
@@ -50,31 +16,55 @@ class ApplicationCancelSelectView(discord.ui.View):
         self.selected_ids = selected_ids
         self.refresh_callback = refresh_callback
         self.cancel_selected_callback = cancel_selected_callback
-        self.cancel_all_callback = cancel_all_callback
+        self.back_callback = back_callback
 
-        self.add_item(
-            ApplicationCancelSelect(
-                applications=applications,
-                selected_ids=selected_ids,
-                refresh_callback=refresh_callback,
-            )
+        for idx, app in enumerate(applications[:8], start=1):
+            self.add_item(ApplicationToggleButton(self, idx, app))
+
+        self.add_item(CancelSelectedButton(self))
+        self.add_item(BackButton(self))
+
+
+class ApplicationToggleButton(discord.ui.Button):
+    def __init__(self, parent, index: int, application):
+        selected = application.id in parent.selected_ids
+        super().__init__(
+            label=str(index),
+            style=discord.ButtonStyle.success if selected else discord.ButtonStyle.secondary,
+            row=0 if index <= 5 else 1,
         )
+        self.parent = parent
+        self.application = application
 
-    @discord.ui.button(label="선택 취소", style=discord.ButtonStyle.danger, row=3)
-    async def cancel_selected_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.cancel_selected_callback(
+    async def callback(self, interaction: discord.Interaction):
+        if self.application.id in self.parent.selected_ids:
+            self.parent.selected_ids.remove(self.application.id)
+        else:
+            self.parent.selected_ids.add(self.application.id)
+
+        await self.parent.refresh_callback(
             interaction,
-            list(self.selected_ids),
+            self.parent.applications,
+            self.parent.selected_ids,
         )
 
-    @discord.ui.button(label="전체 취소", style=discord.ButtonStyle.danger, row=3)
-    async def cancel_all_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.cancel_all_callback(interaction)
 
-    @discord.ui.button(label="닫기", style=discord.ButtonStyle.secondary, row=3)
-    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(
-            content="신청 취소 창을 닫았습니다.",
-            embed=None,
-            view=None,
+class CancelSelectedButton(discord.ui.Button):
+    def __init__(self, parent):
+        super().__init__(label="선택 취소", style=discord.ButtonStyle.danger, row=2)
+        self.parent = parent
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.parent.cancel_selected_callback(
+            interaction,
+            list(self.parent.selected_ids),
         )
+
+
+class BackButton(discord.ui.Button):
+    def __init__(self, parent):
+        super().__init__(label="뒤로 가기", style=discord.ButtonStyle.secondary, row=2)
+        self.parent = parent
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.parent.back_callback(interaction)
