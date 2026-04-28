@@ -244,6 +244,10 @@ class HttpApiService(BaseApiService):
 
         headers = self._get_headers(referer)
         headers["Cookie"] = self._build_cookie_header(race_id, server_id)
+        headers.pop("Origin", None)
+
+        print("[API][DETAIL_REQUEST_REFERER]", res.request.headers.get("Referer"))
+        print("[API][DETAIL_REQUEST_HEADERS]", dict(res.request.headers))
 
         try:
             res = self.session.get(
