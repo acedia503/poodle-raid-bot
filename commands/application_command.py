@@ -82,7 +82,7 @@ class ApplicationCommand(commands.Cog):
 
             if channel_raid is None:
                 await interaction.response.send_message(
-                    content=content,
+                    content=None,
                     embed=embed,
                     ephemeral=True,
                 )
