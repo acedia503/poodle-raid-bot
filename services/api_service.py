@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 import re
-from urllib.parse import unquote
 
 import requests
 
@@ -50,26 +49,6 @@ class BaseApiService(ABC):
             raise InvalidApiResponseError("캐릭터 API 응답 형식이 예상과 다릅니다.") from exc
 
 
-class MockApiService(BaseApiService):
-    def get_character_info(
-        self,
-        character_name: str,
-        server: str | None = None,
-        race: str | None = None,
-    ) -> dict[str, Any]:
-        if not character_name.strip():
-            raise CharacterNotFoundError("캐릭터명이 비어 있습니다.")
-
-        return {
-            "character_name": character_name.strip(),
-            "job": "수호성",
-            "item_level": 3394,
-            "combat_power": 247499,
-            "server": server or "기본서버",
-            "race": race or "기본종족",
-        }
-
-
 class HttpApiService(BaseApiService):
     def __init__(self, timeout: int = 5):
         self.search_url = "https://aion2.plaync.com/ko-kr/api/search/aion2/search/v2/character"
@@ -92,18 +71,19 @@ class HttpApiService(BaseApiService):
         )
 
         basic = self._extract_basic_character(search_data, character_name.strip())
+
+        # 🔥 DETAIL 실패해도 fallback
         try:
             detail_data = self._get_character_detail(
                 character_id=basic["character_id"],
                 server_id=basic["server_id"],
             )
-        except ApiServiceError as exc:
+        except Exception as exc:
             print("[API][DETAIL_FALLBACK]", repr(exc))
             detail_data = {}
-        merged = self._merge_basic_and_detail(basic, detail_data)
 
-        normalized = self.normalize_character_response(merged)
-        return normalized
+        merged = self._merge_basic_and_detail(basic, detail_data)
+        return self.normalize_character_response(merged)
 
     def _search_character(
         self,
@@ -111,25 +91,19 @@ class HttpApiService(BaseApiService):
         server: str | None,
         race: str | None,
     ) -> dict[str, Any]:
-        params: dict[str, Any] = {
+        params = {
             "keyword": character_name,
             "page": 1,
             "size": 10,
         }
 
         if race:
-            race_id = RACE_TO_ID.get(race)
-            if race_id is None:
-                raise InvalidApiResponseError(f"알 수 없는 종족입니다: {race}")
-            params["race"] = race_id
+            params["race"] = RACE_TO_ID.get(race)
 
         if server:
-            server_id = SERVER_NAME_TO_ID.get(server)
-            if server_id is None:
-                raise InvalidApiResponseError(f"알 수 없는 서버입니다: {server}")
-            params["serverId"] = server_id
+            params["serverId"] = SERVER_NAME_TO_ID.get(server)
 
-        response = self._request_json(self.search_url, params=params)
+        response = self._request_json(self.search_url, params)
         payload = response["data"]
 
         print("[API][SEARCH_URL]", response["url"])
@@ -147,7 +121,7 @@ class HttpApiService(BaseApiService):
             "serverId": server_id,
         }
 
-        response = self._request_json(self.detail_url, params=params)
+        response = self._request_json(self.detail_url, params)
         payload = response["data"]
 
         print("[API][DETAIL_URL]", response["url"])
@@ -160,26 +134,20 @@ class HttpApiService(BaseApiService):
 
     def _request_json(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
         headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/136.0.0.0 Safari/537.36"
-            ),
+            "User-Agent": "Mozilla/5.0",
             "Accept": "application/json, text/plain, */*",
             "Referer": "https://aion2.plaync.com/ko-kr/",
             "Origin": "https://aion2.plaync.com",
         }
 
-        try:
-            res = requests.get(
-                url,
-                params=params,
-                headers=headers,
-                timeout=self.timeout,
-            )
-        except requests.RequestException as exc:
-            raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
+        res = requests.get(url, params=params, headers=headers, timeout=self.timeout)
 
+        # 🔥 디버깅 로그
+        if res.status_code >= 400:
+            print("[API][ERROR]")
+            print("URL:", res.url)
+            print("STATUS:", res.status_code)
+            print("BODY:", res.text[:500])
 
         if res.status_code == 404:
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
@@ -189,13 +157,10 @@ class HttpApiService(BaseApiService):
 
         try:
             data = res.json()
-        except ValueError as exc:
-            raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
+        except ValueError:
+            raise InvalidApiResponseError("JSON 파싱 실패")
 
-        return {
-            "url": res.url,
-            "data": data,
-        }
+        return {"url": res.url, "data": data}
 
     def _extract_basic_character(self, data: dict[str, Any], keyword: str) -> dict[str, Any]:
         char_list = data.get("list", [])
@@ -204,83 +169,58 @@ class HttpApiService(BaseApiService):
 
         matched = None
         for char in char_list:
-            raw_name = self._clean_html(str(char.get("characterName") or char.get("name") or ""))
-            if raw_name.strip() == keyword.strip():
+            name = self._clean_html(str(char.get("characterName") or ""))
+            if name.strip() == keyword.strip():
                 matched = char
                 break
 
         if matched is None:
             matched = char_list[0]
 
-        raw_character_id = str(matched.get("characterId") or "")
-        character_id = unquote(raw_character_id)
+        # 🔥 unquote 제거 (중요)
+        character_id = str(matched.get("characterId") or "")
         server_id = int(matched.get("serverId") or 0)
 
         return {
             "character_id": character_id,
             "server_id": server_id,
-            "character_name": self._clean_html(
-                str(matched.get("characterName") or matched.get("name") or "-")
-            ),
+            "character_name": self._clean_html(str(matched.get("characterName") or "-")),
             "server": str(matched.get("serverName") or "-"),
             "race": self._extract_race_name(matched),
             "item_level": int(matched.get("level") or 0),
             "job": "-",
             "combat_power": 0,
         }
-        
-    def _merge_basic_and_detail(self, basic: dict[str, Any], detail: dict[str, Any]) -> dict[str, Any]:
+
+    def _merge_basic_and_detail(self, basic, detail):
         profile = detail.get("profile", {}) if isinstance(detail, dict) else {}
         stat = detail.get("stat", {}) if isinstance(detail, dict) else {}
-    
-        job = (
-            profile.get("className")
-            or detail.get("className")
-            or basic.get("job")
-            or "-"
-        )
-        combat_power = (
-            profile.get("combatPower")
-            or detail.get("combatPower")
-            or basic.get("combat_power")
-            or 0
-        )
+
+        job = profile.get("className") or basic.get("job") or "-"
+        combat_power = profile.get("combatPower") or basic.get("combat_power") or 0
+
         item_level = self._extract_item_level_from_detail(stat, detail)
         if not item_level:
             item_level = basic.get("item_level") or 0
-    
+
         return {
-            "character_name": basic.get("character_name", "-"),
-            "job": str(job or "-"),
-            "item_level": int(item_level or 0),
-            "combat_power": int(combat_power or 0),
-            "server": basic.get("server", "-"),
-            "race": basic.get("race", "-"),
+            "character_name": basic.get("character_name"),
+            "job": job,
+            "item_level": item_level,
+            "combat_power": combat_power,
+            "server": basic.get("server"),
+            "race": basic.get("race"),
         }
 
-    def _extract_item_level_from_detail(self, stat: dict[str, Any], detail: dict[str, Any]) -> int:
-        stat_list = stat.get("statList", []) if isinstance(stat, dict) else []
-
-        for entry in stat_list:
+    def _extract_item_level_from_detail(self, stat, detail):
+        for entry in stat.get("statList", []):
             if entry.get("type") == "ItemLevel":
                 return int(entry.get("value", 0))
-
         return int(detail.get("itemLevel") or 0)
 
-    def _extract_race_name(self, char: dict[str, Any]) -> str:
-        if char.get("raceName"):
-            return str(char["raceName"])
-
-        race_value = char.get("race")
-        race_map = {
-            1: "천족",
-            2: "마족",
-            "1": "천족",
-            "2": "마족",
-        }
-        return race_map.get(race_value, "-")
+    def _extract_race_name(self, char):
+        race_map = {1: "천족", 2: "마족", "1": "천족", "2": "마족"}
+        return race_map.get(char.get("race"), "-")
 
     def _clean_html(self, text: str) -> str:
-        if not text:
-            return "-"
-        return re.sub(r"<.*?>", "", text).strip()
+        return re.sub(r"<.*?>", "", text).strip() if text else "-"
