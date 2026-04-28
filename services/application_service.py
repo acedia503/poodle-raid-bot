@@ -233,11 +233,22 @@ class ApplicationService:
         application = self.repository.get_by_id(application_id)
         if application is None:
             return False
-
+    
         if not is_admin and application.user_id != requester_user_id:
             raise ValueError("본인의 신청만 취소할 수 있습니다.")
-
-        return self.repository.delete_by_id(application_id)
+    
+        character_id = application.character_id
+    
+        deleted = self.repository.delete_by_id(application_id)
+        if not deleted:
+            return False
+    
+        if character_id is not None:
+            remaining_count = self.repository.count_by_character_id(character_id)
+            if remaining_count == 0:
+                self.character_repository.delete_by_id(character_id)
+    
+        return True
 
 
     def get_current_raid_application_list(
