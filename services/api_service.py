@@ -174,6 +174,15 @@ class HttpApiService(BaseApiService):
             domain=".plaync.com",
         )
         self.session.cookies.set("ncBannerfloating20260407", "true", domain=".plaync.com")
+        
+        self.session.cookies.set("gw_locale", "ko-KR", domain=".plaync.com")
+        self.session.cookies.set("aion2_gw_locale", "ko-KR", domain=".plaync.com")
+        self.session.cookies.set("visitedGame", "AION2", domain=".plaync.com")
+        self.session.cookies.set(
+            "charactersSelectedServerId",
+            selected_server_id,
+            domain=".plaync.com",
+        )
 
         try:
             res = self.session.get(
