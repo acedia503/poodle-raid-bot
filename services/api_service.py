@@ -162,13 +162,13 @@ class HttpApiService(BaseApiService):
 
         selected_server_id = f"{race_id}-{server_id}" if race_id else str(server_id)
 
-        self.session.cookies.set("gw_locale", "ko-KR", domain="aion2.plaync.com")
-        self.session.cookies.set("aion2_gw_locale", "ko-KR", domain="aion2.plaync.com")
-        self.session.cookies.set("visitedGame", "AION2", domain="aion2.plaync.com")
+        self.session.cookies.set("gw_locale", "ko-KR", domain=".plaync.com")
+        self.session.cookies.set("aion2_gw_locale", "ko-KR", domain=".plaync.com")
+        self.session.cookies.set("visitedGame", "AION2", domain=".plaync.com")
         self.session.cookies.set(
             "charactersSelectedServerId",
             selected_server_id,
-            domain="aion2.plaync.com",
+            domain=".plaync.com",
         )
 
         try:
