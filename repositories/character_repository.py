@@ -93,6 +93,7 @@ class CharacterRepository:
             )
             row = cur.fetchone()
             return self._to_domain(row)
+            print("[APP][CHARACTER]", character)
             
     def delete_by_id(self, character_id: int) -> bool:
         with self.database.get_connection() as conn:
