@@ -145,29 +145,40 @@ class HttpApiService(BaseApiService):
         race: str | None,
     ) -> dict[str, Any]:
         params: dict[str, Any] = {
-            "keyword": character_name,
+            "keyword": character_name.strip(),  # 입력받은 캐릭터명
             "page": 1,
             "size": 10,
         }
-
+    
         if race:
             race_id = RACE_TO_ID.get(race)
             if race_id is None:
                 raise InvalidApiResponseError(f"알 수 없는 종족입니다: {race}")
-            params["race"] = race_id
-
+    
+            params["race"] = race_id  # 입력받은 종족 → 종족 ID
+    
         if server:
             server_id = SERVER_NAME_TO_ID.get(server)
             if server_id is None:
                 raise InvalidApiResponseError(f"알 수 없는 서버입니다: {server}")
-            params["serverId"] = server_id
-
-        response = self._request_json(self.search_url, params=params)
+    
+            params["serverId"] = server_id  # 입력받은 서버 → 서버 ID
+    
+        print("[API][SEARCH_PARAMS]", params)
+    
+        response = self._request_json(
+            self.search_url,
+            params=params,
+        )
+    
         payload = response["data"]
-
+    
+        print("[API][SEARCH_URL]", response["url"])
+        print("[API][SEARCH_PAYLOAD]", payload)
+    
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
             return payload["data"]
-
+    
         return payload
 
     def _warmup_character_page(
