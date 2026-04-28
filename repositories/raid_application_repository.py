@@ -447,3 +447,17 @@ class RaidApplicationRepository:
                 (guild_id, raid_name, f"%{keyword.lower()}%"),
             )
             return cur.fetchall()
+
+    def count_by_character_id(self, character_id: int) -> int:
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM raid_applications
+                WHERE character_id = %s
+                """,
+                (character_id,),
+            )
+            row = cur.fetchone()
+            return int(row["cnt"]) if row else 0
