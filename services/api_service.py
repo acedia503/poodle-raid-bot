@@ -135,10 +135,12 @@ class HttpApiService(BaseApiService):
 
     
     def _get_character_detail(self, character_id: str, server_id: int) -> dict[str, Any]:
+        encoded_character_id = quote(character_id, safe="")
+    
         url = (
             f"{self.detail_url}"
             f"?lang=ko"
-            f"&characterId={character_id}"
+            f"&characterId={encoded_character_id}"
             f"&serverId={server_id}"
         )
     
