@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any
-from urllib.parse import unquote
+from urllib.parse import quote
 import re
 
 import requests
@@ -133,22 +133,26 @@ class HttpApiService(BaseApiService):
 
         return payload
 
+    
     def _get_character_detail(self, character_id: str, server_id: int) -> dict[str, Any]:
-        params = {
-            "lang": "ko",
-            "characterId": character_id,
-            "serverId": server_id,
-        }
-
-        response = self._request_json(self.detail_url, params=params)
+        # character_id는 검색 API에서 받은 raw 값 그대로 사용
+        # requests params를 쓰면 %가 다시 인코딩될 수 있어서 URL을 직접 조립
+        url = (
+            f"{self.detail_url}"
+            f"?lang=ko"
+            f"&characterId={character_id}"
+            f"&serverId={server_id}"
+        )
+    
+        response = self._request_json_raw(url)
         payload = response["data"]
-
+    
         print("[API][DETAIL_URL]", response["url"])
         print("[API][DETAIL_DATA]", payload)
-        
+    
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
             return payload["data"]
-
+    
         return payload
 
 
