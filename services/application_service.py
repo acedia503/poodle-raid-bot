@@ -43,6 +43,8 @@ class ApplicationService:
         info_race = info.get("race") or race
         info_server = info.get("server") or server
 
+        print("[APP][INFO]", info)
+        
         existing_apps = self.repository.get_user_applications_by_character_identity(
             guild_id=guild_id,
             user_id=user_id,
