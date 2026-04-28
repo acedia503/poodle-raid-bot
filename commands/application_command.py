@@ -51,7 +51,6 @@ class ApplicationCommand(commands.Cog):
                     interaction.user.id,
                 )
                 title = f"내 {channel_raid.raid_name} 신청 현황"
-                content = f"{channel_raid.raid_name} 신청 메뉴입니다."
             else:
                 applications = await asyncio.to_thread(
                     self.service.repository.get_by_guild_and_user_id,
@@ -59,7 +58,6 @@ class ApplicationCommand(commands.Cog):
                     interaction.user.id,
                 )
                 title = "내 전체 신청 현황"
-                content = "현재 채널에 매칭된 레이드가 없습니다."
 
             if applications:
                 lines = []
