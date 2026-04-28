@@ -119,6 +119,9 @@ class HttpApiService(BaseApiService):
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Dest": "empty",
             "Connection": "keep-alive",
+            "sec-ch-ua": '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
         }
 
     def _search_character(
@@ -163,14 +166,14 @@ class HttpApiService(BaseApiService):
 
         selected_server_id = f"{race_id}-{server_id}" if race_id else str(server_id)
 
-        self.session.cookies.set("gw_locale", "ko-KR", domain=".plaync.com")
-        self.session.cookies.set("aion2_gw_locale", "ko-KR", domain=".plaync.com")
-        self.session.cookies.set("visitedGame", "AION2", domain=".plaync.com")
+        self.session.cookies.set("_gcl_au", "1.1.718781253.1777368849", domain=".plaync.com")
+        self.session.cookies.set("_ga", "GA1.1.101173522.1777368849", domain=".plaync.com")
         self.session.cookies.set(
-            "charactersSelectedServerId",
-            selected_server_id,
+            "_ga_JMPDHRVRRL",
+            "GS2.1.s1777374888$o2$g0$t1777374888$j60$l0$h0",
             domain=".plaync.com",
         )
+        self.session.cookies.set("ncBannerfloating20260407", "true", domain=".plaync.com")
 
         try:
             res = self.session.get(
