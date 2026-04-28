@@ -9,7 +9,7 @@ from utils.permissions import is_admin
 from views.application_view import RaceView, ServerView
 from views.application_result_view import ApplicationResultView
 from views.application_main_view import ApplicationMainView, ApplicationCharacterModal
-from views.application_cancel_view import ApplicationCancelSelectView
+from views.application_cancel_view import ApplicationCancelButtonSelectView
 
 
 class ApplicationCommand(commands.Cog):
