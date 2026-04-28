@@ -585,12 +585,16 @@ class ApplicationCommand(commands.Cog):
                 )
 
             elif result["action"] == "rejected":
+                embed = self.message_service.build_application_result_embed(
+                    result["raid_name"],
+                    result["info"],
+                    result["action"],
+                    show_identity=show_identity,
+                )
+            
                 await interaction.edit_original_response(
                     content=None,
-                    embed=self._error_embed(
-                        "신청 불가",
-                        result.get("message", "신청 조건을 만족하지 않아 신청할 수 없습니다."),
-                    ),
+                    embed=embed,
                     view=None,
                 )
 
