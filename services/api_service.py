@@ -197,6 +197,50 @@ class HttpApiService(BaseApiService):
             "data": data,
         }
 
+    
+    def _request_json_raw(self, url: str) -> dict[str, Any]:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/136.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json, text/plain, */*",
+            "Referer": "https://aion2.plaync.com/ko-kr/",
+            "Origin": "https://aion2.plaync.com",
+        }
+    
+        try:
+            res = requests.get(
+                url,
+                headers=headers,
+                timeout=self.timeout,
+            )
+        except requests.RequestException as exc:
+            raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
+    
+        if res.status_code >= 400:
+            print("[API][ERROR_URL]", res.url)
+            print("[API][ERROR_STATUS]", res.status_code)
+            print("[API][ERROR_BODY]", res.text[:500])
+    
+        if res.status_code == 404:
+            raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
+    
+        if res.status_code >= 400:
+            raise ExternalApiRequestError(f"외부 API 오류: {res.status_code}")
+    
+        try:
+            data = res.json()
+        except ValueError as exc:
+            raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
+    
+        return {
+            "url": res.url,
+            "data": data,
+        }
+
+    
     def _extract_basic_character(self, data: dict[str, Any], keyword: str) -> dict[str, Any]:
         char_list = data.get("list", [])
         if not char_list:
