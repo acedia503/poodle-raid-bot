@@ -93,3 +93,15 @@ class CharacterRepository:
             )
             row = cur.fetchone()
             return self._to_domain(row)
+            
+    def delete_by_id(self, character_id: int) -> bool:
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                DELETE FROM characters
+                WHERE id = %s
+                """,
+                (character_id,),
+            )
+            return cur.rowcount > 0
