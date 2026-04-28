@@ -142,13 +142,14 @@ class HttpApiService(BaseApiService):
         response = self._request_json(self.detail_url, params=params)
         payload = response["data"]
 
+        print("[API][DETAIL_URL]", response["url"])
+        print("[API][DETAIL_DATA]", payload)
+        
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
             return payload["data"]
 
         return payload
-        
-        print("[API][DETAIL_URL]", response["url"])
-        print("[API][DETAIL_DATA]", payload)
+
 
     def _request_json(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
         headers = {
@@ -262,7 +263,10 @@ class HttpApiService(BaseApiService):
             or basic.get("race")
             or "-"
         )
-
+        
+        print("[API][MERGE_DETAIL_KEYS]", detail.keys() if isinstance(detail, dict) else type(detail))
+        print("[API][MERGE_DETAIL]", detail)
+        
         return {
             "character_name": character_name,
             "job": job,
@@ -271,8 +275,7 @@ class HttpApiService(BaseApiService):
             "server": server,
             "race": race,
         }
-        print("[API][MERGE_DETAIL_KEYS]", detail.keys() if isinstance(detail, dict) else type(detail))
-        print("[API][MERGE_DETAIL]", detail)
+
 
     def _extract_item_level(self, detail: dict[str, Any]) -> int:
         # 실제 응답 구조: detail["stat"] == list[dict]
