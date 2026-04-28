@@ -97,8 +97,18 @@ class ApplicationCommand(commands.Cog):
 
                     if not setting:
                         async def race_callback(race_inter, race):
+                            embed = discord.Embed(
+                                title="신규 신청",
+                                description=(
+                                    f"**캐릭터명** : {character_name}\n"
+                                    f"**종족** : {race}\n\n"
+                                    "서버를 선택하세요."
+                                ),
+                            )
+                    
                             await race_inter.response.edit_message(
-                                content=f"종족: **{race}**\n서버를 선택하세요.",
+                                content=None,
+                                embed=embed,
                                 view=ServerView(
                                     race,
                                     lambda i, r, s: self._process(
@@ -109,13 +119,20 @@ class ApplicationCommand(commands.Cog):
                                         show_identity=True,
                                     ),
                                 ),
-                                embed=None,
                             )
-
-                        await modal_inter.response.send_message(
-                            content="기본 서버 설정이 없습니다.\n종족을 선택하세요.",
+                    
+                        embed = discord.Embed(
+                            title="신규 신청",
+                            description=(
+                                f"**캐릭터명** : {character_name}\n\n"
+                                "종족을 선택하세요."
+                            ),
+                        )
+                    
+                        await modal_inter.response.edit_message(
+                            content=None,
+                            embed=embed,
                             view=RaceView(race_callback),
-                            ephemeral=True,
                         )
                         return
 
