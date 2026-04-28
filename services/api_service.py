@@ -3,10 +3,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 import re
+from urllib.parse import unquote, quote
 
 import requests
 
-from urllib.parse import unquote, quote
 from utils.constants import RACE_TO_ID, SERVER_NAME_TO_ID
 
 
@@ -124,6 +124,20 @@ class HttpApiService(BaseApiService):
             "sec-ch-ua-platform": '"Windows"',
         }
 
+    def _build_cookie_header(self, race_id: int | None, server_id: int) -> str:
+        selected_server_id = f"{race_id}-{server_id}" if race_id else str(server_id)
+
+        return (
+            "gw_locale=ko-KR; "
+            "aion2_gw_locale=ko-KR; "
+            "visitedGame=AION2; "
+            "_gcl_au=1.1.718781253.1777368849; "
+            "_ga=GA1.1.101173522.1777368849; "
+            f"charactersSelectedServerId={selected_server_id}; "
+            "ncBannerfloating20260407=true; "
+            "_ga_JMPDHRVRRL=GS2.1.s1777374888$o2$g0$t1777374888$j60$l0$h0"
+        )
+
     def _search_character(
         self,
         character_name: str,
@@ -162,32 +176,23 @@ class HttpApiService(BaseApiService):
         server_id: int,
         race_id: int | None = None,
     ) -> str:
-        page_url = f"{self.character_page_url}/{server_id}/{character_id}"
+        decoded_character_id = unquote(character_id)
+        encoded_character_id = quote(decoded_character_id, safe="")
+        page_url = f"{self.character_page_url}/{server_id}/{encoded_character_id}"
 
-        selected_server_id = f"{race_id}-{server_id}" if race_id else str(server_id)
+        cookie_header = self._build_cookie_header(race_id, server_id)
 
-        self.session.cookies.set("_gcl_au", "1.1.718781253.1777368849", domain=".plaync.com")
-        self.session.cookies.set("_ga", "GA1.1.101173522.1777368849", domain=".plaync.com")
-        self.session.cookies.set(
-            "_ga_JMPDHRVRRL",
-            "GS2.1.s1777374888$o2$g0$t1777374888$j60$l0$h0",
-            domain=".plaync.com",
-        )
-        self.session.cookies.set("ncBannerfloating20260407", "true", domain=".plaync.com")
-        
-        self.session.cookies.set("gw_locale", "ko-KR", domain=".plaync.com")
-        self.session.cookies.set("aion2_gw_locale", "ko-KR", domain=".plaync.com")
-        self.session.cookies.set("visitedGame", "AION2", domain=".plaync.com")
-        self.session.cookies.set(
-            "charactersSelectedServerId",
-            selected_server_id,
-            domain=".plaync.com",
-        )
+        for item in cookie_header.split("; "):
+            key, value = item.split("=", 1)
+            self.session.cookies.set(key, value, domain=".plaync.com")
+
+        headers = self._get_headers("https://aion2.plaync.com/ko-kr/")
+        headers["Cookie"] = cookie_header
 
         try:
             res = self.session.get(
                 page_url,
-                headers=self._get_headers("https://aion2.plaync.com/ko-kr/"),
+                headers=headers,
                 timeout=self.timeout,
                 allow_redirects=True,
             )
@@ -206,67 +211,70 @@ class HttpApiService(BaseApiService):
         server_id: int,
         race_id: int | None = None,
     ) -> dict[str, Any]:
-        # 상세 페이지를 먼저 호출해서 세션/쿠키를 준비
         self._warmup_character_page(
             character_id=character_id,
             server_id=server_id,
             race_id=race_id,
         )
-    
+
         decoded_character_id = unquote(character_id)
         encoded_character_id = quote(decoded_character_id, safe="")
-    
+
         referer = (
             f"https://aion2.plaync.com/ko-kr/characters/"
             f"{server_id}/{encoded_character_id}"
         )
-    
+
         params = {
             "lang": "ko",
             "characterId": decoded_character_id,
             "serverId": server_id,
         }
-    
+
+        headers = self._get_headers(referer)
+        headers["Cookie"] = self._build_cookie_header(race_id, server_id)
+
         try:
             res = self.session.get(
                 self.detail_url,
                 params=params,
-                headers=self._get_headers(referer),
+                headers=headers,
                 timeout=self.timeout,
                 allow_redirects=False,
             )
         except requests.RequestException as exc:
             raise ExternalApiRequestError(f"캐릭터 상세 API 요청 실패: {exc}") from exc
-    
+
         print("[API][DETAIL_REFERER]", referer)
         print("[API][DETAIL_URL]", res.url)
         print("[API][DETAIL_STATUS]", res.status_code)
         print("[API][DETAIL_LOCATION]", res.headers.get("Location"))
-    
+        print("[API][DETAIL_REQUEST_COOKIE]", res.request.headers.get("Cookie"))
+
         if res.status_code in (301, 302, 303, 307, 308):
             raise ExternalApiRequestError(
                 f"상세 API가 리다이렉트되었습니다: {res.headers.get('Location')}"
             )
-    
+
         if res.status_code == 404:
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
-    
+
         if res.status_code >= 400:
             print("[API][DETAIL_BODY]", res.text[:500])
             raise ExternalApiRequestError(f"외부 API 오류: {res.status_code}")
-    
+
         try:
             payload = res.json()
         except ValueError as exc:
             raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
-    
+
         print("[API][DETAIL_PAYLOAD]", payload)
-    
+
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
             return payload["data"]
-    
+
         return payload
-    
+
     def _request_json(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
         try:
             res = self.session.get(
@@ -344,37 +352,12 @@ class HttpApiService(BaseApiService):
     ) -> dict[str, Any]:
         profile = detail.get("profile", {}) if isinstance(detail, dict) else {}
 
-        character_name = (
-            profile.get("characterName")
-            or basic.get("character_name")
-            or "-"
-        )
-
-        job = (
-            profile.get("className")
-            or detail.get("className")
-            or "-"
-        )
-
-        combat_power = (
-            profile.get("combatPower")
-            or detail.get("combatPower")
-            or 0
-        )
-
+        character_name = profile.get("characterName") or basic.get("character_name") or "-"
+        job = profile.get("className") or detail.get("className") or "-"
+        combat_power = profile.get("combatPower") or detail.get("combatPower") or 0
         item_level = self._extract_item_level(detail)
-
-        server = (
-            profile.get("serverName")
-            or basic.get("server")
-            or "-"
-        )
-
-        race = (
-            profile.get("raceName")
-            or basic.get("race")
-            or "-"
-        )
+        server = profile.get("serverName") or basic.get("server") or "-"
+        race = profile.get("raceName") or basic.get("race") or "-"
 
         return {
             "character_name": character_name,
