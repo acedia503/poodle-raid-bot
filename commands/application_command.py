@@ -112,6 +112,11 @@ class ApplicationCommand(commands.Cog):
                 interaction.channel.id
             )
 
+            setting = self.setting_service.get_guild_setting(interaction.guild.id)
+            show_identity = not bool(
+                setting and setting.default_race and setting.default_server
+            )
+
             if channel_raid is not None:
                 applications = await asyncio.to_thread(
                     self.service.repository.get_by_guild_raid_and_user_id,
@@ -131,17 +136,31 @@ class ApplicationCommand(commands.Cog):
             if applications:
                 lines = []
                 for idx, app in enumerate(applications, start=1):
-                    if channel_raid is not None:
-                        lines.append(
-                            f"{idx}. {app.character_name} | {app.job} | "
-                            f"{app.item_level} | {app.combat_power:,}"
-                        )
+                    if show_identity:
+                        if channel_raid is not None:
+                            lines.append(
+                                f"{idx}. {app.character_name} | {app.race} | {app.server} | "
+                                f"{app.job} | {app.item_level} | {app.combat_power:,}"
+                            )
+                        else:
+                            lines.append(
+                                f"{idx}. **{app.raid_name}** | "
+                                f"{app.character_name} | {app.race} | {app.server} | "
+                                f"{app.job} | {app.item_level} | {app.combat_power:,}"
+                            )
                     else:
-                        lines.append(
-                            f"{idx}. **{app.raid_name}** | "
-                            f"{app.character_name} | {app.job} | "
-                            f"{app.item_level} | {app.combat_power:,}"
-                        )
+                        if channel_raid is not None:
+                            lines.append(
+                                f"{idx}. {app.character_name} | {app.job} | "
+                                f"{app.item_level} | {app.combat_power:,}"
+                            )
+                        else:
+                            lines.append(
+                                f"{idx}. **{app.raid_name}** | "
+                                f"{app.character_name} | {app.job} | "
+                                f"{app.item_level} | {app.combat_power:,}"
+                            )
+                    
 
                 embed = discord.Embed(
                     title=title,
@@ -435,10 +454,16 @@ class ApplicationCommand(commands.Cog):
                     lines = []
                     for idx, app in enumerate(apps, start=1):
                         checked = "✅" if app.id in ids else "⬜"
-                        lines.append(
-                            f"{checked} {idx}. {app.character_name} | {app.job} | "
-                            f"{app.item_level} | {app.combat_power:,}"
-                        )
+                        if show_identity:
+                            lines.append(
+                                f"{checked} {idx}. {app.character_name} | {app.race} | {app.server} | "
+                                f"{app.job} | {app.item_level} | {app.combat_power:,}"
+                            )
+                        else:
+                            lines.append(
+                                f"{checked} {idx}. {app.character_name} | {app.job} | "
+                                f"{app.item_level} | {app.combat_power:,}"
+                            )
 
                     cancel_list_embed = discord.Embed(
                         title="신청 취소 대상 선택",
