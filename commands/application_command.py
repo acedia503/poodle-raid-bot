@@ -294,6 +294,143 @@ class ApplicationCommand(commands.Cog):
 
                 selected_ids = set()
 
+                async def select_cancel_callback(inter: discord.Interaction):
+                    applications = await asyncio.to_thread(
+                        self.service.repository.get_by_guild_raid_and_user_id,
+                        inter.guild.id,
+                        channel_raid.raid_name,
+                        inter.user.id,
+                    )
+                
+                    if not applications:
+                        await inter.response.edit_message(
+                            content=None,
+                            embed=self._notice_embed(
+                                "취소할 신청이 없습니다.",
+                                "현재 레이드에 신청한 내역이 없습니다.",
+                                discord.Color.orange(),
+                            ),
+                            view=None,
+                        )
+                        return
+                
+                    selected_ids = set()
+                
+                    async def refresh_view(refresh_inter, apps, ids):
+                        lines = []
+                        for idx, app in enumerate(apps, start=1):
+                            mark = "✅" if app.id in ids else "⬜"
+                            lines.append(
+                                f"{mark} {idx}. {app.character_name} | {app.job} | "
+                                f"{app.item_level} | {app.combat_power:,}"
+                            )
+                
+                        embed = discord.Embed(
+                            title="신청 취소 대상 선택",
+                            description="\n".join(lines),
+                        )
+                
+                        view = ApplicationCancelButtonSelectView(
+                            applications=apps,
+                            selected_ids=ids,
+                            refresh_callback=refresh_view,
+                            cancel_selected_callback=cancel_selected,
+                            back_callback=back_to_main,
+                        )
+                
+                        if refresh_inter.response.is_done():
+                            await refresh_inter.edit_original_response(
+                                embed=embed,
+                                view=view,
+                                content=None,
+                            )
+                        else:
+                            await refresh_inter.response.edit_message(
+                                embed=embed,
+                                view=view,
+                                content=None,
+                            )
+                
+                    async def cancel_selected(cancel_inter, ids: list[int]):
+                        if not ids:
+                            await cancel_inter.response.send_message(
+                                content=None,
+                                embed=self._notice_embed(
+                                    "선택된 신청이 없습니다.",
+                                    "취소할 신청을 선택해주세요.",
+                                    discord.Color.orange(),
+                                ),
+                                ephemeral=True,
+                            )
+                            return
+                
+                        count = 0
+                        for app_id in ids:
+                            ok = await asyncio.to_thread(
+                                self.service.cancel_application,
+                                app_id,
+                                cancel_inter.user.id,
+                                False,
+                            )
+                            if ok:
+                                count += 1
+                
+                        await cancel_inter.response.edit_message(
+                            content=None,
+                            embed=self._notice_embed(
+                                "신청 취소 완료",
+                                f"{count}건의 신청을 취소했습니다.",
+                                discord.Color.green(),
+                            ),
+                            view=None,
+                        )
+                
+                    async def back_to_main(back_inter: discord.Interaction):
+                        await self.apply(back_inter)
+                
+                    await refresh_view(inter, applications, selected_ids)
+
+            async def cancel_all_callback(inter: discord.Interaction):
+                applications = await asyncio.to_thread(
+                    self.service.repository.get_by_guild_raid_and_user_id,
+                    inter.guild.id,
+                    channel_raid.raid_name,
+                    inter.user.id,
+                )
+            
+                if not applications:
+                    await inter.response.edit_message(
+                        content=None,
+                        embed=self._notice_embed(
+                            "취소할 신청이 없습니다.",
+                            "현재 레이드에 신청한 내역이 없습니다.",
+                            discord.Color.orange(),
+                        ),
+                        view=None,
+                    )
+                    return
+            
+                count = 0
+                for app in applications:
+                    ok = await asyncio.to_thread(
+                        self.service.cancel_application,
+                        app.id,
+                        inter.user.id,
+                        False,
+                    )
+                    if ok:
+                        count += 1
+            
+                await inter.response.edit_message(
+                    content=None,
+                    embed=self._notice_embed(
+                        "전체 취소 완료",
+                        f"{count}건의 신청을 취소했습니다.",
+                        discord.Color.green(),
+                    ),
+                    view=None,
+                )
+                
                 async def refresh_cancel_view(refresh_inter, apps, ids):
                     lines = []
                     for idx, app in enumerate(apps, start=1):
@@ -440,8 +577,11 @@ class ApplicationCommand(commands.Cog):
                 content=None,
                 embed=embed,
                 view=ApplicationMainView(
+                    application_count=len(applications),
                     apply_callback=apply_callback,
                     cancel_callback=cancel_callback,
+                    select_cancel_callback=select_cancel_callback,
+                    cancel_all_callback=cancel_all_callback,
                     status_callback=status_callback,
                     admin_delete_callback=admin_delete_callback,
                 ),
