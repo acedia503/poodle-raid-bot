@@ -236,10 +236,10 @@ class HttpApiService(BaseApiService):
             "serverId": server_id,
         }
 
-        headers = self._get_headers(referer)
-        headers.pop("Origin", None)
-        headers["Cookie"] = cookie_header
-
+        session_cookie = "; ".join(
+            f"{k}={v}" for k, v in session.cookies.items()
+        )
+        
         extra_cookie = (
             "visitedGame=AION2; "
             "board_viewMode_tooltip=disabled; "
@@ -249,9 +249,8 @@ class HttpApiService(BaseApiService):
             "_ga_JMPDHRVRRL=GS2.1.s1777374888$o2$g0$t1777374888$j60$l0$h0"
         )
         
-        session_cookie = "; ".join(
-            f"{k}={v}" for k, v in session.cookies.items()
-        )
+        headers = self._get_headers(referer)
+        headers.pop("Origin", None)
         
         headers["Cookie"] = f"{session_cookie}; {extra_cookie}"
 
