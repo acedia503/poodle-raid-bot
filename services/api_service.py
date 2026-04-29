@@ -237,6 +237,8 @@ class HttpApiService(BaseApiService):
         }
 
         headers = self._get_headers(referer)
+        headers.pop("Origin", None)
+        headers["Cookie"] = cookie_header
 
         extra_cookie = (
             "visitedGame=AION2; "
