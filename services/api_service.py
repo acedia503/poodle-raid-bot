@@ -265,11 +265,11 @@ class HttpApiService(BaseApiService):
         except Exception as exc:
             raise ExternalApiRequestError(f"캐릭터 상세 API 요청 실패: {exc}") from exc
 
-        print("[API][DETAIL_REFERER]", referer)
-        print("[API][DETAIL_URL]", res.url)
         print("[API][DETAIL_STATUS]", res.status_code)
         print("[API][DETAIL_LOCATION]", res.headers.get("Location"))
         print("[API][DETAIL_REQUEST_COOKIE]", res.request.headers.get("Cookie"))
+        print("[API][DETAIL_REFERER]", referer)
+        print("[API][DETAIL_URL]", res.url)
 
         if res.status_code in (301, 302, 303, 307, 308):
             raise ExternalApiRequestError(
