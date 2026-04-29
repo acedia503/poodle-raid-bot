@@ -257,26 +257,31 @@ class HttpApiService(BaseApiService):
 
     def _parse_aion2tool_html(self, text: str) -> dict[str, Any]:
         decoded = html.unescape(text)
-
+    
         job = self._extract_job(decoded)
+    
         item_level = self._extract_number_by_patterns(
             decoded,
             [
+                r"아이템\s*레벨\s*</[^>]+>\s*<[^>]+>\s*([\d,]+)",
+                r"아이템레벨\s*</[^>]+>\s*<[^>]+>\s*([\d,]+)",
+                r"아이템\s*레벨[^0-9]{0,100}([\d,]+)",
+                r"아이템레벨[^0-9]{0,100}([\d,]+)",
                 r'"item[_-]?level"\s*:\s*"?([\d,]+)"?',
                 r'"itemLevel"\s*:\s*"?([\d,]+)"?',
-                r"아이템\s*레벨[^0-9]{0,20}([\d,]+)",
-                r"아이템레벨[^0-9]{0,20}([\d,]+)",
             ],
         )
+    
         combat_power = self._extract_number_by_patterns(
             decoded,
             [
+                r"전투력\s*</[^>]+>\s*<[^>]+>\s*([\d,]+)",
+                r"전투력[^0-9]{0,100}([\d,]+)",
                 r'"combat[_-]?power"\s*:\s*"?([\d,]+)"?',
                 r'"combatPower"\s*:\s*"?([\d,]+)"?',
-                r"전투력[^0-9]{0,20}([\d,]+)",
             ],
         )
-
+    
         return {
             "job": job,
             "item_level": item_level,
