@@ -249,6 +249,16 @@ class HttpApiService(BaseApiService):
 
         print("[API][TOOL_PARSED]", parsed)
 
+        decoded = html.unescape(text)
+
+        for keyword in ["3973", "388098", "item_level", "combat_power", "itemLevel", "combatPower"]:
+            print(f"[API][TOOL_FIND][{keyword}]", decoded.find(keyword))
+
+        for keyword in ["3973", "388098"]:
+            idx = decoded.find(keyword)
+            if idx != -1:
+                print(f"[API][TOOL_CONTEXT][{keyword}]", decoded[idx - 300: idx + 300])
+
         if not parsed.get("job") and not parsed.get("item_level") and not parsed.get("combat_power"):
             print("[API][TOOL_HTML_HEAD]", text[:1000])
             raise InvalidApiResponseError("아툴 페이지에서 캐릭터 상세 정보를 찾지 못했습니다.")
