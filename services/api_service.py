@@ -248,8 +248,7 @@ class HttpApiService(BaseApiService):
         )
         
         session_cookie = "; ".join(
-            f"{cookie.name}={cookie.value}"
-            for cookie in session.cookies
+            f"{k}={v}" for k, v in session.cookies.items()
         )
         
         headers["Cookie"] = f"{session_cookie}; {extra_cookie}"
