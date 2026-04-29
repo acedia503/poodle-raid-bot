@@ -76,7 +76,6 @@ class HttpApiService(BaseApiService):
         self.detail_url = "https://aion2.plaync.com/api/character/info"
         self.character_page_url = "https://aion2.plaync.com/ko-kr/characters"
         self.timeout = timeout
-        self.session = requests.Session()
 
     def get_character_info(
         self,
@@ -87,7 +86,10 @@ class HttpApiService(BaseApiService):
         if not character_name.strip():
             raise CharacterNotFoundError("캐릭터명이 비어 있습니다.")
 
+        session = requests.Session()
+
         search_data = self._search_character(
+            session=session,
             character_name=character_name.strip(),
             server=server,
             race=race,
@@ -96,6 +98,7 @@ class HttpApiService(BaseApiService):
         basic = self._extract_basic_character(search_data, character_name.strip())
 
         detail_data = self._get_character_detail(
+            session=session,
             character_id=basic["character_id"],
             server_id=basic["server_id"],
             race_id=basic.get("race_id"),
@@ -114,7 +117,6 @@ class HttpApiService(BaseApiService):
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": referer or "https://aion2.plaync.com/ko-kr/",
-            "Origin": "https://aion2.plaync.com",
             "Sec-Fetch-Site": "same-origin",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Dest": "empty",
@@ -124,65 +126,52 @@ class HttpApiService(BaseApiService):
             "sec-ch-ua-platform": '"Windows"',
         }
 
-    def _build_cookie_header(self, race_id: int | None, server_id: int) -> str:
-        selected_server_id = f"{race_id}-{server_id}" if race_id else str(server_id)
-
-        return (
-            "gw_locale=ko-KR; "
-            "aion2_gw_locale=ko-KR; "
-            "visitedGame=AION2; "
-            "_gcl_au=1.1.718781253.1777368849; "
-            "_ga=GA1.1.101173522.1777368849; "
-            f"charactersSelectedServerId={selected_server_id}; "
-            "ncBannerfloating20260407=true; "
-            "_ga_JMPDHRVRRL=GS2.1.s1777374888$o2$g0$t1777374888$j60$l0$h0"
-        )
-
     def _search_character(
         self,
+        session: requests.Session,
         character_name: str,
         server: str | None,
         race: str | None,
     ) -> dict[str, Any]:
         params: dict[str, Any] = {
-            "keyword": character_name.strip(),  # 입력받은 캐릭터명
+            "keyword": character_name.strip(),
             "page": 1,
             "size": 10,
         }
-    
+
         if race:
             race_id = RACE_TO_ID.get(race)
             if race_id is None:
                 raise InvalidApiResponseError(f"알 수 없는 종족입니다: {race}")
-    
-            params["race"] = race_id  # 입력받은 종족 → 종족 ID
-    
+            params["race"] = race_id
+
         if server:
             server_id = SERVER_NAME_TO_ID.get(server)
             if server_id is None:
                 raise InvalidApiResponseError(f"알 수 없는 서버입니다: {server}")
-    
-            params["serverId"] = server_id  # 입력받은 서버 → 서버 ID
-    
+            params["serverId"] = server_id
+
         print("[API][SEARCH_PARAMS]", params)
-    
+
         response = self._request_json(
-            self.search_url,
+            session=session,
+            url=self.search_url,
             params=params,
         )
-    
+
         payload = response["data"]
-    
+
         print("[API][SEARCH_URL]", response["url"])
         print("[API][SEARCH_PAYLOAD]", payload)
-    
+
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
             return payload["data"]
-    
+
         return payload
 
     def _warmup_character_page(
         self,
+        session: requests.Session,
         character_id: str,
         server_id: int,
         race_id: int | None = None,
@@ -191,19 +180,18 @@ class HttpApiService(BaseApiService):
         encoded_character_id = quote(decoded_character_id, safe="")
         page_url = f"{self.character_page_url}/{server_id}/{encoded_character_id}"
 
-        cookie_header = self._build_cookie_header(race_id, server_id)
-
-        for item in cookie_header.split("; "):
-            key, value = item.split("=", 1)
-            self.session.cookies.set(key, value, domain=".plaync.com")
-
-        headers = self._get_headers("https://aion2.plaync.com/ko-kr/")
-        headers["Cookie"] = cookie_header
+        # 공식 페이지가 기대하는 선택 서버 쿠키만 보강
+        if race_id:
+            session.cookies.set(
+                "charactersSelectedServerId",
+                f"{race_id}-{server_id}",
+                domain=".plaync.com",
+            )
 
         try:
-            res = self.session.get(
+            res = session.get(
                 page_url,
-                headers=headers,
+                headers=self._get_headers("https://aion2.plaync.com/ko-kr/"),
                 timeout=self.timeout,
                 allow_redirects=True,
             )
@@ -212,17 +200,20 @@ class HttpApiService(BaseApiService):
 
         print("[API][WARMUP_URL]", res.url)
         print("[API][WARMUP_STATUS]", res.status_code)
-        print("[API][COOKIE]", self.session.cookies.get_dict())
+        print("[API][WARMUP_SET_COOKIE]", res.headers.get("Set-Cookie"))
+        print("[API][SESSION_COOKIE]", session.cookies.get_dict())
 
         return page_url
 
     def _get_character_detail(
         self,
+        session: requests.Session,
         character_id: str,
         server_id: int,
         race_id: int | None = None,
     ) -> dict[str, Any]:
         self._warmup_character_page(
+            session=session,
             character_id=character_id,
             server_id=server_id,
             race_id=race_id,
@@ -243,11 +234,9 @@ class HttpApiService(BaseApiService):
         }
 
         headers = self._get_headers(referer)
-        headers["Cookie"] = self._build_cookie_header(race_id, server_id)
-        headers.pop("Origin", None)
 
         try:
-            res = self.session.get(
+            res = session.get(
                 self.detail_url,
                 params=params,
                 headers=headers,
@@ -256,9 +245,7 @@ class HttpApiService(BaseApiService):
             )
         except requests.RequestException as exc:
             raise ExternalApiRequestError(f"캐릭터 상세 API 요청 실패: {exc}") from exc
-            
-        print("[API][DETAIL_REQUEST_REFERER]", res.request.headers.get("Referer"))
-        print("[API][DETAIL_REQUEST_HEADERS]", dict(res.request.headers))
+
         print("[API][DETAIL_REFERER]", referer)
         print("[API][DETAIL_URL]", res.url)
         print("[API][DETAIL_STATUS]", res.status_code)
@@ -289,9 +276,14 @@ class HttpApiService(BaseApiService):
 
         return payload
 
-    def _request_json(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
+    def _request_json(
+        self,
+        session: requests.Session,
+        url: str,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
         try:
-            res = self.session.get(
+            res = session.get(
                 url,
                 params=params,
                 headers=self._get_headers(),
