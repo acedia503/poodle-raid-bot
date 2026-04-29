@@ -237,6 +237,7 @@ class HttpApiService(BaseApiService):
 
         extra_cookie = (
             "visitedGame=AION2; "
+            "board_viewMode_tooltip=disabled; "
             "_gcl_au=1.1.718781253.1777368849; "
             "_ga=GA1.1.101173522.1777368849; "
             "ncBannerfloating20260407=true; "
