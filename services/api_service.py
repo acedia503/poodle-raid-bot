@@ -5,7 +5,8 @@ from typing import Any
 import re
 from urllib.parse import unquote, quote
 
-import requests
+# import requests
+from curl_cffi import requests
 
 from utils.constants import RACE_TO_ID, SERVER_NAME_TO_ID
 
@@ -86,7 +87,8 @@ class HttpApiService(BaseApiService):
         if not character_name.strip():
             raise CharacterNotFoundError("캐릭터명이 비어 있습니다.")
 
-        session = requests.Session()
+        #session = requests.Session()
+        session = requests.Session(impersonate="chrome")
 
         search_data = self._search_character(
             session=session,
@@ -195,7 +197,8 @@ class HttpApiService(BaseApiService):
                 timeout=self.timeout,
                 allow_redirects=True,
             )
-        except requests.RequestException as exc:
+        #except requests.RequestException as exc:
+        except Exception as exc:
             raise ExternalApiRequestError(f"캐릭터 상세 페이지 요청 실패: {exc}") from exc
 
         print("[API][WARMUP_URL]", res.url)
@@ -259,7 +262,8 @@ class HttpApiService(BaseApiService):
                 timeout=self.timeout,
                 allow_redirects=False,
             )
-        except requests.RequestException as exc:
+        #except requests.RequestException as exc:
+        except Exception as exc:
             raise ExternalApiRequestError(f"캐릭터 상세 API 요청 실패: {exc}") from exc
 
         print("[API][DETAIL_REFERER]", referer)
@@ -305,7 +309,8 @@ class HttpApiService(BaseApiService):
                 headers=self._get_headers(),
                 timeout=self.timeout,
             )
-        except requests.RequestException as exc:
+        #except requests.RequestException as exc:
+        except Exception as exc:
             raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
 
         if res.status_code == 404:
