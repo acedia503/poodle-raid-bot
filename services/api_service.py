@@ -235,6 +235,21 @@ class HttpApiService(BaseApiService):
 
         headers = self._get_headers(referer)
 
+        extra_cookie = (
+            "visitedGame=AION2; "
+            "_gcl_au=1.1.718781253.1777368849; "
+            "_ga=GA1.1.101173522.1777368849; "
+            "ncBannerfloating20260407=true; "
+            "_ga_JMPDHRVRRL=GS2.1.s1777374888$o2$g0$t1777374888$j60$l0$h0"
+        )
+        
+        session_cookie = "; ".join(
+            f"{cookie.name}={cookie.value}"
+            for cookie in session.cookies
+        )
+        
+        headers["Cookie"] = f"{session_cookie}; {extra_cookie}"
+
         try:
             res = session.get(
                 self.detail_url,
