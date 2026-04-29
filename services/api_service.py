@@ -268,6 +268,7 @@ class HttpApiService(BaseApiService):
 
         print("[API][DETAIL_STATUS]", res.status_code)
         print("[API][DETAIL_LOCATION]", res.headers.get("Location"))
+        print("[API][DETAIL_REQUEST_HEADERS]", dict(res.request.headers))
         print("[API][DETAIL_REQUEST_COOKIE]", res.request.headers.get("Cookie"))
         print("[API][DETAIL_REFERER]", referer)
         print("[API][DETAIL_URL]", res.url)
