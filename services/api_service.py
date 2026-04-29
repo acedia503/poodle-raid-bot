@@ -252,7 +252,19 @@ class HttpApiService(BaseApiService):
         headers = self._get_headers(referer)
         headers.pop("Origin", None)
         
-        headers["Cookie"] = f"{session_cookie}; {extra_cookie}"
+        cookie_header = (
+            "gw_locale=ko-KR; "
+            "aion2_gw_locale=ko-KR; "
+            "_gcl_au=1.1.487963729.1777342092; "
+            "board_viewMode_tooltip=disabled; "
+            "_ga=GA1.1.499102846.1777342092; "
+            "ncBannerfloating20260407=true; "
+            "visitedGame=AION2; "
+            f"charactersSelectedServerId={race_id}-{server_id}; "
+            "_ga_JMPDHRVRRL=GS2.1.s1777427012$o2$g1$t1777427047$j25$l0$h0"
+        )
+        
+        headers["Cookie"] = cookie_header
 
         try:
             res = session.get(
