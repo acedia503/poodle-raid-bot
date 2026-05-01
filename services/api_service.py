@@ -49,6 +49,26 @@ class BaseApiService(ABC):
             raise InvalidApiResponseError("캐릭터 API 응답 형식이 예상과 다릅니다.") from exc
 
 
+class MockApiService(BaseApiService):
+    def get_character_info(
+        self,
+        character_name: str,
+        server: str | None = None,
+        race: str | None = None,
+    ) -> dict[str, Any]:
+        if not character_name.strip():
+            raise CharacterNotFoundError("캐릭터명이 비어 있습니다.")
+
+        return {
+            "character_name": character_name.strip(),
+            "job": "수호성",
+            "item_level": 3394,
+            "combat_power": 247499,
+            "server": server or "기본서버",
+            "race": race or "기본종족",
+        }
+        
+
 class HttpApiService(BaseApiService):
     def __init__(self, timeout: int = 5):
         self.base_url = "https://aion2.plaync.com"
