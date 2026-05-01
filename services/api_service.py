@@ -112,7 +112,7 @@ class HttpApiService(BaseApiService):
         server_id: int | None = None,
         race_id: int | None = None,
     ) -> dict[str, str]:
-        headers = {
+        return {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -121,12 +121,13 @@ class HttpApiService(BaseApiService):
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": referer or f"{self.base_url}/ko-kr/",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "sec-ch-ua": '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
         }
-
-        if server_id and race_id:
-            headers["Cookie"] = f"charactersSelectedServerId={race_id}-{server_id}"
-
-        return headers
 
     def _search_character(
         self,
@@ -178,22 +179,6 @@ class HttpApiService(BaseApiService):
     
         referer = f"{self.character_page_url}/{server_id}/{encoded_character_id}"
     
-        # 1) 상세 페이지 먼저 접근해서 세션/쿠키 워밍업
-        warmup_res = self.session.get(
-            referer,
-            headers=self._get_headers(
-                referer=f"{self.base_url}/ko-kr/characters",
-                server_id=server_id,
-                race_id=race_id,
-            ),
-            timeout=self.timeout,
-            allow_redirects=True,
-        )
-    
-        print("[API][WARMUP_URL]", warmup_res.url)
-        print("[API][WARMUP_STATUS]", warmup_res.status_code)
-    
-        # 2) 상세 API 호출
         params = {
             "lang": "ko",
             "characterId": decoded_character_id,
@@ -204,8 +189,6 @@ class HttpApiService(BaseApiService):
             url=self.detail_url,
             params=params,
             referer=referer,
-            server_id=server_id,
-            race_id=race_id,
             allow_redirects=False,
         )
     
@@ -216,7 +199,6 @@ class HttpApiService(BaseApiService):
             raise InvalidApiResponseError("상세 API 응답 형식이 예상과 다릅니다.")
     
         print("[API][DETAIL_KEYS]", payload.keys())
-    
         return payload
 
     def _request_json(
