@@ -179,21 +179,12 @@ class HttpApiService(BaseApiService):
     
         payload = res["data"]
     
-        print("[API][RAW_DETAIL_PAYLOAD]", payload)
+        if not isinstance(payload, dict):
+            raise InvalidApiResponseError("상세 API 응답 형식이 예상과 다릅니다.")
     
-        if isinstance(payload, dict):
-            if isinstance(payload.get("data"), dict):
-                payload = payload["data"]
+        print("[API][DETAIL_KEYS]", payload.keys())
     
-            if isinstance(payload.get("character"), dict):
-                return payload["character"]
-    
-            if isinstance(payload.get("profile"), dict):
-                return payload
-    
-            return payload
-    
-        raise InvalidApiResponseError("상세 API 응답 형식이 예상과 다릅니다.")
+        return payload
 
     def _request_json(
         self,
@@ -275,41 +266,25 @@ class HttpApiService(BaseApiService):
         basic: dict[str, Any],
         detail: dict[str, Any],
     ) -> dict[str, Any]:
-        profile = detail.get("profile", {}) if isinstance(detail, dict) else {}
-
-        print("[API][MERGE_DETAIL_KEYS]", detail.keys() if isinstance(detail, dict) else None)
-        print("[API][MERGE_DETAIL]", detail)
-        
+        profile = detail.get("profile") or {}
+    
         character_name = (
             profile.get("characterName")
-            or detail.get("characterName")
             or basic.get("character_name")
             or "-"
         )
     
         job = (
             profile.get("className")
-            or profile.get("jobName")
-            or detail.get("className")
-            or detail.get("jobName")
-            or detail.get("job")
             or "-"
         )
     
         combat_power = (
             profile.get("combatPower")
-            or detail.get("combatPower")
-            or self._extract_stat_value(detail, "CombatPower")
-            or self._extract_stat_value(detail, "Power")
             or 0
         )
     
-        item_level = (
-            detail.get("itemLevel")
-            or profile.get("itemLevel")
-            or self._extract_stat_value(detail, "ItemLevel")
-            or 0
-        )
+        item_level = self._extract_item_level(detail)
     
         return {
             "character_name": self._clean_html(str(character_name)),
@@ -353,6 +328,16 @@ class HttpApiService(BaseApiService):
             "1": "천족",
             "2": "마족",
         }.get(race_value, "-")
+
+    def _extract_item_level(self, detail: dict[str, Any]) -> int:
+        stat = detail.get("stat") or {}
+        stat_list = stat.get("statList") or []
+    
+        for entry in stat_list:
+            if entry.get("type") == "ItemLevel":
+                return int(entry.get("value") or 0)
+    
+        return 0
     
     def _clean_html(self, text: str) -> str:
         if not text:
