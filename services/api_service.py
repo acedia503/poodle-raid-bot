@@ -1,3 +1,54 @@
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import Any
+import re
+
+import requests
+
+from utils.constants import RACE_TO_ID, SERVER_NAME_TO_ID
+
+
+class ApiServiceError(Exception):
+    pass
+
+
+class CharacterNotFoundError(ApiServiceError):
+    pass
+
+
+class ExternalApiRequestError(ApiServiceError):
+    pass
+
+
+class InvalidApiResponseError(ApiServiceError):
+    pass
+
+
+class BaseApiService(ABC):
+    @abstractmethod
+    def get_character_info(
+        self,
+        character_name: str,
+        server: str | None = None,
+        race: str | None = None,
+    ) -> dict[str, Any]:
+        raise NotImplementedError
+
+    def normalize_character_response(self, raw_data: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return {
+                "character_name": str(raw_data.get("character_name") or "-").strip(),
+                "job": str(raw_data.get("job") or "-").strip(),
+                "item_level": int(raw_data.get("item_level") or 0),
+                "combat_power": int(raw_data.get("combat_power") or 0),
+                "server": str(raw_data.get("server") or "-").strip(),
+                "race": str(raw_data.get("race") or "-").strip(),
+            }
+        except (TypeError, ValueError) as exc:
+            raise InvalidApiResponseError("캐릭터 API 응답 형식이 예상과 다릅니다.") from exc
+
+
 class HttpApiService(BaseApiService):
     def __init__(self, timeout: int = 5):
         self.base_url = "https://aion2.plaync.com"
