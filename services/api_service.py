@@ -231,14 +231,22 @@ class HttpApiService(BaseApiService):
             raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
     
         matched = None
+    
         for char in char_list:
-            name = str(char.get("characterName") or char.get("name") or "").strip()
-            if name == keyword:
+            raw_name = self._clean_html(
+                str(char.get("characterName") or char.get("name") or "")
+            )
+    
+            if raw_name.strip() == keyword.strip():
                 matched = char
                 break
     
         if matched is None:
             matched = char_list[0]
+    
+        character_name = self._clean_html(
+            str(matched.get("characterName") or matched.get("name") or "-")
+        )
     
         character_id = str(matched.get("characterId") or "")
         server_id = int(matched.get("serverId") or 0)
@@ -249,9 +257,9 @@ class HttpApiService(BaseApiService):
         return {
             "character_id": character_id,
             "server_id": server_id,
-            "character_name": name,
+            "character_name": character_name,
             "server": str(matched.get("serverName") or "-"),
-            "race": str(matched.get("raceName") or "-"),
+            "race": self._extract_race_name(matched),
         }
     
     def _merge_basic_and_detail(
@@ -259,25 +267,84 @@ class HttpApiService(BaseApiService):
         basic: dict[str, Any],
         detail: dict[str, Any],
     ) -> dict[str, Any]:
+        profile = detail.get("profile", {}) if isinstance(detail, dict) else {}
     
-        profile = detail.get("profile", {})
+        character_name = (
+            profile.get("characterName")
+            or detail.get("characterName")
+            or basic.get("character_name")
+            or "-"
+        )
+    
+        job = (
+            profile.get("className")
+            or profile.get("jobName")
+            or detail.get("className")
+            or detail.get("jobName")
+            or detail.get("job")
+            or "-"
+        )
+    
+        combat_power = (
+            profile.get("combatPower")
+            or detail.get("combatPower")
+            or self._extract_stat_value(detail, "CombatPower")
+            or self._extract_stat_value(detail, "Power")
+            or 0
+        )
+    
+        item_level = (
+            detail.get("itemLevel")
+            or profile.get("itemLevel")
+            or self._extract_stat_value(detail, "ItemLevel")
+            or 0
+        )
     
         return {
-            "character_name": profile.get("characterName") or basic.get("character_name"),
-            "job": profile.get("className") or detail.get("className") or "-",
-            "item_level": self._extract_item_level(detail),
-            "combat_power": profile.get("combatPower") or detail.get("combatPower") or 0,
-            "server": profile.get("serverName") or basic.get("server"),
-            "race": profile.get("raceName") or basic.get("race"),
+            "character_name": self._clean_html(str(character_name)),
+            "job": str(job).strip(),
+            "item_level": int(item_level or 0),
+            "combat_power": int(combat_power or 0),
+            "server": profile.get("serverName") or basic.get("server") or "-",
+            "race": profile.get("raceName") or basic.get("race") or "-",
         }
     
-    def _extract_item_level(self, detail: dict[str, Any]) -> int:
+    def _extract_stat_value(self, detail: dict[str, Any], stat_type: str) -> int:
         stat_obj = detail.get("stat", {})
     
-        if isinstance(stat_obj, dict):
-            stat_list = stat_obj.get("statList", [])
-            for entry in stat_list:
-                if entry.get("type") == "ItemLevel":
-                    return int(entry.get("value") or 0)
+        candidates = []
     
-        return int(detail.get("itemLevel") or 0)
+        if isinstance(stat_obj, dict):
+            candidates.extend(stat_obj.get("statList", []))
+            candidates.extend(stat_obj.get("battleStatList", []))
+            candidates.extend(stat_obj.get("basicStatList", []))
+    
+        elif isinstance(stat_obj, list):
+            candidates.extend(stat_obj)
+    
+        for entry in candidates:
+            if not isinstance(entry, dict):
+                continue
+    
+            if entry.get("type") == stat_type or entry.get("statType") == stat_type:
+                return int(entry.get("value") or entry.get("statValue") or 0)
+    
+        return 0
+    
+    def _extract_race_name(self, char: dict[str, Any]) -> str:
+        if char.get("raceName"):
+            return str(char["raceName"])
+    
+        race_value = char.get("race")
+        return {
+            1: "천족",
+            2: "마족",
+            "1": "천족",
+            "2": "마족",
+        }.get(race_value, "-")
+    
+    def _clean_html(self, text: str) -> str:
+        if not text:
+            return "-"
+    
+        return re.sub(r"<.*?>", "", text).strip()
