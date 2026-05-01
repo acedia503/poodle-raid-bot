@@ -100,22 +100,19 @@ class HttpApiService(BaseApiService):
         merged = self._merge_basic_and_detail(basic, detail_data)
         return self.normalize_character_response(merged)
 
-    def _get_headers(self, referer: str | None = None) -> dict[str, str]:
+    def _get_headers(self, referer: str | None = None, server_id: int | None = None, race_id: int | None = None):
         headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/147.0.0.0 Safari/537.36"
-            ),
+            "User-Agent": "Mozilla/5.0",
             "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
         }
-
+    
         if referer:
             headers["Referer"] = referer
-        else:
-            headers["Referer"] = f"{self.base_url}/ko-kr/"
-
+    
+        # 🔥 핵심 추가
+        if server_id and race_id:
+            headers["Cookie"] = f"charactersSelectedServerId={race_id}-{server_id}"
+    
         return headers
 
     def _search_character(
