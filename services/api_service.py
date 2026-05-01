@@ -175,15 +175,31 @@ class HttpApiService(BaseApiService):
     ) -> dict[str, Any]:
         decoded_character_id = unquote(character_id)
         encoded_character_id = quote(decoded_character_id, safe="")
-
+    
         referer = f"{self.character_page_url}/{server_id}/{encoded_character_id}"
-
+    
+        # 1) 상세 페이지 먼저 접근해서 세션/쿠키 워밍업
+        warmup_res = self.session.get(
+            referer,
+            headers=self._get_headers(
+                referer=f"{self.base_url}/ko-kr/characters",
+                server_id=server_id,
+                race_id=race_id,
+            ),
+            timeout=self.timeout,
+            allow_redirects=True,
+        )
+    
+        print("[API][WARMUP_URL]", warmup_res.url)
+        print("[API][WARMUP_STATUS]", warmup_res.status_code)
+    
+        # 2) 상세 API 호출
         params = {
             "lang": "ko",
             "characterId": decoded_character_id,
             "serverId": server_id,
         }
-
+    
         payload = self._request_json(
             url=self.detail_url,
             params=params,
@@ -192,15 +208,15 @@ class HttpApiService(BaseApiService):
             race_id=race_id,
             allow_redirects=False,
         )
-
+    
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
             payload = payload["data"]
-
+    
         if not isinstance(payload, dict):
             raise InvalidApiResponseError("상세 API 응답 형식이 예상과 다릅니다.")
-
+    
         print("[API][DETAIL_KEYS]", payload.keys())
-
+    
         return payload
 
     def _request_json(
