@@ -164,28 +164,36 @@ class HttpApiService(BaseApiService):
         server_id: int,
     ) -> dict[str, Any]:
         referer = f"{self.character_page_url}/{server_id}/{character_id}"
-
+    
         params = {
             "lang": "ko",
             "characterId": character_id,
             "serverId": server_id,
         }
-
+    
         res = self._request_json(
             url=self.detail_url,
             params=params,
             referer=referer,
         )
-
+    
         payload = res["data"]
-
-        if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
-            return payload["data"]
-
-        if not isinstance(payload, dict):
-            raise InvalidApiResponseError("상세 API 응답 형식이 예상과 다릅니다.")
-
-        return payload
+    
+        print("[API][RAW_DETAIL_PAYLOAD]", payload)
+    
+        if isinstance(payload, dict):
+            if isinstance(payload.get("data"), dict):
+                payload = payload["data"]
+    
+            if isinstance(payload.get("character"), dict):
+                return payload["character"]
+    
+            if isinstance(payload.get("profile"), dict):
+                return payload
+    
+            return payload
+    
+        raise InvalidApiResponseError("상세 API 응답 형식이 예상과 다릅니다.")
 
     def _request_json(
         self,
@@ -268,7 +276,10 @@ class HttpApiService(BaseApiService):
         detail: dict[str, Any],
     ) -> dict[str, Any]:
         profile = detail.get("profile", {}) if isinstance(detail, dict) else {}
-    
+
+        print("[API][MERGE_DETAIL_KEYS]", detail.keys() if isinstance(detail, dict) else None)
+        print("[API][MERGE_DETAIL]", detail)
+        
         character_name = (
             profile.get("characterName")
             or detail.get("characterName")
