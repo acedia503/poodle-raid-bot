@@ -178,7 +178,10 @@ class HttpApiService(BaseApiService):
         )
     
         payload = res["data"]
-    
+        
+        if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+            payload = payload["data"]
+            
         if not isinstance(payload, dict):
             raise InvalidApiResponseError("상세 API 응답 형식이 예상과 다릅니다.")
     
