@@ -166,8 +166,7 @@ class HttpApiService(BaseApiService):
         character_id: str,
         server_id: int,
     ) -> dict[str, Any]:
-        referer_character_id = quote(character_id, safe="")
-        referer = f"{self.character_page_url}/{server_id}/{referer_character_id}"
+        referer = f"{self.character_page_url}/{server_id}/{character_id}"
 
         params = {
             "lang": "ko",
