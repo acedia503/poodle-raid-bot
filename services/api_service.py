@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any
+from urllib.parse import quote
 import re
 
 import requests
@@ -169,7 +170,8 @@ class HttpApiService(BaseApiService):
         server_id: int,
         race_id: int,
     ) -> dict[str, Any]:
-        referer = f"{self.character_page_url}/{server_id}/{character_id}"
+        encoded_character_id = quote(character_id, safe="")
+        referer = f"{self.character_page_url}/{server_id}/{encoded_character_id}"
 
         params = {
             "lang": "ko",
