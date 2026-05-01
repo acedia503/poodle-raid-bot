@@ -166,9 +166,8 @@ class HttpApiService(BaseApiService):
         character_id: str,
         server_id: int,
     ) -> dict[str, Any]:
-        # search API에서 받은 characterId는 이미 %3D 형태일 수 있음.
-        # requests/curl_cffi의 params 인코딩에 맡기면 %가 다시 인코딩되어 %253D가 될 수 있으므로
-        # 상세 API URL은 문자열로 직접 조립한다.
+        # character_id는 검색 API에서 이미 %3D 형태로 내려옴.
+        # params로 넘기면 %가 다시 인코딩되어 %253D가 될 수 있으므로 직접 URL 조립.
         detail_url = (
             f"{self.detail_url}"
             f"?lang=ko&characterId={character_id}&serverId={server_id}"
@@ -201,14 +200,18 @@ class HttpApiService(BaseApiService):
         debug_label: str = "API",
     ) -> dict[str, Any]:
         try:
-            res = self.session.get(
-                url,
-                params=params,
-                headers=self._get_headers(referer),
-                timeout=self.timeout,
-                allow_redirects=False,
-                impersonate="chrome120",
-            )
+            kwargs: dict[str, Any] = {
+                "headers": self._get_headers(referer),
+                "timeout": self.timeout,
+                "allow_redirects": False,
+                "impersonate": "chrome120",
+            }
+
+            if params is not None:
+                kwargs["params"] = params
+
+            res = self.session.get(url, **kwargs)
+
         except Exception as exc:
             raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
 
