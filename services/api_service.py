@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any
-from urllib.parse import quote, unquote
+from urllib.parse import quote
 import re
 
 import requests
@@ -96,7 +96,6 @@ class HttpApiService(BaseApiService):
         detail_data = self._get_character_detail(
             character_id=basic["character_id"],
             server_id=basic["server_id"],
-            race_id=basic["race_id"],
         )
 
         merged = self._merge_basic_and_detail(basic, detail_data)
@@ -106,12 +105,7 @@ class HttpApiService(BaseApiService):
 
         return result
 
-    def _get_headers(
-        self,
-        referer: str | None = None,
-        server_id: int | None = None,
-        race_id: int | None = None,
-    ) -> dict[str, str]:
+    def _get_headers(self, referer: str | None = None) -> dict[str, str]:
         return {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -157,7 +151,6 @@ class HttpApiService(BaseApiService):
             url=self.search_url,
             params=params,
             referer=f"{self.base_url}/ko-kr/characters",
-            allow_redirects=False,
         )
 
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
@@ -172,33 +165,30 @@ class HttpApiService(BaseApiService):
         self,
         character_id: str,
         server_id: int,
-        race_id: int,
     ) -> dict[str, Any]:
-        decoded_character_id = unquote(character_id)
-        encoded_character_id = quote(decoded_character_id, safe="")
-    
-        referer = f"{self.character_page_url}/{server_id}/{encoded_character_id}"
-    
+        referer_character_id = quote(character_id, safe="")
+        referer = f"{self.character_page_url}/{server_id}/{referer_character_id}"
+
         params = {
             "lang": "ko",
-            "characterId": decoded_character_id,
+            "characterId": character_id,
             "serverId": server_id,
         }
-    
+
         payload = self._request_json(
             url=self.detail_url,
             params=params,
             referer=referer,
-            allow_redirects=False,
         )
-    
+
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
             payload = payload["data"]
-    
+
         if not isinstance(payload, dict):
             raise InvalidApiResponseError("상세 API 응답 형식이 예상과 다릅니다.")
-    
+
         print("[API][DETAIL_KEYS]", payload.keys())
+
         return payload
 
     def _request_json(
@@ -206,21 +196,14 @@ class HttpApiService(BaseApiService):
         url: str,
         params: dict[str, Any],
         referer: str | None = None,
-        server_id: int | None = None,
-        race_id: int | None = None,
-        allow_redirects: bool = False,
     ) -> dict[str, Any]:
         try:
             res = self.session.get(
                 url,
                 params=params,
-                headers=self._get_headers(
-                    referer=referer,
-                    server_id=server_id,
-                    race_id=race_id,
-                ),
+                headers=self._get_headers(referer),
                 timeout=self.timeout,
-                allow_redirects=allow_redirects,
+                allow_redirects=False,
             )
         except requests.RequestException as exc:
             raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
@@ -229,8 +212,6 @@ class HttpApiService(BaseApiService):
         print("[API][FINAL_URL]", res.url)
         print("[API][STATUS]", res.status_code)
         print("[API][LOCATION]", res.headers.get("Location"))
-        print("[API][HISTORY]", [r.status_code for r in res.history])
-        print("[API][REQUEST_HEADERS]", dict(res.request.headers))
         print("[API][BODY]", res.text[:500])
         print("=======================")
 
@@ -281,22 +262,12 @@ class HttpApiService(BaseApiService):
         character_id = str(matched.get("characterId") or "")
         server_id = int(matched.get("serverId") or 0)
 
-        try:
-            race_id = int(matched.get("race") or 0)
-        except (TypeError, ValueError):
-            race_id = 0
-
-        if race_id <= 0:
-            race_name = self._extract_race_name(matched)
-            race_id = RACE_TO_ID.get(race_name, 2)
-
         if not character_id or server_id <= 0:
             raise InvalidApiResponseError("캐릭터 ID 또는 서버 ID가 없습니다.")
 
         return {
             "character_id": character_id,
             "server_id": server_id,
-            "race_id": race_id,
             "character_name": character_name,
             "server": str(matched.get("serverName") or "-"),
             "race": self._extract_race_name(matched),
