@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any
-from urllib.parse import quote
 import re
 
-import requests
+from curl_cffi import requests
 
 from utils.constants import RACE_TO_ID, SERVER_NAME_TO_ID
 
@@ -151,6 +150,7 @@ class HttpApiService(BaseApiService):
             url=self.search_url,
             params=params,
             referer=f"{self.base_url}/ko-kr/characters",
+            debug_label="SEARCH",
         )
 
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
@@ -166,18 +166,21 @@ class HttpApiService(BaseApiService):
         character_id: str,
         server_id: int,
     ) -> dict[str, Any]:
+        # search API에서 받은 characterId는 이미 %3D 형태일 수 있음.
+        # requests/curl_cffi의 params 인코딩에 맡기면 %가 다시 인코딩되어 %253D가 될 수 있으므로
+        # 상세 API URL은 문자열로 직접 조립한다.
+        detail_url = (
+            f"{self.detail_url}"
+            f"?lang=ko&characterId={character_id}&serverId={server_id}"
+        )
+
         referer = f"{self.character_page_url}/{server_id}/{character_id}"
 
-        params = {
-            "lang": "ko",
-            "characterId": character_id,
-            "serverId": server_id,
-        }
-
         payload = self._request_json(
-            url=self.detail_url,
-            params=params,
+            url=detail_url,
+            params=None,
             referer=referer,
+            debug_label="DETAIL",
         )
 
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
@@ -193,8 +196,9 @@ class HttpApiService(BaseApiService):
     def _request_json(
         self,
         url: str,
-        params: dict[str, Any],
+        params: dict[str, Any] | None = None,
         referer: str | None = None,
+        debug_label: str = "API",
     ) -> dict[str, Any]:
         try:
             res = self.session.get(
@@ -203,11 +207,12 @@ class HttpApiService(BaseApiService):
                 headers=self._get_headers(referer),
                 timeout=self.timeout,
                 allow_redirects=False,
+                impersonate="chrome120",
             )
-        except requests.RequestException as exc:
+        except Exception as exc:
             raise ExternalApiRequestError(f"외부 API 요청 실패: {exc}") from exc
 
-        print("====== API DEBUG ======")
+        print(f"====== API DEBUG [{debug_label}] ======")
         print("[API][FINAL_URL]", res.url)
         print("[API][STATUS]", res.status_code)
         print("[API][LOCATION]", res.headers.get("Location"))
@@ -228,6 +233,7 @@ class HttpApiService(BaseApiService):
         try:
             return res.json()
         except ValueError as exc:
+            print("[API][INVALID_JSON_BODY]", res.text[:500])
             raise InvalidApiResponseError("JSON 응답 파싱 실패") from exc
 
     def _extract_basic_character(
@@ -281,6 +287,7 @@ class HttpApiService(BaseApiService):
 
         character_name = (
             profile.get("characterName")
+            or detail.get("characterName")
             or basic.get("character_name")
             or "-"
         )
@@ -289,6 +296,7 @@ class HttpApiService(BaseApiService):
             profile.get("className")
             or profile.get("jobName")
             or detail.get("className")
+            or detail.get("jobName")
             or "-"
         )
 
@@ -305,8 +313,8 @@ class HttpApiService(BaseApiService):
             "job": str(job).strip(),
             "item_level": int(item_level or 0),
             "combat_power": int(combat_power or 0),
-            "server": profile.get("serverName") or basic.get("server") or "-",
-            "race": profile.get("raceName") or basic.get("race") or "-",
+            "server": profile.get("serverName") or detail.get("serverName") or basic.get("server") or "-",
+            "race": profile.get("raceName") or detail.get("raceName") or basic.get("race") or "-",
         }
 
     def _extract_item_level(self, detail: dict[str, Any]) -> int:
