@@ -106,17 +106,20 @@ class HttpApiService(BaseApiService):
 
     def _get_headers(self, referer: str | None = None) -> dict[str, str]:
         return {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/147.0.0.0 Safari/537.36"
-            ),
+            "Host": "aion2.plaync.com",
+            "Connection": "keep-alive",
             "Accept": "application/json, text/plain, */*",
+            "Accept-Encoding": "gzip, deflate, br, zstd",
             "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": referer or f"{self.base_url}/ko-kr/",
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-origin",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/147.0.0.0 Safari/537.36"
+            ),
             "sec-ch-ua": '"Google Chrome";v="147", "Not.A/Brand";v="8", "Chromium";v="147"',
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"Windows"',
@@ -149,7 +152,7 @@ class HttpApiService(BaseApiService):
         payload = self._request_json(
             url=self.search_url,
             params=params,
-            referer=f"{self.base_url}/ko-kr/characters",
+            referer=f"{self.base_url}/ko-kr/characters/index",
             debug_label="SEARCH",
         )
 
@@ -166,8 +169,8 @@ class HttpApiService(BaseApiService):
         character_id: str,
         server_id: int,
     ) -> dict[str, Any]:
-        # character_id는 검색 API에서 이미 %3D 형태로 내려옴.
-        # params로 넘기면 %가 다시 인코딩되어 %253D가 될 수 있으므로 직접 URL 조립.
+        # character_id는 검색 API 응답 그대로 사용.
+        # 예: R2A3...Txs%3D
         detail_url = (
             f"{self.detail_url}"
             f"?lang=ko&characterId={character_id}&serverId={server_id}"
@@ -204,7 +207,6 @@ class HttpApiService(BaseApiService):
                 "headers": self._get_headers(referer),
                 "timeout": self.timeout,
                 "allow_redirects": False,
-                "impersonate": "chrome120",
             }
 
             if params is not None:
@@ -219,6 +221,7 @@ class HttpApiService(BaseApiService):
         print("[API][FINAL_URL]", res.url)
         print("[API][STATUS]", res.status_code)
         print("[API][LOCATION]", res.headers.get("Location"))
+        print("[API][REQUEST_HEADERS]", dict(res.request.headers))
         print("[API][BODY]", res.text[:500])
         print("=======================")
 
