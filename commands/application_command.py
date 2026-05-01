@@ -10,6 +10,7 @@ from views.application_view import RaceView, ServerView
 from views.application_result_view import ApplicationResultView
 from views.application_main_view import ApplicationMainView, ApplicationCharacterModal
 from views.application_cancel_view import ApplicationCancelButtonSelectView
+from views.application_status_view import ApplicationStatusView, ApplicationStatusSearchModal
 
 
 class ApplicationCommand(commands.Cog):
