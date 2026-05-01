@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 import re
 
 import requests
@@ -170,15 +170,17 @@ class HttpApiService(BaseApiService):
         server_id: int,
         race_id: int,
     ) -> dict[str, Any]:
-        encoded_character_id = quote(character_id, safe="")
+        decoded_character_id = unquote(character_id)
+        encoded_character_id = quote(decoded_character_id, safe="")
+    
         referer = f"{self.character_page_url}/{server_id}/{encoded_character_id}"
-
+    
         params = {
             "lang": "ko",
-            "characterId": character_id,
+            "characterId": decoded_character_id,
             "serverId": server_id,
         }
-
+    
         res = self._request_json(
             url=self.detail_url,
             params=params,
@@ -186,17 +188,17 @@ class HttpApiService(BaseApiService):
             server_id=server_id,
             race_id=race_id,
         )
-
+    
         payload = res["data"]
-
+    
         if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
             payload = payload["data"]
-
+    
         if not isinstance(payload, dict):
             raise InvalidApiResponseError("상세 API 응답 형식이 예상과 다릅니다.")
-
+    
         print("[API][DETAIL_KEYS]", payload.keys())
-
+    
         return payload
 
     def _request_json(
