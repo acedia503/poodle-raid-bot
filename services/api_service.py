@@ -224,3 +224,60 @@ class HttpApiService(BaseApiService):
             "url": res.url,
             "data": data,
         }
+
+    def _extract_basic_character(self, data: dict[str, Any], keyword: str) -> dict[str, Any]:
+        char_list = data.get("list", [])
+        if not char_list:
+            raise CharacterNotFoundError("캐릭터를 찾을 수 없습니다.")
+    
+        matched = None
+        for char in char_list:
+            name = str(char.get("characterName") or char.get("name") or "").strip()
+            if name == keyword:
+                matched = char
+                break
+    
+        if matched is None:
+            matched = char_list[0]
+    
+        character_id = str(matched.get("characterId") or "")
+        server_id = int(matched.get("serverId") or 0)
+    
+        if not character_id or server_id <= 0:
+            raise InvalidApiResponseError("캐릭터 ID 또는 서버 ID가 없습니다.")
+    
+        return {
+            "character_id": character_id,
+            "server_id": server_id,
+            "character_name": name,
+            "server": str(matched.get("serverName") or "-"),
+            "race": str(matched.get("raceName") or "-"),
+        }
+    
+    def _merge_basic_and_detail(
+        self,
+        basic: dict[str, Any],
+        detail: dict[str, Any],
+    ) -> dict[str, Any]:
+    
+        profile = detail.get("profile", {})
+    
+        return {
+            "character_name": profile.get("characterName") or basic.get("character_name"),
+            "job": profile.get("className") or detail.get("className") or "-",
+            "item_level": self._extract_item_level(detail),
+            "combat_power": profile.get("combatPower") or detail.get("combatPower") or 0,
+            "server": profile.get("serverName") or basic.get("server"),
+            "race": profile.get("raceName") or basic.get("race"),
+        }
+    
+    def _extract_item_level(self, detail: dict[str, Any]) -> int:
+        stat_obj = detail.get("stat", {})
+    
+        if isinstance(stat_obj, dict):
+            stat_list = stat_obj.get("statList", [])
+            for entry in stat_list:
+                if entry.get("type") == "ItemLevel":
+                    return int(entry.get("value") or 0)
+    
+        return int(detail.get("itemLevel") or 0)
