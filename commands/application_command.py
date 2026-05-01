@@ -65,9 +65,17 @@ class ApplicationCommand(commands.Cog):
         )
 
         if interaction.response.is_done():
-            await interaction.edit_original_response(content=None, embed=embed, view=None)
+            await interaction.edit_original_response(
+                content=None,
+                embed=embed,
+                view=None,
+            )
         else:
-            await interaction.response.send_message(content=None, embed=embed, ephemeral=True)
+            await interaction.response.send_message(
+                content=None,
+                embed=embed,
+                ephemeral=True,
+            )
 
     def _get_show_identity(self, guild_id: int) -> bool:
         setting = self.setting_service.get_guild_setting(guild_id)
@@ -114,15 +122,18 @@ class ApplicationCommand(commands.Cog):
             color=discord.Color.blurple(),
         )
 
-    def _build_cancel_select_embed(self, applications, selected_ids, show_identity: bool) -> discord.Embed:
+    def _build_cancel_select_embed(
+        self,
+        applications,
+        selected_ids,
+        show_identity: bool,
+    ) -> discord.Embed:
         lines = []
 
         for idx, app in enumerate(applications, start=1):
             mark = "✅" if app.id in selected_ids else "⬜"
 
-            parts = [
-                app.character_name,
-            ]
+            parts = [app.character_name]
 
             if show_identity:
                 parts.append(app.race)
@@ -158,9 +169,17 @@ class ApplicationCommand(commands.Cog):
                 "서버 채널에서만 사용할 수 있습니다.",
             )
             if first_response:
-                await interaction.response.send_message(content=None, embed=embed, ephemeral=True)
+                await interaction.response.send_message(
+                    content=None,
+                    embed=embed,
+                    ephemeral=True,
+                )
             else:
-                await interaction.response.edit_message(content=None, embed=embed, view=None)
+                await interaction.response.edit_message(
+                    content=None,
+                    embed=embed,
+                    view=None,
+                )
             return
 
         channel_raid = self.service.raid_service.get_channel_raid(interaction.channel.id)
@@ -199,9 +218,17 @@ class ApplicationCommand(commands.Cog):
             )
 
             if first_response:
-                await interaction.response.send_message(content=None, embed=embed, ephemeral=True)
+                await interaction.response.send_message(
+                    content=None,
+                    embed=embed,
+                    ephemeral=True,
+                )
             else:
-                await interaction.response.edit_message(content=None, embed=embed, view=None)
+                await interaction.response.edit_message(
+                    content=None,
+                    embed=embed,
+                    view=None,
+                )
             return
 
         async def apply_callback(inter: discord.Interaction):
@@ -262,7 +289,9 @@ class ApplicationCommand(commands.Cog):
                     show_identity=False,
                 )
 
-            await inter.response.send_modal(ApplicationCharacterModal(on_character_submit))
+            await inter.response.send_modal(
+                ApplicationCharacterModal(on_character_submit)
+            )
 
         async def cancel_callback(inter: discord.Interaction):
             current_apps = await asyncio.to_thread(
@@ -306,7 +335,11 @@ class ApplicationCommand(commands.Cog):
                     "cancelled",
                     show_identity=show_identity,
                 )
-                await inter.response.edit_message(content=None, embed=cancel_embed, view=None)
+                await inter.response.edit_message(
+                    content=None,
+                    embed=cancel_embed,
+                    view=None,
+                )
             else:
                 await inter.response.edit_message(
                     content=None,
@@ -449,30 +482,148 @@ class ApplicationCommand(commands.Cog):
             await refresh_view(inter, current_apps, selected_ids)
 
         async def status_callback(inter: discord.Interaction):
-            result = await asyncio.to_thread(
-                self.service.get_current_raid_application_list,
-                inter.channel.id,
-            )
-
-            if result["raid_name"] is None:
-                await inter.response.edit_message(
-                    content=None,
-                    embed=self._notice_embed(
-                        "레이드 신청 현황을 볼 수 없습니다.",
-                        "현재 채널에 매칭된 레이드가 없습니다.",
-                        discord.Color.orange(),
-                    ),
-                    view=None,
+            async def render_status(
+                status_inter: discord.Interaction,
+                keyword: str | None = None,
+                search_type: str | None = None,
+            ):
+                result = await asyncio.to_thread(
+                    self.service.get_current_raid_application_list,
+                    status_inter.channel.id,
                 )
-                return
 
-            status_embed = self.message_service.build_admin_application_list_embed(
-                result["raid_name"],
-                result["applications"],
-                show_identity=show_identity,
-            )
+                if result["raid_name"] is None:
+                    await status_inter.response.edit_message(
+                        content=None,
+                        embed=self._notice_embed(
+                            "레이드 신청 현황을 볼 수 없습니다.",
+                            "현재 채널에 매칭된 레이드가 없습니다.",
+                            discord.Color.orange(),
+                        ),
+                        view=None,
+                    )
+                    return
 
-            await inter.response.edit_message(content=None, embed=status_embed, view=None)
+                applications = result["applications"]
+                title = f"{result['raid_name']} 신청 현황"
+
+                if keyword:
+                    if search_type == "user":
+                        applications = [
+                            app for app in applications
+                            if keyword.lower() in str(app.user_name).lower()
+                        ]
+                        title += " - 유저명 검색"
+                    elif search_type == "character":
+                        applications = [
+                            app for app in applications
+                            if keyword.lower() in str(app.character_name).lower()
+                        ]
+                        title += " - 캐릭터명 검색"
+
+                if applications:
+                    lines = []
+                    for idx, app in enumerate(applications, start=1):
+                        if show_identity:
+                            lines.append(
+                                f"{idx}. {app.user_name} | {app.character_name} | "
+                                f"{app.race} | {app.server} | {app.job} | "
+                                f"{app.item_level} | {app.combat_power:,}"
+                            )
+                        else:
+                            lines.append(
+                                f"{idx}. {app.user_name} | {app.character_name} | "
+                                f"{app.job} | {app.item_level} | {app.combat_power:,}"
+                            )
+
+                    description = "\n".join(lines)
+                else:
+                    description = "신청 내역이 없습니다."
+
+                if keyword:
+                    description = f"검색어: `{keyword}`\n\n{description}"
+
+                status_embed = discord.Embed(
+                    title=title,
+                    description=description,
+                    color=discord.Color.blurple(),
+                )
+
+                async def user_search_callback(search_inter: discord.Interaction):
+                    async def submit_callback(
+                        modal_inter: discord.Interaction,
+                        search_keyword: str,
+                    ):
+                        await render_status(
+                            modal_inter,
+                            keyword=search_keyword,
+                            search_type="user",
+                        )
+
+                    await search_inter.response.send_modal(
+                        ApplicationStatusSearchModal(
+                            title="유저명 검색",
+                            submit_callback=submit_callback,
+                        )
+                    )
+
+                async def character_search_callback(search_inter: discord.Interaction):
+                    async def submit_callback(
+                        modal_inter: discord.Interaction,
+                        search_keyword: str,
+                    ):
+                        await render_status(
+                            modal_inter,
+                            keyword=search_keyword,
+                            search_type="character",
+                        )
+
+                    await search_inter.response.send_modal(
+                        ApplicationStatusSearchModal(
+                            title="캐릭터명 검색",
+                            submit_callback=submit_callback,
+                        )
+                    )
+
+                async def back_callback(back_inter: discord.Interaction):
+                    await self._render_main(back_inter, first_response=False)
+
+                admin_status_delete_callback = None
+                if is_admin(status_inter):
+                    async def admin_status_delete_callback(
+                        delete_inter: discord.Interaction,
+                    ):
+                        await delete_inter.response.edit_message(
+                            content=None,
+                            embed=self._notice_embed(
+                                "관리자용 삭제",
+                                "관리자 삭제 기능은 다음 단계에서 연결됩니다.",
+                                discord.Color.orange(),
+                            ),
+                            view=None,
+                        )
+
+                status_view = ApplicationStatusView(
+                    user_search_callback=user_search_callback,
+                    character_search_callback=character_search_callback,
+                    admin_delete_callback=admin_status_delete_callback,
+                    back_callback=back_callback,
+                )
+
+                if status_inter.response.is_done():
+                    await status_inter.edit_original_response(
+                        content=None,
+                        embed=status_embed,
+                        view=status_view,
+                    )
+                else:
+                    await status_inter.response.edit_message(
+                        content=None,
+                        embed=status_embed,
+                        view=status_view,
+                    )
+
+            await render_status(inter)
 
         admin_delete_callback = None
         if is_admin(interaction):
@@ -481,7 +632,7 @@ class ApplicationCommand(commands.Cog):
                     content=None,
                     embed=self._notice_embed(
                         "관리자용 신청 삭제",
-                        "관리자 삭제 기능은 다음 단계에서 연결됩니다.",
+                        "관리자 삭제 기능은 레이드 신청 현황 화면에서 사용해주세요.",
                         discord.Color.orange(),
                     ),
                     view=None,
@@ -518,7 +669,14 @@ class ApplicationCommand(commands.Cog):
         except Exception as exc:
             await self._respond_error(interaction, exc)
 
-    async def _process(self, interaction, character_name, race, server, show_identity: bool):
+    async def _process(
+        self,
+        interaction,
+        character_name,
+        race,
+        server,
+        show_identity: bool,
+    ):
         await interaction.response.defer(ephemeral=True)
 
         try:
