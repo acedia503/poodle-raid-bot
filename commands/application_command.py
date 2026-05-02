@@ -10,7 +10,7 @@ from views.application_view import RaceView, ServerView
 from views.application_result_view import ApplicationResultView
 from views.application_main_view import ApplicationMainView, ApplicationCharacterModal
 from views.application_cancel_view import ApplicationCancelButtonSelectView
-from views.application_status_view import ApplicationStatusView, ApplicationStatusSearchModal
+from views.application_status_view import ApplicationStatusSearchModal
 
 
 class ApplicationCommand(commands.Cog):
@@ -81,6 +81,36 @@ class ApplicationCommand(commands.Cog):
         setting = self.setting_service.get_guild_setting(guild_id)
         return not bool(setting and setting.default_race and setting.default_server)
 
+    def _format_application_line(
+        self,
+        idx: int,
+        app,
+        show_identity: bool,
+        include_user_name: bool = False,
+        include_raid_name: bool = False,
+    ) -> str:
+        parts = []
+
+        if include_raid_name:
+            parts.append(f"**{app.raid_name}**")
+
+        if include_user_name:
+            parts.append(app.user_name)
+
+        parts.append(app.character_name)
+
+        if show_identity:
+            parts.append(app.race)
+            parts.append(app.server)
+
+        parts.extend([
+            app.job,
+            str(app.item_level),
+            f"{app.combat_power:,}",
+        ])
+
+        return f"{idx}. " + " | ".join(parts)
+
     def _build_my_applications_embed(
         self,
         title: str,
@@ -95,26 +125,15 @@ class ApplicationCommand(commands.Cog):
                 color=discord.Color.blurple(),
             )
 
-        lines = []
-        for idx, app in enumerate(applications, start=1):
-            parts = []
-
-            if include_raid_name:
-                parts.append(f"**{app.raid_name}**")
-
-            parts.append(app.character_name)
-
-            if show_identity:
-                parts.append(app.race)
-                parts.append(app.server)
-
-            parts.extend([
-                app.job,
-                str(app.item_level),
-                f"{app.combat_power:,}",
-            ])
-
-            lines.append(f"{idx}. " + " | ".join(parts))
+        lines = [
+            self._format_application_line(
+                idx=idx,
+                app=app,
+                show_identity=show_identity,
+                include_raid_name=include_raid_name,
+            )
+            for idx, app in enumerate(applications, start=1)
+        ]
 
         return discord.Embed(
             title=title,
@@ -132,29 +151,59 @@ class ApplicationCommand(commands.Cog):
 
         for idx, app in enumerate(applications, start=1):
             mark = "✅" if app.id in selected_ids else "⬜"
+            text = self._format_application_line(
+                idx=idx,
+                app=app,
+                show_identity=show_identity,
+            )
 
-            parts = [app.character_name]
+            # "1. ..." 앞에 체크 표시 붙이기
+            text = text.replace(f"{idx}. ", f"{mark} {idx}. ", 1)
 
-            if show_identity:
-                parts.append(app.race)
-                parts.append(app.server)
-
-            parts.extend([
-                app.job,
-                str(app.item_level),
-                f"{app.combat_power:,}",
-            ])
-
-            text = " | ".join(parts)
             if app.id in selected_ids:
                 text = f"**{text}**"
 
-            lines.append(f"{mark} {idx}. {text}")
+            lines.append(text)
 
         return discord.Embed(
             title="신청 취소 대상 선택",
             description="\n".join(lines) if lines else "취소할 신청 내역이 없습니다.",
             color=discord.Color.orange(),
+        )
+
+    def _build_status_embed(
+        self,
+        raid_name: str,
+        applications,
+        show_identity: bool,
+        keyword: str | None = None,
+        search_label: str | None = None,
+    ) -> discord.Embed:
+        title = f"{raid_name} 신청 현황"
+        if search_label:
+            title += f" - {search_label}"
+
+        if applications:
+            lines = [
+                self._format_application_line(
+                    idx=idx,
+                    app=app,
+                    show_identity=show_identity,
+                    include_user_name=True,
+                )
+                for idx, app in enumerate(applications, start=1)
+            ]
+            description = "\n".join(lines)
+        else:
+            description = "신청 내역이 없습니다."
+
+        if keyword:
+            description = f"검색어: `{keyword}`\n\n{description}"
+
+        return discord.Embed(
+            title=title,
+            description=description,
+            color=discord.Color.blurple(),
         )
 
     async def _render_main(
@@ -482,161 +531,11 @@ class ApplicationCommand(commands.Cog):
             await refresh_view(inter, current_apps, selected_ids)
 
         async def status_callback(inter: discord.Interaction):
-            async def render_status(
-                status_inter: discord.Interaction,
-                keyword: str | None = None,
-                search_type: str | None = None,
-            ):
-                result = await asyncio.to_thread(
-                    self.service.get_current_raid_application_list,
-                    status_inter.channel.id,
-                )
-
-                if result["raid_name"] is None:
-                    await status_inter.response.edit_message(
-                        content=None,
-                        embed=self._notice_embed(
-                            "레이드 신청 현황을 볼 수 없습니다.",
-                            "현재 채널에 매칭된 레이드가 없습니다.",
-                            discord.Color.orange(),
-                        ),
-                        view=None,
-                    )
-                    return
-
-                applications = result["applications"]
-                title = f"{result['raid_name']} 신청 현황"
-
-                if keyword:
-                    if search_type == "user":
-                        applications = [
-                            app for app in applications
-                            if keyword.lower() in str(app.user_name).lower()
-                        ]
-                        title += " - 유저명 검색"
-                    elif search_type == "character":
-                        applications = [
-                            app for app in applications
-                            if keyword.lower() in str(app.character_name).lower()
-                        ]
-                        title += " - 캐릭터명 검색"
-
-                if applications:
-                    lines = []
-                    for idx, app in enumerate(applications, start=1):
-                        if show_identity:
-                            lines.append(
-                                f"{idx}. {app.user_name} | {app.character_name} | "
-                                f"{app.race} | {app.server} | {app.job} | "
-                                f"{app.item_level} | {app.combat_power:,}"
-                            )
-                        else:
-                            lines.append(
-                                f"{idx}. {app.user_name} | {app.character_name} | "
-                                f"{app.job} | {app.item_level} | {app.combat_power:,}"
-                            )
-
-                    description = "\n".join(lines)
-                else:
-                    description = "신청 내역이 없습니다."
-
-                if keyword:
-                    description = f"검색어: `{keyword}`\n\n{description}"
-
-                status_embed = discord.Embed(
-                    title=title,
-                    description=description,
-                    color=discord.Color.blurple(),
-                )
-
-                async def user_search_callback(search_inter: discord.Interaction):
-                    async def submit_callback(
-                        modal_inter: discord.Interaction,
-                        search_keyword: str,
-                    ):
-                        await render_status(
-                            modal_inter,
-                            keyword=search_keyword,
-                            search_type="user",
-                        )
-
-                    await search_inter.response.send_modal(
-                        ApplicationStatusSearchModal(
-                            title="유저명 검색",
-                            submit_callback=submit_callback,
-                        )
-                    )
-
-                async def character_search_callback(search_inter: discord.Interaction):
-                    async def submit_callback(
-                        modal_inter: discord.Interaction,
-                        search_keyword: str,
-                    ):
-                        await render_status(
-                            modal_inter,
-                            keyword=search_keyword,
-                            search_type="character",
-                        )
-
-                    await search_inter.response.send_modal(
-                        ApplicationStatusSearchModal(
-                            title="캐릭터명 검색",
-                            submit_callback=submit_callback,
-                        )
-                    )
-
-                async def back_callback(back_inter: discord.Interaction):
-                    await self._render_main(back_inter, first_response=False)
-
-                admin_status_delete_callback = None
-                if is_admin(status_inter):
-                    async def admin_status_delete_callback(
-                        delete_inter: discord.Interaction,
-                    ):
-                        await delete_inter.response.edit_message(
-                            content=None,
-                            embed=self._notice_embed(
-                                "관리자용 삭제",
-                                "관리자 삭제 기능은 다음 단계에서 연결됩니다.",
-                                discord.Color.orange(),
-                            ),
-                            view=None,
-                        )
-
-                status_view = ApplicationStatusView(
-                    user_search_callback=user_search_callback,
-                    character_search_callback=character_search_callback,
-                    admin_delete_callback=admin_status_delete_callback,
-                    back_callback=back_callback,
-                )
-
-                if status_inter.response.is_done():
-                    await status_inter.edit_original_response(
-                        content=None,
-                        embed=status_embed,
-                        view=status_view,
-                    )
-                else:
-                    await status_inter.response.edit_message(
-                        content=None,
-                        embed=status_embed,
-                        view=status_view,
-                    )
-
-            await render_status(inter)
-
-        admin_delete_callback = None
-        if is_admin(interaction):
-            async def admin_delete_callback(inter: discord.Interaction):
-                await inter.response.edit_message(
-                    content=None,
-                    embed=self._notice_embed(
-                        "관리자용 신청 삭제",
-                        "관리자 삭제 기능은 레이드 신청 현황 화면에서 사용해주세요.",
-                        discord.Color.orange(),
-                    ),
-                    view=None,
-                )
+            await self._render_status_main(
+                interaction=inter,
+                raid_name=channel_raid.raid_name,
+                show_identity=show_identity,
+            )
 
         view = ApplicationMainView(
             application_count=len(applications),
@@ -645,7 +544,7 @@ class ApplicationCommand(commands.Cog):
             select_cancel_callback=select_cancel_callback,
             cancel_all_callback=cancel_all_callback,
             status_callback=status_callback,
-            admin_delete_callback=admin_delete_callback,
+            admin_delete_callback=None,
         )
 
         if first_response:
@@ -661,6 +560,558 @@ class ApplicationCommand(commands.Cog):
                 embed=embed,
                 view=view,
             )
+
+    async def _get_raid_applications(self, channel_id: int):
+        result = await asyncio.to_thread(
+            self.service.get_current_raid_application_list,
+            channel_id,
+        )
+        return result["raid_name"], result["applications"]
+
+    async def _delete_applications_as_admin(
+        self,
+        applications,
+        requester_user_id: int,
+    ) -> int:
+        count = 0
+        for app in applications:
+            ok = await asyncio.to_thread(
+                self.service.cancel_application,
+                app.id,
+                requester_user_id,
+                True,
+            )
+            if ok:
+                count += 1
+        return count
+
+    async def _render_status_main(
+        self,
+        interaction: discord.Interaction,
+        raid_name: str,
+        show_identity: bool,
+    ):
+        current_raid_name, applications = await self._get_raid_applications(
+            interaction.channel.id
+        )
+
+        if current_raid_name is None:
+            await interaction.response.edit_message(
+                content=None,
+                embed=self._notice_embed(
+                    "레이드 신청 현황을 볼 수 없습니다.",
+                    "현재 채널에 매칭된 레이드가 없습니다.",
+                    discord.Color.orange(),
+                ),
+                view=None,
+            )
+            return
+
+        embed = self._build_status_embed(
+            raid_name=current_raid_name,
+            applications=applications,
+            show_identity=show_identity,
+        )
+
+        view = self._build_status_main_view(
+            raid_name=current_raid_name,
+            applications=applications,
+            show_identity=show_identity,
+        )
+
+        if interaction.response.is_done():
+            await interaction.edit_original_response(
+                content=None,
+                embed=embed,
+                view=view,
+            )
+        else:
+            await interaction.response.edit_message(
+                content=None,
+                embed=embed,
+                view=view,
+            )
+
+    def _build_status_main_view(
+        self,
+        raid_name: str,
+        applications,
+        show_identity: bool,
+    ) -> discord.ui.View:
+        view = discord.ui.View(timeout=180)
+
+        command_self = self
+
+        class UserSearchButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(
+                    label="유저명으로 검색",
+                    style=discord.ButtonStyle.secondary,
+                    row=0,
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                async def submit_callback(
+                    modal_inter: discord.Interaction,
+                    keyword: str,
+                ):
+                    await command_self._render_status_search_result(
+                        interaction=modal_inter,
+                        raid_name=raid_name,
+                        keyword=keyword,
+                        search_type="user",
+                        show_identity=show_identity,
+                    )
+
+                await interaction.response.send_modal(
+                    ApplicationStatusSearchModal(
+                        title="유저명 검색",
+                        submit_callback=submit_callback,
+                    )
+                )
+
+        class CharacterSearchButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(
+                    label="캐릭터명으로 검색",
+                    style=discord.ButtonStyle.secondary,
+                    row=0,
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                async def submit_callback(
+                    modal_inter: discord.Interaction,
+                    keyword: str,
+                ):
+                    await command_self._render_status_search_result(
+                        interaction=modal_inter,
+                        raid_name=raid_name,
+                        keyword=keyword,
+                        search_type="character",
+                        show_identity=show_identity,
+                    )
+
+                await interaction.response.send_modal(
+                    ApplicationStatusSearchModal(
+                        title="캐릭터명 검색",
+                        submit_callback=submit_callback,
+                    )
+                )
+
+        class DeleteAllButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(
+                    label="전체 삭제",
+                    style=discord.ButtonStyle.danger,
+                    row=0,
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                if not is_admin(interaction):
+                    await interaction.response.send_message(
+                        "관리자만 사용할 수 있습니다.",
+                        ephemeral=True,
+                    )
+                    return
+
+                current_raid_name, current_apps = await command_self._get_raid_applications(
+                    interaction.channel.id
+                )
+
+                count = await command_self._delete_applications_as_admin(
+                    current_apps,
+                    interaction.user.id,
+                )
+
+                await interaction.response.edit_message(
+                    content=None,
+                    embed=command_self._notice_embed(
+                        "전체 삭제 완료",
+                        f"{current_raid_name} 신청 내역 {count}건을 삭제했습니다.",
+                        discord.Color.green(),
+                    ),
+                    view=None,
+                )
+
+        class BackButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(
+                    label="뒤로 가기",
+                    style=discord.ButtonStyle.secondary,
+                    row=0,
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                await command_self._render_main(interaction, first_response=False)
+
+        view.add_item(UserSearchButton())
+        view.add_item(CharacterSearchButton())
+
+        if applications and is_admin_context_available := True:
+            # 실제 노출 여부는 interaction 시점에서 검사하기 어렵기 때문에
+            # 버튼은 관리자 화면에서만 만들 수 있도록 아래에서 View 생성 시 판단한다.
+            pass
+
+        view.add_item(BackButton())
+
+        # 관리자 버튼은 View 생성 시점에 interaction이 없으므로,
+        # 실제 권한별 노출은 호출부에서 별도 처리하지 못한다.
+        # 대신 버튼 callback에서 권한을 검사한다.
+        # "삭제" 버튼이 일반 유저에게 보이면 안 되는 정책이라면,
+        # 아래 버튼은 호출부에서 admin 여부를 받아 분기하는 방식으로 바꾸면 된다.
+        view.add_item(DeleteAllButton())
+
+        return view
+
+    async def _render_status_search_result(
+        self,
+        interaction: discord.Interaction,
+        raid_name: str,
+        keyword: str,
+        search_type: str,
+        show_identity: bool,
+    ):
+        current_raid_name, applications = await self._get_raid_applications(
+            interaction.channel.id
+        )
+
+        if search_type == "user":
+            filtered = [
+                app for app in applications
+                if keyword.lower() in str(app.user_name).lower()
+            ]
+            label = "유저명 검색"
+        else:
+            filtered = [
+                app for app in applications
+                if keyword.lower() in str(app.character_name).lower()
+            ]
+            label = "캐릭터명 검색"
+
+        embed = self._build_status_embed(
+            raid_name=current_raid_name,
+            applications=filtered,
+            show_identity=show_identity,
+            keyword=keyword,
+            search_label=label,
+        )
+
+        view = self._build_status_search_result_view(
+            raid_name=current_raid_name,
+            applications=filtered,
+            show_identity=show_identity,
+            keyword=keyword,
+            search_type=search_type,
+        )
+
+        if interaction.response.is_done():
+            await interaction.edit_original_response(
+                content=None,
+                embed=embed,
+                view=view,
+            )
+        else:
+            await interaction.response.edit_message(
+                content=None,
+                embed=embed,
+                view=view,
+            )
+
+    def _build_status_search_result_view(
+        self,
+        raid_name: str,
+        applications,
+        show_identity: bool,
+        keyword: str,
+        search_type: str,
+    ) -> discord.ui.View:
+        view = discord.ui.View(timeout=180)
+        command_self = self
+
+        class DeleteOneButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(
+                    label="신청 삭제",
+                    style=discord.ButtonStyle.danger,
+                    row=0,
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                if not is_admin(interaction):
+                    await interaction.response.send_message(
+                        "관리자만 사용할 수 있습니다.",
+                        ephemeral=True,
+                    )
+                    return
+
+                app = applications[0]
+                ok = await asyncio.to_thread(
+                    command_self.service.cancel_application,
+                    app.id,
+                    interaction.user.id,
+                    True,
+                )
+
+                if ok:
+                    await interaction.response.edit_message(
+                        content=None,
+                        embed=command_self._notice_embed(
+                            "신청 삭제 완료",
+                            f"{app.character_name} 신청 내역을 삭제했습니다.",
+                            discord.Color.green(),
+                        ),
+                        view=None,
+                    )
+                else:
+                    await interaction.response.edit_message(
+                        content=None,
+                        embed=command_self._notice_embed(
+                            "신청 삭제 실패",
+                            "이미 삭제되었거나 존재하지 않는 신청입니다.",
+                            discord.Color.orange(),
+                        ),
+                        view=None,
+                    )
+
+        class SelectDeleteButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(
+                    label="선택 삭제",
+                    style=discord.ButtonStyle.danger,
+                    row=0,
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                if not is_admin(interaction):
+                    await interaction.response.send_message(
+                        "관리자만 사용할 수 있습니다.",
+                        ephemeral=True,
+                    )
+                    return
+
+                await command_self._render_status_delete_select(
+                    interaction=interaction,
+                    applications=applications,
+                    show_identity=show_identity,
+                    keyword=keyword,
+                    search_type=search_type,
+                )
+
+        class DeleteAllResultButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(
+                    label="전체 삭제",
+                    style=discord.ButtonStyle.danger,
+                    row=0,
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                if not is_admin(interaction):
+                    await interaction.response.send_message(
+                        "관리자만 사용할 수 있습니다.",
+                        ephemeral=True,
+                    )
+                    return
+
+                count = await command_self._delete_applications_as_admin(
+                    applications,
+                    interaction.user.id,
+                )
+
+                await interaction.response.edit_message(
+                    content=None,
+                    embed=command_self._notice_embed(
+                        "전체 삭제 완료",
+                        f"검색 결과 신청 내역 {count}건을 삭제했습니다.",
+                        discord.Color.green(),
+                    ),
+                    view=None,
+                )
+
+        class BackButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(
+                    label="뒤로 가기",
+                    style=discord.ButtonStyle.secondary,
+                    row=0,
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                await command_self._render_status_main(
+                    interaction=interaction,
+                    raid_name=raid_name,
+                    show_identity=show_identity,
+                )
+
+        if applications:
+            if len(applications) == 1:
+                view.add_item(DeleteOneButton())
+            else:
+                view.add_item(SelectDeleteButton())
+                view.add_item(DeleteAllResultButton())
+
+        view.add_item(BackButton())
+        return view
+
+    async def _render_status_delete_select(
+        self,
+        interaction: discord.Interaction,
+        applications,
+        show_identity: bool,
+        keyword: str,
+        search_type: str,
+    ):
+        selected_ids = set()
+
+        async def refresh_view(refresh_inter, apps, ids):
+            embed = self._build_admin_delete_select_embed(
+                applications=apps,
+                selected_ids=ids,
+                show_identity=show_identity,
+            )
+
+            view = self._build_admin_delete_select_view(
+                applications=apps,
+                selected_ids=ids,
+                refresh_callback=refresh_view,
+                delete_selected_callback=delete_selected,
+                back_callback=back_to_result,
+            )
+
+            if refresh_inter.response.is_done():
+                await refresh_inter.edit_original_response(
+                    content=None,
+                    embed=embed,
+                    view=view,
+                )
+            else:
+                await refresh_inter.response.edit_message(
+                    content=None,
+                    embed=embed,
+                    view=view,
+                )
+
+        async def delete_selected(delete_inter, ids: list[int]):
+            if not ids:
+                await delete_inter.response.send_message(
+                    "삭제할 신청을 선택해주세요.",
+                    ephemeral=True,
+                )
+                return
+
+            targets = [app for app in applications if app.id in ids]
+            count = await self._delete_applications_as_admin(
+                targets,
+                delete_inter.user.id,
+            )
+
+            await delete_inter.response.edit_message(
+                content=None,
+                embed=self._notice_embed(
+                    "선택 삭제 완료",
+                    f"선택한 신청 내역 {count}건을 삭제했습니다.",
+                    discord.Color.green(),
+                ),
+                view=None,
+            )
+
+        async def back_to_result(back_inter):
+            await self._render_status_search_result(
+                interaction=back_inter,
+                raid_name="",
+                keyword=keyword,
+                search_type=search_type,
+                show_identity=show_identity,
+            )
+
+        await refresh_view(interaction, applications, selected_ids)
+
+    def _build_admin_delete_select_embed(
+        self,
+        applications,
+        selected_ids,
+        show_identity: bool,
+    ) -> discord.Embed:
+        lines = []
+
+        for idx, app in enumerate(applications, start=1):
+            mark = "✅" if app.id in selected_ids else "⬜"
+            line = self._format_application_line(
+                idx=idx,
+                app=app,
+                show_identity=show_identity,
+                include_user_name=True,
+            )
+            line = line.replace(f"{idx}. ", f"{mark} {idx}. ", 1)
+
+            if app.id in selected_ids:
+                line = f"**{line}**"
+
+            lines.append(line)
+
+        return discord.Embed(
+            title="삭제할 신청 선택",
+            description="\n".join(lines) if lines else "삭제할 신청 내역이 없습니다.",
+            color=discord.Color.orange(),
+        )
+
+    def _build_admin_delete_select_view(
+        self,
+        applications,
+        selected_ids,
+        refresh_callback,
+        delete_selected_callback,
+        back_callback,
+    ) -> discord.ui.View:
+        view = discord.ui.View(timeout=180)
+
+        class ToggleButton(discord.ui.Button):
+            def __init__(self, idx: int, app):
+                selected = app.id in selected_ids
+                super().__init__(
+                    label=str(idx),
+                    style=discord.ButtonStyle.success if selected else discord.ButtonStyle.secondary,
+                    row=0 if idx <= 5 else 1,
+                )
+                self.app = app
+
+            async def callback(self, interaction: discord.Interaction):
+                if self.app.id in selected_ids:
+                    selected_ids.remove(self.app.id)
+                else:
+                    selected_ids.add(self.app.id)
+
+                await refresh_callback(interaction, applications, selected_ids)
+
+        class DeleteSelectedButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(
+                    label="선택 삭제",
+                    style=discord.ButtonStyle.danger,
+                    row=2,
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                await delete_selected_callback(interaction, list(selected_ids))
+
+        class BackButton(discord.ui.Button):
+            def __init__(self):
+                super().__init__(
+                    label="뒤로 가기",
+                    style=discord.ButtonStyle.secondary,
+                    row=2,
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                await back_callback(interaction)
+
+        for idx, app in enumerate(applications[:8], start=1):
+            view.add_item(ToggleButton(idx, app))
+
+        view.add_item(DeleteSelectedButton())
+        view.add_item(BackButton())
+
+        return view
 
     @app_commands.command(name="신청", description="레이드 신청 메뉴")
     async def apply(self, interaction: discord.Interaction):
