@@ -120,15 +120,15 @@ def create_bot() -> commands.Bot:
                 party_waiting_repository,
             )
         )
-        await bot.add_cog(
-            ApplicationAdminCommand(
-                bot,
-                application_service,
-                setting_service,
-                raid_service,
-                message_service,
-            )
-        )
+        #await bot.add_cog(
+        #    ApplicationAdminCommand(
+        #        bot,
+        #        application_service,
+        #        setting_service,
+        #        raid_service,
+        #        message_service,
+        #    )
+        #)
         await bot.add_cog(InfoCommand(bot, character_info_service, message_service))
         await bot.add_cog(
             PartyCommand(
