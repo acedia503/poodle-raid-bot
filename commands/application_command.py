@@ -156,8 +156,6 @@ class ApplicationCommand(commands.Cog):
                 app=app,
                 show_identity=show_identity,
             )
-
-            # "1. ..." 앞에 체크 표시 붙이기
             text = text.replace(f"{idx}. ", f"{mark} {idx}. ", 1)
 
             if app.id in selected_ids:
@@ -533,7 +531,6 @@ class ApplicationCommand(commands.Cog):
         async def status_callback(inter: discord.Interaction):
             await self._render_status_main(
                 interaction=inter,
-                raid_name=channel_raid.raid_name,
                 show_identity=show_identity,
             )
 
@@ -588,7 +585,6 @@ class ApplicationCommand(commands.Cog):
     async def _render_status_main(
         self,
         interaction: discord.Interaction,
-        raid_name: str,
         show_identity: bool,
     ):
         current_raid_name, applications = await self._get_raid_applications(
@@ -615,7 +611,6 @@ class ApplicationCommand(commands.Cog):
 
         view = self._build_status_main_view(
             raid_name=current_raid_name,
-            applications=applications,
             show_identity=show_identity,
             is_admin_user=is_admin(interaction),
         )
@@ -636,12 +631,10 @@ class ApplicationCommand(commands.Cog):
     def _build_status_main_view(
         self,
         raid_name: str,
-        applications,
         show_identity: bool,
         is_admin_user: bool,
     ) -> discord.ui.View:
         view = discord.ui.View(timeout=180)
-
         command_self = self
 
         class UserSearchButton(discord.ui.Button):
@@ -659,7 +652,6 @@ class ApplicationCommand(commands.Cog):
                 ):
                     await command_self._render_status_search_result(
                         interaction=modal_inter,
-                        raid_name=raid_name,
                         keyword=keyword,
                         search_type="user",
                         show_identity=show_identity,
@@ -687,7 +679,6 @@ class ApplicationCommand(commands.Cog):
                 ):
                     await command_self._render_status_search_result(
                         interaction=modal_inter,
-                        raid_name=raid_name,
                         keyword=keyword,
                         search_type="character",
                         show_identity=show_identity,
@@ -748,17 +739,16 @@ class ApplicationCommand(commands.Cog):
 
         view.add_item(UserSearchButton())
         view.add_item(CharacterSearchButton())
-        
+
         if is_admin_user:
             view.add_item(DeleteAllButton())
-        
+
         view.add_item(BackButton())
         return view
 
     async def _render_status_search_result(
         self,
         interaction: discord.Interaction,
-        raid_name: str,
         keyword: str,
         search_type: str,
         show_identity: bool,
@@ -933,7 +923,6 @@ class ApplicationCommand(commands.Cog):
             async def callback(self, interaction: discord.Interaction):
                 await command_self._render_status_main(
                     interaction=interaction,
-                    raid_name=raid_name,
                     show_identity=show_identity,
                 )
 
@@ -1012,7 +1001,6 @@ class ApplicationCommand(commands.Cog):
         async def back_to_result(back_inter):
             await self._render_status_search_result(
                 interaction=back_inter,
-                raid_name="",
                 keyword=keyword,
                 search_type=search_type,
                 show_identity=show_identity,
