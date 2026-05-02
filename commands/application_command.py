@@ -617,6 +617,7 @@ class ApplicationCommand(commands.Cog):
             raid_name=current_raid_name,
             applications=applications,
             show_identity=show_identity,
+            is_admin_user=is_admin(interaction),
         )
 
         if interaction.response.is_done():
@@ -637,6 +638,7 @@ class ApplicationCommand(commands.Cog):
         raid_name: str,
         applications,
         show_identity: bool,
+        is_admin_user: bool,
     ) -> discord.ui.View:
         view = discord.ui.View(timeout=180)
 
@@ -746,21 +748,11 @@ class ApplicationCommand(commands.Cog):
 
         view.add_item(UserSearchButton())
         view.add_item(CharacterSearchButton())
-
-        if applications and is_admin_user:
-            # 실제 노출 여부는 interaction 시점에서 검사하기 어렵기 때문에
-            # 버튼은 관리자 화면에서만 만들 수 있도록 아래에서 View 생성 시 판단한다.
-            pass
-
+        
+        if is_admin_user:
+            view.add_item(DeleteAllButton())
+        
         view.add_item(BackButton())
-
-        # 관리자 버튼은 View 생성 시점에 interaction이 없으므로,
-        # 실제 권한별 노출은 호출부에서 별도 처리하지 못한다.
-        # 대신 버튼 callback에서 권한을 검사한다.
-        # "삭제" 버튼이 일반 유저에게 보이면 안 되는 정책이라면,
-        # 아래 버튼은 호출부에서 admin 여부를 받아 분기하는 방식으로 바꾸면 된다.
-        view.add_item(DeleteAllButton())
-
         return view
 
     async def _render_status_search_result(
@@ -802,6 +794,7 @@ class ApplicationCommand(commands.Cog):
             show_identity=show_identity,
             keyword=keyword,
             search_type=search_type,
+            is_admin_user=is_admin(interaction),
         )
 
         if interaction.response.is_done():
@@ -824,6 +817,7 @@ class ApplicationCommand(commands.Cog):
         show_identity: bool,
         keyword: str,
         search_type: str,
+        is_admin_user: bool,
     ) -> discord.ui.View:
         view = discord.ui.View(timeout=180)
         command_self = self
@@ -943,7 +937,7 @@ class ApplicationCommand(commands.Cog):
                     show_identity=show_identity,
                 )
 
-        if applications:
+        if is_admin_user and applications:
             if len(applications) == 1:
                 view.add_item(DeleteOneButton())
             else:
