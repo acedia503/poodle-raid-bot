@@ -747,7 +747,7 @@ class ApplicationCommand(commands.Cog):
         view.add_item(UserSearchButton())
         view.add_item(CharacterSearchButton())
 
-        if applications and is_admin_context_available:
+        if applications and is_admin_user:
             # 실제 노출 여부는 interaction 시점에서 검사하기 어렵기 때문에
             # 버튼은 관리자 화면에서만 만들 수 있도록 아래에서 View 생성 시 판단한다.
             pass
