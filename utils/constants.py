@@ -82,8 +82,8 @@ RAID_PRESETS = [
         "min_item_level": 3500,
     },
     {
-        "name": "테스트레이드",
-        "min_item_level": 0,
+        "name": "무스펠",
+        "min_item_level": 4500,
     },
 ]
 
