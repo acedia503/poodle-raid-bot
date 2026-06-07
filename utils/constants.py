@@ -86,7 +86,7 @@ RAID_PRESETS = [
         "min_item_level": 4500,
     },
     {
-        "name": "무스펠-보통",
+        "name": "무스펠_보통",
         "min_item_level": 4300,
     },
 ]
