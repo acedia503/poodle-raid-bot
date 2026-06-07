@@ -85,6 +85,10 @@ RAID_PRESETS = [
         "name": "무스펠",
         "min_item_level": 4500,
     },
+    {
+        "name": "무스펠-보통",
+        "min_item_level": 4300,
+    },
 ]
 
 SAFE_MESSAGE_LIMIT = 1900
