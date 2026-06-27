@@ -2,6 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass, field
+from contents import DEFAULT_SLOTS_PER_PARTY
 
 from domain.party_build_session import PartyBuildSession
 from domain.party_waiting_member import PartyWaitingMember
@@ -18,7 +19,7 @@ class PartyBucket:
     total_combat_power: int = 0
 
     def can_add(self) -> bool:
-        return len(self.members) < 4
+        return len(self.members) < DEFAULT_SLOTS_PER_PARTY
 
     def add_member(self, app) -> None:
         self.members.append(app)
