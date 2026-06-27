@@ -1,6 +1,7 @@
 # services/party_modify_service.py
 
 from domain.party_slot import PartySlot
+from contents import DEFAULT_GROUP_SIZE, DEFAULT_SLOTS_PER_PARTY
 
 
 class PartyModifyService:
@@ -84,7 +85,7 @@ class PartyModifyService:
             party_no,
         )
 
-        if len(target_members) >= 4:
+        if len(target_members) >= DEFAULT_SLOTS_PER_PARTY:
             raise Exception("해당 파티는 이미 가득 찼습니다.")
 
         group_members = self.slot_repository.get_by_group(
