@@ -1,7 +1,7 @@
 # services/party_modify_service.py
 
 from domain.party_slot import PartySlot
-from constents import DEFAULT_GROUP_SIZE, DEFAULT_SLOTS_PER_PARTY
+from utils.constants import DEFAULT_GROUP_SIZE, DEFAULT_SLOTS_PER_PARTY
 
 
 class PartyModifyService:
