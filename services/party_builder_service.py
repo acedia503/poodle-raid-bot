@@ -2,7 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from contents import DEFAULT_GROUP_SIZE, DEFAULT_SLOTS_PER_PARTY
+from constents import DEFAULT_GROUP_SIZE, DEFAULT_SLOTS_PER_PARTY
 
 from domain.party_build_session import PartyBuildSession
 from domain.party_waiting_member import PartyWaitingMember
