@@ -2,7 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from contents import DEFAULT_SLOTS_PER_PARTY
+from contents import DEFAULT_GROUP_SIZE, DEFAULT_SLOTS_PER_PARTY
 
 from domain.party_build_session import PartyBuildSession
 from domain.party_waiting_member import PartyWaitingMember
@@ -238,7 +238,7 @@ class PartyBuilderService:
         )
 
         total = len(applications)
-        full_group_count = total // 8
+        full_group_count = total // DEFAULT_GROUP_SIZE
 
         session = PartyBuildSession(
             id=None,
@@ -281,7 +281,7 @@ class PartyBuilderService:
 
         applications.sort(key=lambda x: x.combat_power, reverse=True)
 
-        assign_count = full_group_count * 8
+        assign_count = full_group_count * DEFAULT_GROUP_SIZE
         assign_targets = applications[:assign_count]
         waiting_targets = applications[assign_count:]
 
@@ -403,7 +403,7 @@ class PartyBuilderService:
         )
 
         total = len(applications)
-        full_group_count = total // 8
+        full_group_count = total // DEFAULT_GROUP_SIZE
 
         session = PartyBuildSession(
             id=None,
