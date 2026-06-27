@@ -284,43 +284,53 @@ class PartyBuilderService:
         assign_count = full_group_count * DEFAULT_GROUP_SIZE
         assign_targets = applications[:assign_count]
         waiting_targets = applications[assign_count:]
-
+        
         for app in assign_targets:
             candidates = [p for p in party_buckets if p.can_add()]
             if not candidates:
-                break
-
-            # 1) 같은 공대 안 동일 유저 금지
+                waiting_targets.append(app)
+                continue
+        
+            # 1) 같은 공대 동일 유저 금지
             candidates = self._filter_candidates_by_user_duplication(
                 app,
                 candidates,
                 party_buckets,
             )
-
+        
             if not candidates:
-                raise Exception(
-                    f"{app.character_name} 배치 불가: 같은 공대에 동일 유저가 이미 존재합니다."
+                print(
+                    f"[상비군] {app.character_name} : "
+                    "모든 공대에 동일 Discord 유저가 존재하여 배치 불가"
                 )
-
-            # 2) 같은 직업 3중복 금지 + 2중복 최소화
+                waiting_targets.append(app)
+                continue
+        
+            # 2) 같은 직업 3중복 금지
             filtered_candidates = self._filter_candidates_by_job_duplication(
                 app,
                 candidates,
             )
-
+        
             if not filtered_candidates:
-                raise Exception(
-                    f"{app.character_name}({app.job}) 배치 불가: "
-                    "같은 직업 3중복 없이 배치할 수 있는 파티가 없습니다."
+                print(
+                    f"[상비군] {app.character_name}({app.job}) : "
+                    "직업 중복 규칙으로 배치 불가"
                 )
-
+                waiting_targets.append(app)
+                continue
+        
             best_party = max(
                 filtered_candidates,
-                key=lambda p: self._calculate_party_score(app, p, party_buckets),
+                key=lambda p: self._calculate_party_score(
+                    app,
+                    p,
+                    party_buckets,
+                ),
             )
-
+        
             best_party.add_member(app)
-
+    
         slots = []
         for party in party_buckets:
             for slot_no, app in enumerate(party.members, start=1):
