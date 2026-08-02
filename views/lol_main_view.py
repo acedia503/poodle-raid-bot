@@ -84,7 +84,6 @@ class LolResetButton(discord.ui.Button):
         super().__init__(
             label="초기화",
             style=discord.ButtonStyle.danger,
-            row=1,
         )
         self.view_ref = view_ref
 
