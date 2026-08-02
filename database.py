@@ -175,6 +175,23 @@ class Database:
             )
             """)
 
+            # 롤 신청
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS lol_applications (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                user_id BIGINT NOT NULL,
+                user_name TEXT NOT NULL,
+                riot_id TEXT NOT NULL,
+                normalized_riot_id TEXT NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+                UNIQUE(guild_id, user_id),
+                UNIQUE(guild_id, normalized_riot_id)
+            )
+            """)
+
             # 인덱스
             cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_guild_settings_guild_id
@@ -243,4 +260,14 @@ class Database:
             cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_party_waiting_members_session
             ON party_waiting_members(session_id)
+            """)
+
+            cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_lol_applications_guild
+            ON lol_applications(guild_id)
+            """)
+
+            cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_lol_applications_guild_created
+            ON lol_applications(guild_id, created_at, id)
             """)

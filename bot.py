@@ -7,6 +7,7 @@ from commands.raid_command import RaidCommand
 from commands.setting_command import SettingCommand
 from commands.application_admin_command import ApplicationAdminCommand
 from commands.party_command import PartyCommand
+from commands.lol_command import LolCommand
 
 from config import load_config
 from database import Database
@@ -19,6 +20,7 @@ from repositories.raid_rule_repository import RaidRuleRepository
 from repositories.party_build_session_repository import PartyBuildSessionRepository
 from repositories.party_slot_repository import PartySlotRepository
 from repositories.party_waiting_repository import PartyWaitingMemberRepository
+from repositories.lol_application_repository import LolApplicationRepository
 
 from services.api_service import HttpApiService, MockApiService
 from services.application_service import ApplicationService
@@ -30,6 +32,7 @@ from services.party_rule_service import PartyRuleService
 from services.party_builder_service import PartyBuilderService
 from services.party_manage_service import PartyManageService
 from services.party_modify_service import PartyModifyService
+from services.lol_application_service import LolApplicationService
 
 
 def create_bot() -> commands.Bot:
@@ -51,6 +54,7 @@ def create_bot() -> commands.Bot:
     party_build_session_repository = PartyBuildSessionRepository(database)
     party_slot_repository = PartySlotRepository(database)
     party_waiting_repository = PartyWaitingMemberRepository(database)
+    lol_application_repository = LolApplicationRepository(database)
 
     # External API
     if config.api_mode == "http":
@@ -102,6 +106,10 @@ def create_bot() -> commands.Bot:
         waiting_repository=party_waiting_repository,
     )
 
+    lol_application_service = LolApplicationService(
+        lol_application_repository
+    )
+
     intents = discord.Intents.default()
     intents.members = True
 
@@ -139,6 +147,12 @@ def create_bot() -> commands.Bot:
                 party_manage_service=party_manage_service,
                 party_modify_service=party_modify_service,
                 setting_service=setting_service,
+            )
+        )
+        await bot.add_cog(
+            LolCommand(
+                bot=bot,
+                service=lol_application_service,
             )
         )
 
