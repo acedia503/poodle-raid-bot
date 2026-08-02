@@ -224,6 +224,8 @@ class LolCommand(commands.Cog):
         application = result["application"]
 
         if action == "created":
+            await self._send_public_notice(interaction, application)
+
             embed = discord.Embed(
                 title="✅ 롤 신청 완료",
                 description=application.riot_id,
@@ -237,6 +239,39 @@ class LolCommand(commands.Cog):
             )
 
         await interaction.edit_original_response(embed=embed, view=None)
+
+    async def _send_public_notice(self, interaction: discord.Interaction, application):
+        """
+        신규 롤 신청 시 현재 채널에 공개 알림을 전송한다.
+        전송에 실패해도 이미 완료된 DB 신청이나 신청자 응답에는 영향을 주지 않는다.
+        """
+        if interaction.channel is None:
+            return
+
+        embed = discord.Embed(
+            description=(
+                f"🎮 롤 신청 추가\n\n{interaction.user.display_name} - {application.riot_id}"
+            ),
+            color=discord.Color.green(),
+        )
+
+        try:
+            await interaction.channel.send(embed=embed)
+        except discord.Forbidden:
+            print(
+                "[LOL][PUBLIC_NOTICE_ERROR]",
+                "봇에게 현재 채널 메시지 전송 권한이 없습니다.",
+            )
+        except discord.HTTPException as exc:
+            print(
+                "[LOL][PUBLIC_NOTICE_ERROR]",
+                f"디스코드 전송 오류가 발생했습니다. 상태 코드: {exc.status}",
+            )
+        except Exception as exc:
+            print(
+                "[LOL][PUBLIC_NOTICE_ERROR]",
+                f"알 수 없는 전송 오류가 발생했습니다. ({type(exc).__name__})",
+            )
 
     # ---------- cancel ----------
 
