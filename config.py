@@ -12,6 +12,8 @@ class Config:
     api_key: str | None
     api_character_path: str
     api_auth_header_name: str | None
+    db_pool_min_size: int
+    db_pool_max_size: int
 
 
 def load_config() -> Config:
@@ -24,4 +26,6 @@ def load_config() -> Config:
         api_key=os.getenv("API_KEY"),
         api_character_path=os.getenv("API_CHARACTER_PATH", "/characters"),
         api_auth_header_name=os.getenv("API_AUTH_HEADER_NAME", "Authorization"),
+        db_pool_min_size=int(os.getenv("DB_POOL_MIN_SIZE", "1")),
+        db_pool_max_size=int(os.getenv("DB_POOL_MAX_SIZE", "15")),
     )

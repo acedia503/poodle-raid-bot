@@ -48,7 +48,10 @@ class ApplicationAdminCommand(commands.Cog):
             )
             return
 
-        channel_raid = self.raid_service.get_channel_raid(interaction.channel.id)
+        channel_raid = await asyncio.to_thread(
+            self.raid_service.get_channel_raid,
+            interaction.channel.id,
+        )
         if channel_raid is None:
             await interaction.response.send_message(
                 "현재 채널에 레이드가 설정되어 있지 않습니다.",
@@ -83,7 +86,10 @@ class ApplicationAdminCommand(commands.Cog):
                 inter.channel.id,
             )
 
-            setting = self.setting_service.get_guild_setting(inter.guild.id)
+            setting = await asyncio.to_thread(
+                self.setting_service.get_guild_setting,
+                inter.guild.id,
+            )
             show_identity = not bool(
                 setting and setting.default_race and setting.default_server
             )
@@ -105,7 +111,10 @@ class ApplicationAdminCommand(commands.Cog):
             applications,
             back_callback,
         ):
-            setting = self.setting_service.get_guild_setting(inter.guild.id)
+            setting = await asyncio.to_thread(
+                self.setting_service.get_guild_setting,
+                inter.guild.id,
+            )
             show_identity = not bool(
                 setting and setting.default_race and setting.default_server
             )
@@ -256,7 +265,10 @@ class ApplicationAdminCommand(commands.Cog):
                     )
                     return
 
-                setting = self.setting_service.get_guild_setting(modal_inter.guild.id)
+                setting = await asyncio.to_thread(
+                    self.setting_service.get_guild_setting,
+                    modal_inter.guild.id,
+                )
                 show_identity = not bool(
                     setting and setting.default_race and setting.default_server
                 )

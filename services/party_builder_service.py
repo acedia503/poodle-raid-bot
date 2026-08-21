@@ -8,6 +8,10 @@ from domain.party_build_session import PartyBuildSession
 from domain.party_waiting_member import PartyWaitingMember
 from domain.party_slot import PartySlot
 
+# 신청자 정보 갱신 시 동시에 실행할 최대 작업 수.
+# 무제한으로 풀면 DB 커넥션 풀과 외부 캐릭터 조회 API에 순간적으로 과도한 부하가 걸릴 수 있다.
+REFRESH_CONCURRENCY_LIMIT = 8
+
 
 @dataclass
 class PartyBucket:
@@ -49,36 +53,40 @@ class PartyBuilderService:
     # 공통: 신청자 최신 정보 갱신
     # =========================
     async def _refresh_applicants(self, applications: list):
+        semaphore = asyncio.Semaphore(REFRESH_CONCURRENCY_LIMIT)
+
         async def fetch(app):
-            try:
-                info = await asyncio.to_thread(
-                    self.character_info_service.get_character_info,
-                    app.character_name,
-                    app.race,
-                    app.server,
-                )
+            async with semaphore:
+                try:
+                    info = await asyncio.to_thread(
+                        self.character_info_service.get_character_info,
+                        app.character_name,
+                        app.race,
+                        app.server,
+                    )
 
-                app.job = info["job"]
-                app.item_level = info["item_level"]
-                app.combat_power = info["combat_power"]
+                    app.job = info["job"]
+                    app.item_level = info["item_level"]
+                    app.combat_power = info["combat_power"]
 
-                self.application_service.repository.update_character_snapshot(
-                    application_id=app.id,
-                    job=app.job,
-                    item_level=app.item_level,
-                    combat_power=app.combat_power,
-                )
+                    await asyncio.to_thread(
+                        self.application_service.repository.update_character_snapshot,
+                        application_id=app.id,
+                        job=app.job,
+                        item_level=app.item_level,
+                        combat_power=app.combat_power,
+                    )
 
-                print(
-                    f"[API 조회 성공] {app.character_name} / "
-                    f"{app.job} / {app.item_level} / {app.combat_power}"
-                )
+                    print(
+                        f"[API 조회 성공] {app.character_name} / "
+                        f"{app.job} / {app.item_level} / {app.combat_power}"
+                    )
 
-            except Exception as e:
-                print(
-                    f"[API 조회 실패] {app.character_name} / "
-                    f"race={app.race} / server={app.server} / error={e}"
-                )
+                except Exception as e:
+                    print(
+                        f"[API 조회 실패] {app.character_name} / "
+                        f"race={app.race} / server={app.server} / error={e}"
+                    )
 
         await asyncio.gather(*(fetch(app) for app in applications))
         
@@ -217,11 +225,12 @@ class PartyBuilderService:
         channel_id: int,
         created_by: int,
     ):
-        raid = self.raid_service.get_channel_raid(channel_id)
+        raid = await asyncio.to_thread(self.raid_service.get_channel_raid, channel_id)
         if raid is None:
             raise Exception("레이드가 없습니다.")
 
-        applications = self.application_service.get_applications(
+        applications = await asyncio.to_thread(
+            self.application_service.get_applications,
             guild_id=guild_id,
             channel_id=channel_id,
         )
@@ -231,7 +240,8 @@ class PartyBuilderService:
 
         await self._refresh_applicants(applications)
 
-        self.session_repository.deactivate_existing_sessions(
+        await asyncio.to_thread(
+            self.session_repository.deactivate_existing_sessions,
             guild_id,
             channel_id,
             raid.raid_name,
@@ -252,9 +262,10 @@ class PartyBuilderService:
             created_by=created_by,
             is_active=True,
         )
-        session = self.session_repository.save(session)
+        session = await asyncio.to_thread(self.session_repository.save, session)
 
-        rule = self.party_rule_service.get_or_create_rule(
+        rule = await asyncio.to_thread(
+            self.party_rule_service.get_or_create_rule,
             guild_id=guild_id,
             channel_id=channel_id,
             raid_name=raid.raid_name,
@@ -378,8 +389,8 @@ class PartyBuilderService:
                 )
             )
             
-        self.slot_repository.save_all(slots)
-        self.waiting_repository.save_all(waiting)
+        await asyncio.to_thread(self.slot_repository.save_all, slots)
+        await asyncio.to_thread(self.waiting_repository.save_all, waiting)
 
         return session
 
@@ -392,11 +403,12 @@ class PartyBuilderService:
         channel_id: int,
         created_by: int,
     ):
-        raid = self.raid_service.get_channel_raid(channel_id)
+        raid = await asyncio.to_thread(self.raid_service.get_channel_raid, channel_id)
         if raid is None:
             raise Exception("레이드 없음")
 
-        applications = self.application_service.get_applications(
+        applications = await asyncio.to_thread(
+            self.application_service.get_applications,
             guild_id=guild_id,
             channel_id=channel_id,
         )
@@ -406,7 +418,8 @@ class PartyBuilderService:
 
         await self._refresh_applicants(applications)
 
-        self.session_repository.deactivate_existing_sessions(
+        await asyncio.to_thread(
+            self.session_repository.deactivate_existing_sessions,
             guild_id,
             channel_id,
             raid.raid_name,
@@ -427,7 +440,7 @@ class PartyBuilderService:
             created_by=created_by,
             is_active=True,
         )
-        session = self.session_repository.save(session)
+        session = await asyncio.to_thread(self.session_repository.save, session)
 
         waiting = []
         for app in applications:
@@ -450,6 +463,6 @@ class PartyBuilderService:
                 )
             )
 
-        self.waiting_repository.save_all(waiting)
+        await asyncio.to_thread(self.waiting_repository.save_all, waiting)
 
         return session

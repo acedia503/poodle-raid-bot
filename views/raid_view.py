@@ -1,3 +1,5 @@
+import asyncio
+
 import discord
 
 from utils.constants import RAID_PRESETS
@@ -28,7 +30,8 @@ class RaidPresetButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         try:
-            channel_raid = self.raid_service.save_channel_raid_by_preset(
+            channel_raid = await asyncio.to_thread(
+                self.raid_service.save_channel_raid_by_preset,
                 guild_id=self.guild_id,
                 channel_id=self.channel_id,
                 raid_name=self.preset["name"],
@@ -112,7 +115,10 @@ class RaidDeleteConfirmView(discord.ui.View):
     @discord.ui.button(label="같이 삭제", style=discord.ButtonStyle.danger)
     async def force_delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
-            result = self.raid_service.force_delete_channel_raid_with_applications(self.channel_id)
+            result = await asyncio.to_thread(
+                self.raid_service.force_delete_channel_raid_with_applications,
+                self.channel_id,
+            )
 
             if not result["deleted_raid"]:
                 await interaction.response.edit_message(
@@ -178,7 +184,10 @@ class RaidMainView(discord.ui.View):
     @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
-            ok = self.raid_service.delete_channel_raid(self.channel_id)
+            ok = await asyncio.to_thread(
+                self.raid_service.delete_channel_raid,
+                self.channel_id,
+            )
 
             if ok:
                 await interaction.response.edit_message(

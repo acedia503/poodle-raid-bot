@@ -1,16 +1,23 @@
 from contextlib import contextmanager
 
 import psycopg2
+from psycopg2 import pool as pg_pool
 from psycopg2.extras import RealDictCursor
 
 
 class Database:
-    def __init__(self, database_url: str):
+    def __init__(self, database_url: str, minconn: int = 1, maxconn: int = 10):
         self.database_url = database_url
+        self._pool = pg_pool.ThreadedConnectionPool(
+            minconn,
+            maxconn,
+            dsn=database_url,
+            cursor_factory=RealDictCursor,
+        )
 
     @contextmanager
     def get_connection(self):
-        conn = psycopg2.connect(self.database_url, cursor_factory=RealDictCursor)
+        conn = self._pool.getconn()
         try:
             yield conn
             conn.commit()
@@ -18,7 +25,10 @@ class Database:
             conn.rollback()
             raise
         finally:
-            conn.close()
+            self._pool.putconn(conn)
+
+    def close(self) -> None:
+        self._pool.closeall()
 
     def initialize(self) -> None:
         with self.get_connection() as conn:

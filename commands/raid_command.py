@@ -1,3 +1,5 @@
+import asyncio
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -35,7 +37,10 @@ class RaidCommand(commands.Cog):
             )
             return
 
-        channel_raid = self.raid_service.get_channel_raid(interaction.channel.id)
+        channel_raid = await asyncio.to_thread(
+            self.raid_service.get_channel_raid,
+            interaction.channel.id,
+        )
 
         if channel_raid is None:
             view = RaidInitView(
