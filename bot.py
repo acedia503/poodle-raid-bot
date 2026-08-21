@@ -42,7 +42,11 @@ def create_bot() -> commands.Bot:
         raise ValueError("DATABASE_URL이 설정되지 않았습니다.")
 
     # DB
-    database = Database(config.database_url)
+    database = Database(
+        config.database_url,
+        minconn=config.db_pool_min_size,
+        maxconn=config.db_pool_max_size,
+    )
     database.initialize()
 
     # Repositories
@@ -164,6 +168,14 @@ def create_bot() -> commands.Bot:
     @bot.event
     async def on_ready():
         print(f"Logged in as {bot.user} (id={bot.user.id})")
+
+    original_close = bot.close
+
+    async def close():
+        await original_close()
+        database.close()
+
+    bot.close = close
 
     return bot
 

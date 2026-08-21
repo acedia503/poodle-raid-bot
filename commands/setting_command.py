@@ -1,3 +1,5 @@
+import asyncio
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -35,7 +37,10 @@ class SettingCommand(commands.Cog):
             )
             return
 
-        setting = self.setting_service.get_guild_setting(interaction.guild.id)
+        setting = await asyncio.to_thread(
+            self.setting_service.get_guild_setting,
+            interaction.guild.id,
+        )
 
         if setting is None:
             view = SettingInitRaceView(

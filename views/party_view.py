@@ -1,5 +1,7 @@
 # views/party_view.py
 
+import asyncio
+
 import discord
 from discord.ui import View, Select, Button
 
@@ -362,11 +364,14 @@ class PartyBuildHomeView(View):
 
     @discord.ui.button(label="자동", style=discord.ButtonStyle.success, row=0)
     async def auto_build(self, interaction: discord.Interaction, button: Button):
-        if self.party_manage_service.has_active_build(
+        has_active = await asyncio.to_thread(
+            self.party_manage_service.has_active_build,
             self.rule.guild_id,
             self.rule.channel_id,
-        ):
-            result = self.party_manage_service.get_active_build_result(
+        )
+        if has_active:
+            result = await asyncio.to_thread(
+                self.party_manage_service.get_active_build_result,
                 self.rule.guild_id,
                 self.rule.channel_id,
             )
@@ -379,7 +384,8 @@ class PartyBuildHomeView(View):
             await interaction.response.edit_message(embed=embed, view=self)
             return
 
-        latest_rule = self.party_rule_service.get_or_create_rule(
+        latest_rule = await asyncio.to_thread(
+            self.party_rule_service.get_or_create_rule,
             guild_id=self.rule.guild_id,
             channel_id=self.rule.channel_id,
             raid_name=self.rule.raid_name,
@@ -405,11 +411,14 @@ class PartyBuildHomeView(View):
 
     @discord.ui.button(label="수동", style=discord.ButtonStyle.primary, row=0)
     async def manual_build(self, interaction: discord.Interaction, button: Button):
-        if self.party_manage_service.has_active_build(
+        has_active = await asyncio.to_thread(
+            self.party_manage_service.has_active_build,
             self.rule.guild_id,
             self.rule.channel_id,
-        ):
-            result = self.party_manage_service.get_active_build_result(
+        )
+        if has_active:
+            result = await asyncio.to_thread(
+                self.party_manage_service.get_active_build_result,
                 self.rule.guild_id,
                 self.rule.channel_id,
             )
@@ -435,7 +444,8 @@ class PartyBuildHomeView(View):
                 interaction.user.id,
             )
 
-            result = self.party_manage_service.get_active_build_result(
+            result = await asyncio.to_thread(
+                self.party_manage_service.get_active_build_result,
                 self.rule.guild_id,
                 self.rule.channel_id,
             )
@@ -469,7 +479,8 @@ class PartyBuildHomeView(View):
 
     @discord.ui.button(label="수정", style=discord.ButtonStyle.secondary, row=1)
     async def modify(self, interaction: discord.Interaction, button: Button):
-        result = self.party_manage_service.get_active_build_result(
+        result = await asyncio.to_thread(
+            self.party_manage_service.get_active_build_result,
             self.rule.guild_id,
             self.rule.channel_id,
         )
@@ -499,7 +510,8 @@ class PartyBuildHomeView(View):
 
     @discord.ui.button(label="공유", style=discord.ButtonStyle.primary, row=1)
     async def share(self, interaction: discord.Interaction, button: Button):
-        result = self.party_manage_service.get_active_build_result(
+        result = await asyncio.to_thread(
+            self.party_manage_service.get_active_build_result,
             self.rule.guild_id,
             self.rule.channel_id,
         )
@@ -573,7 +585,8 @@ class PartyModifyHomeView(View):
 
     @discord.ui.button(label="공대 선택", style=discord.ButtonStyle.primary, row=0)
     async def select_group(self, interaction: discord.Interaction, button: Button):
-        result = self.party_manage_service.get_active_build_result(
+        result = await asyncio.to_thread(
+            self.party_manage_service.get_active_build_result,
             self.rule.guild_id,
             self.rule.channel_id,
         )
@@ -605,13 +618,15 @@ class PartyModifyHomeView(View):
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            result,
             self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
     @discord.ui.button(label="상비군 선택", style=discord.ButtonStyle.success, row=0)
     async def select_reserve(self, interaction: discord.Interaction, button: Button):
-        result = self.party_manage_service.get_active_build_result(
+        result = await asyncio.to_thread(
+            self.party_manage_service.get_active_build_result,
             self.rule.guild_id,
             self.rule.channel_id,
         )
@@ -643,13 +658,15 @@ class PartyModifyHomeView(View):
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            result,
             self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
     @discord.ui.button(label="뒤로가기", style=discord.ButtonStyle.secondary, row=1)
     async def back(self, interaction: discord.Interaction, button: Button):
-        result = self.party_manage_service.get_active_build_result(
+        result = await asyncio.to_thread(
+            self.party_manage_service.get_active_build_result,
             self.rule.guild_id,
             self.rule.channel_id,
         )
@@ -685,6 +702,7 @@ class PartyModifyGroupSelectView(View):
         party_builder_service,
         party_manage_service,
         party_modify_service,
+        result,
         show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
@@ -695,11 +713,6 @@ class PartyModifyGroupSelectView(View):
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
         self.show_race_server = show_race_server
-
-        result = self.party_manage_service.get_active_build_result(
-            self.rule.guild_id,
-            self.rule.channel_id,
-        )
 
         groups = []
         if result:
@@ -749,6 +762,12 @@ class GroupSelect(Select):
             description="상비군으로 이동할 공대원을 선택하세요.",
         )
 
+        result = await asyncio.to_thread(
+            view.party_manage_service.get_active_build_result,
+            view.rule.guild_id,
+            view.rule.channel_id,
+        )
+
         next_view = PartyModifyGroupMemberView(
             view.rule,
             view.party_rule_service,
@@ -756,6 +775,7 @@ class GroupSelect(Select):
             view.party_manage_service,
             view.party_modify_service,
             group_no,
+            result,
             view.show_race_server,
         )
 
@@ -775,6 +795,7 @@ class PartyModifyGroupMemberView(View):
         party_manage_service,
         party_modify_service,
         group_no: int,
+        result,
         show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
@@ -786,11 +807,6 @@ class PartyModifyGroupMemberView(View):
         self.party_modify_service = party_modify_service
         self.group_no = group_no
         self.show_race_server = show_race_server
-
-        result = self.party_manage_service.get_active_build_result(
-            self.rule.guild_id,
-            self.rule.channel_id,
-        )
 
         members = []
         if result:
@@ -807,12 +823,19 @@ class PartyModifyGroupMemberView(View):
             description="상비군으로 이동할 공대원을 고를 공대를 선택하세요.",
         )
 
+        result = await asyncio.to_thread(
+            self.party_manage_service.get_active_build_result,
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
+
         view = PartyModifyGroupSelectView(
             self.rule,
             self.party_rule_service,
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            result,
             self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
@@ -865,14 +888,16 @@ class GroupMemberSelect(Select):
         slot_id = int(self.values[0])
 
         try:
-            result_msg = view.party_modify_service.remove_party_member_to_waiting(
+            result_msg = await asyncio.to_thread(
+                view.party_modify_service.remove_party_member_to_waiting,
                 guild_id=view.rule.guild_id,
                 channel_id=view.rule.channel_id,
                 raid_name=view.rule.raid_name,
                 slot_id=slot_id,
             )
 
-            result = view.party_manage_service.get_active_build_result(
+            result = await asyncio.to_thread(
+                view.party_manage_service.get_active_build_result,
                 view.rule.guild_id,
                 view.rule.channel_id,
             )
@@ -913,6 +938,7 @@ class PartyModifyReserveView(View):
         party_builder_service,
         party_manage_service,
         party_modify_service,
+        result,
         show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
@@ -923,11 +949,6 @@ class PartyModifyReserveView(View):
         self.party_manage_service = party_manage_service
         self.party_modify_service = party_modify_service
         self.show_race_server = show_race_server
-
-        result = self.party_manage_service.get_active_build_result(
-            self.rule.guild_id,
-            self.rule.channel_id,
-        )
 
         waiting_members = result.waiting_members if result else []
         self.add_item(ReserveMemberSelect(waiting_members))
@@ -995,7 +1016,8 @@ class ReserveMemberSelect(Select):
 
         waiting_id = int(self.values[0])
 
-        result = view.party_manage_service.get_active_build_result(
+        result = await asyncio.to_thread(
+            view.party_manage_service.get_active_build_result,
             view.rule.guild_id,
             view.rule.channel_id,
         )
@@ -1019,6 +1041,7 @@ class ReserveMemberSelect(Select):
             view.party_modify_service,
             waiting_id,
             selected_name,
+            result,
             view.show_race_server,
         )
 
@@ -1035,6 +1058,7 @@ class PartyMoveTargetSelectView(View):
         party_modify_service,
         waiting_id: int,
         selected_member_name: str,
+        result,
         show_race_server: bool = True,
     ):
         super().__init__(timeout=300)
@@ -1048,11 +1072,6 @@ class PartyMoveTargetSelectView(View):
         self.selected_member_name = selected_member_name
         self.show_race_server = show_race_server
 
-        result = self.party_manage_service.get_active_build_result(
-            self.rule.guild_id,
-            self.rule.channel_id,
-        )
-
         parties = result.parties if result else []
         self.add_item(MoveTargetSelect(parties))
 
@@ -1062,12 +1081,18 @@ class PartyMoveTargetSelectView(View):
             title="상비군 선택",
             description="공대로 이동할 상비군 인원을 선택하세요.",
         )
+        result = await asyncio.to_thread(
+            self.party_manage_service.get_active_build_result,
+            self.rule.guild_id,
+            self.rule.channel_id,
+        )
         view = PartyModifyReserveView(
             self.rule,
             self.party_rule_service,
             self.party_builder_service,
             self.party_manage_service,
             self.party_modify_service,
+            result,
             self.show_race_server,
         )
         await interaction.response.edit_message(embed=embed, view=view)
@@ -1122,7 +1147,8 @@ class MoveTargetSelect(Select):
         party_no = int(party_no)
 
         try:
-            result_msg = view.party_modify_service.add_waiting_member_to_party(
+            result_msg = await asyncio.to_thread(
+                view.party_modify_service.add_waiting_member_to_party,
                 guild_id=view.rule.guild_id,
                 channel_id=view.rule.channel_id,
                 raid_name=view.rule.raid_name,
@@ -1131,7 +1157,8 @@ class MoveTargetSelect(Select):
                 party_no=party_no,
             )
 
-            result = view.party_manage_service.get_active_build_result(
+            result = await asyncio.to_thread(
+                view.party_manage_service.get_active_build_result,
                 view.rule.guild_id,
                 view.rule.channel_id,
             )
@@ -1293,7 +1320,8 @@ class PartyAutoRuleEditView(View):
         party2_priority = self._normalize_jobs(self.party2_priority_jobs)
         party2_preferred = self._normalize_jobs(self.party2_preferred_jobs)
 
-        self.party_rule_service.update_rule(
+        await asyncio.to_thread(
+            self.party_rule_service.update_rule,
             guild_id=self.rule.guild_id,
             channel_id=self.rule.channel_id,
             raid_name=self.rule.raid_name,
@@ -1316,7 +1344,8 @@ class PartyAutoRuleEditView(View):
                 created_by=interaction.user.id,
             )
 
-            result = self.party_manage_service.get_active_build_result(
+            result = await asyncio.to_thread(
+                self.party_manage_service.get_active_build_result,
                 self.rule.guild_id,
                 self.rule.channel_id,
             )
@@ -1328,7 +1357,8 @@ class PartyAutoRuleEditView(View):
             )
 
         except Exception as e:
-            result = self.party_manage_service.get_active_build_result(
+            result = await asyncio.to_thread(
+                self.party_manage_service.get_active_build_result,
                 self.rule.guild_id,
                 self.rule.channel_id,
             )
@@ -1357,7 +1387,8 @@ class PartyAutoRuleEditView(View):
 
     @discord.ui.button(label="취소", style=discord.ButtonStyle.secondary, row=4)
     async def cancel_button(self, interaction: discord.Interaction, button: Button):
-        result = self.party_manage_service.get_active_build_result(
+        result = await asyncio.to_thread(
+            self.party_manage_service.get_active_build_result,
             self.rule.guild_id,
             self.rule.channel_id,
         )
@@ -1402,7 +1433,8 @@ class PartyShareView(View):
 
     @discord.ui.button(label="뒤로가기", style=discord.ButtonStyle.secondary, row=0)
     async def back(self, interaction: discord.Interaction, button: Button):
-        result = self.party_manage_service.get_active_build_result(
+        result = await asyncio.to_thread(
+            self.party_manage_service.get_active_build_result,
             self.rule.guild_id,
             self.rule.channel_id,
         )

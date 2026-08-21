@@ -77,8 +77,11 @@ class ApplicationCommand(commands.Cog):
                 ephemeral=True,
             )
 
-    def _get_show_identity(self, guild_id: int) -> bool:
-        setting = self.setting_service.get_guild_setting(guild_id)
+    async def _get_show_identity(self, guild_id: int) -> bool:
+        setting = await asyncio.to_thread(
+            self.setting_service.get_guild_setting,
+            guild_id,
+        )
         return not bool(setting and setting.default_race and setting.default_server)
 
     def _format_application_line(
@@ -229,8 +232,11 @@ class ApplicationCommand(commands.Cog):
                 )
             return
 
-        channel_raid = self.service.raid_service.get_channel_raid(interaction.channel.id)
-        show_identity = self._get_show_identity(interaction.guild.id)
+        channel_raid = await asyncio.to_thread(
+            self.service.raid_service.get_channel_raid,
+            interaction.channel.id,
+        )
+        show_identity = await self._get_show_identity(interaction.guild.id)
 
         if channel_raid is not None:
             applications = await asyncio.to_thread(
@@ -283,7 +289,10 @@ class ApplicationCommand(commands.Cog):
                 modal_inter: discord.Interaction,
                 character_name: str,
             ):
-                setting = self.setting_service.get_guild_setting(modal_inter.guild.id)
+                setting = await asyncio.to_thread(
+                    self.setting_service.get_guild_setting,
+                    modal_inter.guild.id,
+                )
 
                 if not setting:
                     async def race_callback(race_inter, race):

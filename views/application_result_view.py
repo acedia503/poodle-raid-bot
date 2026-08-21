@@ -1,3 +1,5 @@
+import asyncio
+
 import discord
 
 
@@ -18,7 +20,8 @@ class ApplicationResultView(discord.ui.View):
             return
 
         try:
-            ok = self.application_service.cancel_application(
+            ok = await asyncio.to_thread(
+                self.application_service.cancel_application,
                 application_id=self.application_id,
                 requester_user_id=interaction.user.id,
                 is_admin=False,

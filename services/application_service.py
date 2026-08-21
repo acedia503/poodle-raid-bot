@@ -207,25 +207,6 @@ class ApplicationService:
             "application": created,
         }
 
-        if not existing_apps:
-            return {
-                "action": "not_allowed",
-                "message": "현재 채널에는 레이드가 설정되어 있지 않아 신청할 수 없습니다.",
-            }
-
-        return {
-            "action": "show_all",
-            "info": {
-                "character_name": character.character_name,
-                "race": character.race,
-                "server": character.server,
-                "job": character.job,
-                "item_level": character.item_level,
-                "combat_power": character.combat_power,
-            },
-            "applications": existing_apps,
-        }
-
     def cancel_application(
         self,
         application_id: int,
@@ -346,12 +327,8 @@ class ApplicationService:
         }
 
     def admin_delete_applications(self, application_ids: list[int]) -> int:
-        applications = [
-            app
-            for app in (self.repository.get_by_id(app_id) for app_id in application_ids)
-            if app is not None
-        ]
-    
+        applications = self.repository.get_by_ids(application_ids)
+
         deleted_count = self.repository.delete_by_ids(application_ids)
     
         character_ids = {

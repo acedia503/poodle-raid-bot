@@ -213,52 +213,6 @@ class RaidApplicationRepository:
             )
             return cur.rowcount
 
-    def bulk_update_character_snapshots(
-        self,
-        updates: list[dict],
-    ) -> int:
-        """
-        updates 예시:
-        [
-            {
-                "application_id": 1,
-                "job": "수호성",
-                "item_level": 3394,
-                "combat_power": 247499,
-            },
-            ...
-        ]
-        """
-        if not updates:
-            return 0
-
-        updated_count = 0
-
-        with self.database.get_connection() as conn:
-            cur = conn.cursor()
-
-            for item in updates:
-                cur.execute(
-                    """
-                    UPDATE raid_applications
-                    SET
-                        job = %s,
-                        item_level = %s,
-                        combat_power = %s,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s
-                    """,
-                    (
-                        item["job"],
-                        item["item_level"],
-                        item["combat_power"],
-                        item["application_id"],
-                    ),
-                )
-                updated_count += cur.rowcount
-
-        return updated_count
-
     def delete_by_id(self, application_id: int) -> bool:
         with self.database.get_connection() as conn:
             cur = conn.cursor()
@@ -367,6 +321,23 @@ class RaidApplicationRepository:
                 ORDER BY created_at ASC
                 """,
                 (guild_id, raid_name, character_name),
+            )
+            rows = cur.fetchall()
+            return [self._to_domain(row) for row in rows]
+
+    def get_by_ids(self, application_ids: list[int]) -> list[RaidApplication]:
+        if not application_ids:
+            return []
+
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT *
+                FROM raid_applications
+                WHERE id = ANY(%s)
+                """,
+                (application_ids,),
             )
             rows = cur.fetchall()
             return [self._to_domain(row) for row in rows]

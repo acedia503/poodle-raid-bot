@@ -1,5 +1,6 @@
 # services/party_manage_service.py
 
+import asyncio
 from dataclasses import dataclass, field
 
 
@@ -191,11 +192,12 @@ class PartyManageService:
         guild_id: int,
         channel_id: int,
     ) -> bool:
-        raid = self.raid_service.get_channel_raid(channel_id)
+        raid = await asyncio.to_thread(self.raid_service.get_channel_raid, channel_id)
         if raid is None:
             return False
 
-        session = self.party_build_session_repository.get_active_session(
+        session = await asyncio.to_thread(
+            self.party_build_session_repository.get_active_session,
             guild_id=guild_id,
             channel_id=channel_id,
             raid_name=raid.raid_name,
@@ -203,7 +205,8 @@ class PartyManageService:
         if session is None:
             return False
 
-        self.party_build_session_repository.deactivate_existing_sessions(
+        await asyncio.to_thread(
+            self.party_build_session_repository.deactivate_existing_sessions,
             guild_id=guild_id,
             channel_id=channel_id,
             raid_name=raid.raid_name,

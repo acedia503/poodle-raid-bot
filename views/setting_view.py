@@ -1,3 +1,5 @@
+import asyncio
+
 import discord
 
 from utils.constants import RACE_SERVERS
@@ -62,7 +64,8 @@ class SettingServerSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         selected_server = self.values[0]
 
-        setting = self.setting_service.save_guild_setting(
+        setting = await asyncio.to_thread(
+            self.setting_service.save_guild_setting,
             guild_id=self.guild_id,
             default_race=self.selected_race,
             default_server=selected_server,
@@ -126,7 +129,10 @@ class SettingMainView(discord.ui.View):
 
     @discord.ui.button(label="삭제", style=discord.ButtonStyle.danger)
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        ok = self.setting_service.delete_guild_setting(self.guild_id)
+        ok = await asyncio.to_thread(
+            self.setting_service.delete_guild_setting,
+            self.guild_id,
+        )
         msg = "기본 설정이 삭제되었습니다." if ok else "삭제할 설정이 없습니다."
 
         await interaction.response.edit_message(

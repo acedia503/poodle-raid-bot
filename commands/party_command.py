@@ -1,5 +1,7 @@
 # commands/party_command.py
 
+import asyncio
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -30,13 +32,16 @@ class PartyCommand(commands.Cog):
         self.party_modify_service = party_modify_service
         self.setting_service = setting_service
 
-    def _get_show_race_server(self, guild_id: int) -> bool:
+    async def _get_show_race_server(self, guild_id: int) -> bool:
         """
         기본 종족/서버 설정이 있으면 False
         없으면 True
         """
         try:
-            setting = self.setting_service.get_guild_setting(guild_id)
+            setting = await asyncio.to_thread(
+                self.setting_service.get_guild_setting,
+                guild_id,
+            )
         except Exception:
             return True
 
@@ -65,7 +70,7 @@ class PartyCommand(commands.Cog):
             )
             return
 
-        raid = self.raid_service.get_channel_raid(channel.id)
+        raid = await asyncio.to_thread(self.raid_service.get_channel_raid, channel.id)
         if raid is None:
             await interaction.response.send_message(
                 "설정된 레이드가 없습니다.",
@@ -73,18 +78,20 @@ class PartyCommand(commands.Cog):
             )
             return
 
-        rule = self.party_rule_service.get_or_create_rule(
+        rule = await asyncio.to_thread(
+            self.party_rule_service.get_or_create_rule,
             guild_id=guild.id,
             channel_id=channel.id,
             raid_name=raid.raid_name,
         )
 
-        result = self.party_manage_service.get_active_build_result(
+        result = await asyncio.to_thread(
+            self.party_manage_service.get_active_build_result,
             guild_id=guild.id,
             channel_id=channel.id,
         )
 
-        show_race_server = self._get_show_race_server(guild.id)
+        show_race_server = await self._get_show_race_server(guild.id)
 
         if result:
             embed = build_first_status_embed(
