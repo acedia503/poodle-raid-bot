@@ -86,10 +86,6 @@ RAID_PRESETS = [
         "min_item_level": 4500,
     },
     {
-        "name": "비비탄_쉬움",
-        "min_item_level": 5800,
-    },
-    {
         "name": "비비탄_보통",
         "min_item_level": 6000,
     },
