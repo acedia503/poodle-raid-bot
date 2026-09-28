@@ -8,6 +8,7 @@ from commands.setting_command import SettingCommand
 from commands.application_admin_command import ApplicationAdminCommand
 from commands.party_command import PartyCommand
 from commands.lol_command import LolCommand
+from commands.refresh_command import RefreshCommand
 
 from config import load_config
 from database import Database
@@ -157,6 +158,12 @@ def create_bot() -> commands.Bot:
             LolCommand(
                 bot=bot,
                 service=lol_application_service,
+            )
+        )
+        await bot.add_cog(
+            RefreshCommand(
+                bot=bot,
+                application_service=application_service,
             )
         )
 
