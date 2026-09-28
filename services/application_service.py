@@ -1,3 +1,5 @@
+import asyncio
+
 from repositories.raid_application_repository import RaidApplicationRepository
 from repositories.character_repository import CharacterRepository
 from services.character_info_service import CharacterInfoService
@@ -420,3 +422,86 @@ class ApplicationService:
             combat_power=application.combat_power,
         )
         return True
+
+    async def refresh_character_and_applications(
+        self,
+        application: RaidApplication,
+    ) -> dict:
+        """
+        아툴에서 캐릭터 최신 정보를 조회해 characters 테이블과
+        해당 캐릭터의 모든 레이드 신청 내역(다른 레이드 포함)에 반영한다.
+        """
+        info = await asyncio.to_thread(
+            self.character_info_service.get_character_info,
+            application.character_name,
+            application.race,
+            application.server,
+        )
+
+        await asyncio.to_thread(
+            self.character_repository.upsert,
+            guild_id=application.guild_id,
+            user_id=application.user_id,
+            user_name=application.user_name,
+            character_name=application.character_name,
+            race=application.race,
+            server=application.server,
+            job=info["job"],
+            item_level=info["item_level"],
+            combat_power=info["combat_power"],
+        )
+
+        existing_apps = await asyncio.to_thread(
+            self.repository.get_user_applications_by_character_identity,
+            guild_id=application.guild_id,
+            user_id=application.user_id,
+            character_name=application.character_name,
+            race=application.race,
+            server=application.server,
+        )
+
+        await asyncio.to_thread(
+            self.repository.bulk_update_character_snapshot,
+            applications=existing_apps,
+            job=info["job"],
+            item_level=info["item_level"],
+            combat_power=info["combat_power"],
+        )
+
+        return info
+
+    def get_distinct_character_applications_for_user(
+        self,
+        guild_id: int,
+        user_id: int,
+    ) -> list[RaidApplication]:
+        """
+        해당 유저의 레이드 신청 내역 중 서로 다른 캐릭터(캐릭터명/종족/서버)별로
+        대표 신청 1건씩 반환한다.
+        """
+        apps = self.repository.get_by_guild_and_user_id(guild_id, user_id)
+        return self._dedupe_by_character_identity(apps)
+
+    def get_distinct_character_applications_for_guild(
+        self,
+        guild_id: int,
+    ) -> list[RaidApplication]:
+        """
+        길드 전체 레이드 신청 내역 중 서로 다른 캐릭터(캐릭터명/종족/서버)별로
+        대표 신청 1건씩 반환한다.
+        """
+        apps = self.repository.get_by_guild_id(guild_id)
+        return self._dedupe_by_character_identity(apps)
+
+    def _dedupe_by_character_identity(
+        self,
+        applications: list[RaidApplication],
+    ) -> list[RaidApplication]:
+        seen = set()
+        result = []
+        for app in applications:
+            key = (app.user_id, app.character_name, app.race, app.server)
+            if key not in seen:
+                seen.add(key)
+                result.append(app)
+        return result

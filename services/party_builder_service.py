@@ -2,15 +2,11 @@
 
 import asyncio
 from dataclasses import dataclass, field
-from utils.constants import DEFAULT_GROUP_SIZE, DEFAULT_SLOTS_PER_PARTY
+from utils.constants import DEFAULT_GROUP_SIZE, DEFAULT_SLOTS_PER_PARTY, REFRESH_CONCURRENCY_LIMIT
 
 from domain.party_build_session import PartyBuildSession
 from domain.party_waiting_member import PartyWaitingMember
 from domain.party_slot import PartySlot
-
-# 신청자 정보 갱신 시 동시에 실행할 최대 작업 수.
-# 무제한으로 풀면 DB 커넥션 풀과 외부 캐릭터 조회 API에 순간적으로 과도한 부하가 걸릴 수 있다.
-REFRESH_CONCURRENCY_LIMIT = 8
 
 
 @dataclass
@@ -58,24 +54,11 @@ class PartyBuilderService:
         async def fetch(app):
             async with semaphore:
                 try:
-                    info = await asyncio.to_thread(
-                        self.character_info_service.get_character_info,
-                        app.character_name,
-                        app.race,
-                        app.server,
-                    )
+                    info = await self.application_service.refresh_character_and_applications(app)
 
                     app.job = info["job"]
                     app.item_level = info["item_level"]
                     app.combat_power = info["combat_power"]
-
-                    await asyncio.to_thread(
-                        self.application_service.repository.update_character_snapshot,
-                        application_id=app.id,
-                        job=app.job,
-                        item_level=app.item_level,
-                        combat_power=app.combat_power,
-                    )
 
                     print(
                         f"[API 조회 성공] {app.character_name} / "

@@ -4,6 +4,10 @@ DEFAULT_SLOTS_PER_PARTY = 5
 
 DISCORD_MESSAGE_LIMIT = 2000
 
+# 캐릭터 정보(아툴) 갱신 시 동시에 실행할 최대 작업 수.
+# 무제한으로 풀면 DB 커넥션 풀과 외부 캐릭터 조회 API에 순간적으로 과도한 부하가 걸릴 수 있다.
+REFRESH_CONCURRENCY_LIMIT = 8
+
 VALID_RACES = {"천족", "마족"}
 
 RACE_TO_ID = {

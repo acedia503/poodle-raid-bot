@@ -281,6 +281,21 @@ class RaidApplicationRepository:
             rows = cur.fetchall()
             return [self._to_domain(row) for row in rows]
 
+    def get_by_guild_id(self, guild_id: int) -> list[RaidApplication]:
+        with self.database.get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT *
+                FROM raid_applications
+                WHERE guild_id = %s
+                ORDER BY created_at ASC
+                """,
+                (guild_id,),
+            )
+            rows = cur.fetchall()
+            return [self._to_domain(row) for row in rows]
+
     def get_by_guild_raid_and_user_id(
         self,
         guild_id: int,
