@@ -33,25 +33,23 @@ class RefreshCommand(commands.Cog):
         await asyncio.gather(*(worker(application) for application in applications))
         return success, failed
 
-    def _build_result_embed(self, title: str, success: list, failed: list) -> discord.Embed:
+    def _build_self_result_embed(self, success: list, failed: list) -> discord.Embed:
         if not success and not failed:
             return discord.Embed(
-                title=title,
+                title="내 캐릭터 정보 갱신",
                 description="갱신할 신청 내역이 없습니다.",
                 color=discord.Color.orange(),
             )
 
-        lines = []
-        for application, info in success:
-            lines.append(
-                f"✅ {application.character_name} - {info['job']} / "
-                f"{info['item_level']} / {info['combat_power']:,}"
-            )
+        lines = [
+            f"{idx}. {application.character_name} / {info['item_level']} / {info['combat_power']:,}"
+            for idx, (application, info) in enumerate(success, start=1)
+        ]
         for application, exc in failed:
             lines.append(f"❌ {application.character_name} - 갱신 실패: {exc}")
 
         return discord.Embed(
-            title=title,
+            title="내 캐릭터 정보 갱신",
             description="\n".join(lines),
             color=discord.Color.green() if not failed else discord.Color.orange(),
         )
@@ -90,16 +88,25 @@ class RefreshCommand(commands.Cog):
                 self.application_service.get_distinct_character_applications_for_guild,
                 interaction.guild.id,
             )
-            title = "전체 캐릭터 정보 갱신"
-        else:
-            identities = await asyncio.to_thread(
-                self.application_service.get_distinct_character_applications_for_user,
-                interaction.guild.id,
-                interaction.user.id,
+
+            success, failed = await self._refresh_many(identities)
+
+            for application, exc in failed:
+                print(f"[갱신][전체] {application.character_name} 갱신 실패: {exc}")
+
+            await interaction.edit_original_response(
+                content="모든 캐릭터 정보가 갱신되었습니다. 신청 현황을 통해 확인해주세요.",
+                embed=None,
             )
-            title = "내 캐릭터 정보 갱신"
+            return
+
+        identities = await asyncio.to_thread(
+            self.application_service.get_distinct_character_applications_for_user,
+            interaction.guild.id,
+            interaction.user.id,
+        )
 
         success, failed = await self._refresh_many(identities)
 
-        embed = self._build_result_embed(title, success, failed)
+        embed = self._build_self_result_embed(success, failed)
         await interaction.edit_original_response(embed=embed)
